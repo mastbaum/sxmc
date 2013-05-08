@@ -1,0 +1,43 @@
+{
+  "fit": {
+    "mode": 0,  // 0=energy, 1=energy+radius
+    "experiments": 100,  // number in ensemble
+    "steps": 50000,  // mcmc steps
+    "burnin_fraction": 0.1,  // fraction of steps to toss
+    "signal_name": "0vbb",  // name of signal that is the signal
+    "energy_range": [1.5, 5.0],  // fit energy range (MeV)
+    "radius_range": [0.0, 3500.0],  // fit radius range (mm)
+    "rebin_e": 4,  // rebin factor for energy
+    "rebin_r": 10,  // rebin factor for radius
+    "output_file": "fit_spectrum",  // base name for output files
+    "signals": [
+      "0vbb", "2vbb", "b8"  // list of signals to include
+    ]
+  },
+
+  "experiment": {
+    "live_time": 1.0,  // live time in years
+    "confidence": 0.9  // confidence level for limits
+  },
+
+  "signals": {
+    "0vbb": {  // identifier name
+      "title": "0#nu#beta#beta",  // title for plots (ROOT LaTeX)
+      "filename": "/PATH/TO/zeronu_pdf.root",  // path to histogram file
+      "rate": 0.0  // event rate (per detector-year in domain of 2d pdfs)
+    },
+    "2vbb": {
+      "title": "2#nu#beta#beta",
+      "filename": "/PATH/TO/twonu_pdf.root",
+      "rate": 123456.0,
+      "constraint": 0.12  // NEMO-3
+    },
+    "b8": {
+      "title": "^{8}B #nu ES",
+      "filename": "/PATH/TO/b8_pdf.root",
+      "rate": 1234,
+      "constraint": 0.03  // SNO (flux)
+    }
+  }
+}
+
