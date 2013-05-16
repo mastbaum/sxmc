@@ -22,8 +22,9 @@ To build, run `make` and specify a `CUDA_ROOT` environment variable. E.g.,
 
 Documentation
 -------------
-The code is fully documented for Doxygen. To build HTML and LaTeX
-documentation, run
+The code is fully documented for Doxygen. To view HTML documentation online,
+see [here](http://mastbaum.github.io/sxmc/doc/html). To build HTML and LaTeX
+documentation yourself, run
 
     $ make doc
 
