@@ -1,11 +1,11 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
-// container for a range of values
+/** A container for a range of values */
 template <class T>
 struct Range {
-  T min;
-  T max;
+  T min;  //!< minimum value
+  T max;  //!< maximum value
 };
 
 #endif  // __UTILS_H__

@@ -30,8 +30,13 @@ endif
 
 all: $(CUDA_OBJECTS) $(OBJECTS) $(EXE)
 
+.PHONY: doc
+
 clean:
 	-$(RM) build/*.o bin/*
+
+doc:
+	cd src && doxygen Doxyfile
 
 $(OBJ_DIR)/%.o: src/%.cpp
 	test -d build || mkdir build

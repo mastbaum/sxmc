@@ -12,12 +12,22 @@ Building
 * JsonCpp
 * ROOT
 * RAT (to make PDFs from MC files)
+* Doxygen (if building documentation)
 
 It also requires a CUDA-enabled Nvidia GPU.
 
 To build, run `make` and specify a `CUDA_ROOT` environment variable. E.g.,
 
-    $ make CUDA_ROOT=/opt/cuda-5.0
+    $ CUDA_ROOT=/opt/cuda-5.0 make
+
+Documentation
+-------------
+The code is fully documented for Doxygen. To build HTML and LaTeX
+documentation, run
+
+    $ make doc
+
+The output is placed into the `doc` directory.
 
 Usage
 -----
@@ -27,7 +37,8 @@ Usage
 2. Configure fit: Set up the fit parameters and signal PDFs using a JSON-format
    configuration file. An example is provided in `config/`.
 
-3. To calculate signal sensitivity, run: `$ ./bin/sensitivity config/your_file.json`
+3. To calculate signal sensitivity, run:
+   `$ ./bin/sensitivity config/your_file.json`
 
 Configuration Files
 -------------------
