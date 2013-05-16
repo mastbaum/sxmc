@@ -3,6 +3,8 @@
 #include <cmath>
 #include <assert.h>
 #include <cuda.h>
+#include <hemi/hemi.h>
+#include <hemi/array.h>
 #include <TNtuple.h>
 #include <TH1D.h>
 #include <TH2F.h>
@@ -21,16 +23,18 @@
 } while (0)
 
 
-__global__ void ll(const float* lut, const float* pars, const size_t ne,
-                   const size_t ns, double* sums) {
-  int idx = threadIdx.x + blockIdx.x * blockDim.x;
-  sums[idx] = 0;
-  for (int i=idx; i<(int)ne; i+=gridDim.x*blockDim.x) {
+HEMI_KERNEL(ll)(const float* lut, const float* pars, const size_t ne,
+                const size_t ns, double* sums) {
+  int offset = hemiGetElementOffset();
+  int stride = hemiGetElementStride();
+
+  sums[offset] = 0;
+  for (int i=offset; i<(int)ne; i+=stride) {
     double s = 0;
     for (size_t j=0; j<ns; j++) {
       s += pars[j] * lut[i*ns+j];
     }
-    sums[idx] += log(s);
+    sums[offset] += log(s);
   }
 }
 
@@ -145,10 +149,9 @@ double NLL::operator()(float* norms) {
                               this->nsignals * sizeof(float),
                               cudaMemcpyHostToDevice));
 
-  ll<<<this->nblocks, this->blocksize>>>(this->lut_device,
-                                         this->normalizations_device,
-                                         this->nevents, this->nsignals,
-                                         sums_device);
+  HEMI_KERNEL_LAUNCH(ll, this->nblocks, this->blocksize, 0, 0,
+                     this->lut_device, this->normalizations_device,
+                     this->nevents, this->nsignals, sums_device);
 
   CUDA_CHECK_ERROR(cudaThreadSynchronize());
 

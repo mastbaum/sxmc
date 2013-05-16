@@ -1,5 +1,5 @@
 CUDA_INCLUDE = -I$(CUDA_ROOT)/include
-CUDA_CFLAGS = -arch=sm_30 -O3 -use_fast_math -I$(ROOTSYS)/include
+CUDA_CFLAGS = -arch=sm_30 -O3 -use_fast_math -I$(ROOTSYS)/include -Icontrib/hemi
 CUDA_LFLAGS = -L$(CUDA_ROOT)/lib64 -lcudart -L$(ROOTSYS)/lib -lCore -lCint -lRIO -lMathCore -lm
 INCLUDE = -Isrc -I$(RATROOT)/include -I$(ROOTSYS)/include -I$(RATROOT)/src/stlplus
 CFLAGS = -DVERBOSE=true -O3 $(INCLUDE) 
