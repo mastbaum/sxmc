@@ -1,0 +1,70 @@
+\hypertarget{classFakeDataGenerator}{
+\section{FakeDataGenerator Class Reference}
+\label{classFakeDataGenerator}\index{FakeDataGenerator@{FakeDataGenerator}}
+}
+
+
+Generate fake data sets.  
+
+
+
+
+{\ttfamily \#include $<$generator.h$>$}
+
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classFakeDataGenerator_a0ae60cc103b8b536fbccdfaddf393cbc}{FakeDataGenerator} (std::vector$<$ \hyperlink{structSignal}{Signal} $>$ signals, \hyperlink{structRange}{Range}$<$ float $>$ \_\-e\_\-range, \hyperlink{structRange}{Range}$<$ float $>$ \_\-r\_\-range)
+\item 
+TNtuple $\ast$ \hyperlink{classFakeDataGenerator_ab1084f63fb6a96cf9fc4d4cf12a39384}{operator()} (float $\ast$norms, bool poisson=true)
+\end{DoxyCompactItemize}
+\subsection*{Protected Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\hypertarget{classFakeDataGenerator_a5b49313ba3ec9b9a7030187164f530b6}{
+std::vector$<$ TH1 $\ast$ $>$ \hyperlink{classFakeDataGenerator_a5b49313ba3ec9b9a7030187164f530b6}{pdfs}}
+\label{classFakeDataGenerator_a5b49313ba3ec9b9a7030187164f530b6}
+
+\begin{DoxyCompactList}\small\item\em The set of PDF histograms. \item\end{DoxyCompactList}\item 
+\hypertarget{classFakeDataGenerator_a2f71f284630d70c4219b2bc5d006be4a}{
+\hyperlink{structRange}{Range}$<$ float $>$ \hyperlink{classFakeDataGenerator_a2f71f284630d70c4219b2bc5d006be4a}{e\_\-range}}
+\label{classFakeDataGenerator_a2f71f284630d70c4219b2bc5d006be4a}
+
+\begin{DoxyCompactList}\small\item\em Energy range in which to generate events. \item\end{DoxyCompactList}\item 
+\hypertarget{classFakeDataGenerator_a161a9652d5be58423cd13c6985d56a2d}{
+\hyperlink{structRange}{Range}$<$ float $>$ \hyperlink{classFakeDataGenerator_a161a9652d5be58423cd13c6985d56a2d}{r\_\-range}}
+\label{classFakeDataGenerator_a161a9652d5be58423cd13c6985d56a2d}
+
+\begin{DoxyCompactList}\small\item\em Radius range in which to generate events. \item\end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Generate fake data sets. Make fake data set Ntuples by sampling PDFs according to given normalizations. 
+
+\subsection{Constructor \& Destructor Documentation}
+\hypertarget{classFakeDataGenerator_a0ae60cc103b8b536fbccdfaddf393cbc}{
+\index{FakeDataGenerator@{FakeDataGenerator}!FakeDataGenerator@{FakeDataGenerator}}
+\index{FakeDataGenerator@{FakeDataGenerator}!FakeDataGenerator@{FakeDataGenerator}}
+\subsubsection[{FakeDataGenerator}]{\setlength{\rightskip}{0pt plus 5cm}FakeDataGenerator::FakeDataGenerator (std::vector$<$ {\bf Signal} $>$ {\em signals}, \/  {\bf Range}$<$ float $>$ {\em \_\-e\_\-range}, \/  {\bf Range}$<$ float $>$ {\em \_\-r\_\-range})\hspace{0.3cm}{\ttfamily  \mbox{[}inline\mbox{]}}}}
+\label{classFakeDataGenerator_a0ae60cc103b8b536fbccdfaddf393cbc}
+Constructor
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em signals}]vector of signals whose PDFs to samples \item[{\em \_\-e\_\-range}]Energy range in which to generate events \item[{\em \_\-r\_\-range}]Radius range in which to generate events \end{DoxyParams}
+
+
+\subsection{Member Function Documentation}
+\hypertarget{classFakeDataGenerator_ab1084f63fb6a96cf9fc4d4cf12a39384}{
+\index{FakeDataGenerator@{FakeDataGenerator}!operator()@{operator()}}
+\index{operator()@{operator()}!FakeDataGenerator@{FakeDataGenerator}}
+\subsubsection[{operator()}]{\setlength{\rightskip}{0pt plus 5cm}TNtuple $\ast$ FakeDataGenerator::operator() (float $\ast$ {\em norms}, \/  bool {\em poisson} = {\ttfamily true})}}
+\label{classFakeDataGenerator_ab1084f63fb6a96cf9fc4d4cf12a39384}
+Create a dataset (an ntuple with fields \char`\"{}r:e\char`\"{})
+
+If histograms are TH2s, both fields are filled; if TH1, r is set to 0. 
+
+The documentation for this class was generated from the following files:\begin{DoxyCompactItemize}
+\item 
+generator.h\item 
+generator.cpp\end{DoxyCompactItemize}

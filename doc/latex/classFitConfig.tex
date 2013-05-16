@@ -1,0 +1,159 @@
+\hypertarget{classFitConfig}{
+\section{FitConfig Class Reference}
+\label{classFitConfig}\index{FitConfig@{FitConfig}}
+}
+
+
+Manages the configuration of a fit.  
+
+
+
+
+{\ttfamily \#include $<$config.h$>$}
+
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classFitConfig_af452a95ad4416b08111cffd41e2c8f5a}{FitConfig} (std::string filename)
+\item 
+void \hyperlink{classFitConfig_af39057bb8cece4c40f7f70afa139bbba}{print} () const 
+\end{DoxyCompactItemize}
+\subsection*{Static Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+static TH1D $\ast$ \hyperlink{classFitConfig_ad79c573a375545a767dcfc1b8baea5e6}{project1d} (TH2F $\ast$const hist2d, \hyperlink{structRange}{Range}$<$ float $>$ $\ast$const \hyperlink{classFitConfig_a5c73e875b6a5a15683837cf3e16e5658}{r\_\-range}=NULL)
+\end{DoxyCompactItemize}
+\subsection*{Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\hypertarget{classFitConfig_a1c92272eb2295a68c973ee826c803515}{
+unsigned \hyperlink{classFitConfig_a1c92272eb2295a68c973ee826c803515}{mode}}
+\label{classFitConfig_a1c92272eb2295a68c973ee826c803515}
+
+\begin{DoxyCompactList}\small\item\em fit type (energy, energy+radius, ...) \item\end{DoxyCompactList}\item 
+\hypertarget{classFitConfig_a66991d2653fba1bfa8e1103d45682958}{
+unsigned \hyperlink{classFitConfig_a66991d2653fba1bfa8e1103d45682958}{experiments}}
+\label{classFitConfig_a66991d2653fba1bfa8e1103d45682958}
+
+\begin{DoxyCompactList}\small\item\em number of ensemble experiments \item\end{DoxyCompactList}\item 
+\hypertarget{classFitConfig_aad06a178eacc7b1b88d929a9e562c05e}{
+unsigned \hyperlink{classFitConfig_aad06a178eacc7b1b88d929a9e562c05e}{steps}}
+\label{classFitConfig_aad06a178eacc7b1b88d929a9e562c05e}
+
+\begin{DoxyCompactList}\small\item\em number of mcmc steps \item\end{DoxyCompactList}\item 
+\hypertarget{classFitConfig_a3255d0a1bbe18e6748576c0ce7ee16f7}{
+unsigned \hyperlink{classFitConfig_a3255d0a1bbe18e6748576c0ce7ee16f7}{rebin\_\-e}}
+\label{classFitConfig_a3255d0a1bbe18e6748576c0ce7ee16f7}
+
+\begin{DoxyCompactList}\small\item\em rebinning factor for energy \item\end{DoxyCompactList}\item 
+\hypertarget{classFitConfig_acb53fa7cd68827ac4a430cc8b63070d3}{
+unsigned \hyperlink{classFitConfig_acb53fa7cd68827ac4a430cc8b63070d3}{rebin\_\-r}}
+\label{classFitConfig_acb53fa7cd68827ac4a430cc8b63070d3}
+
+\begin{DoxyCompactList}\small\item\em rebinning factor for radius \item\end{DoxyCompactList}\item 
+\hypertarget{classFitConfig_a994761af35b94c1f041577cf429cd2a5}{
+float \hyperlink{classFitConfig_a994761af35b94c1f041577cf429cd2a5}{confidence}}
+\label{classFitConfig_a994761af35b94c1f041577cf429cd2a5}
+
+\begin{DoxyCompactList}\small\item\em confidence level for results (e.g. 0.9) \item\end{DoxyCompactList}\item 
+\hypertarget{classFitConfig_a71256d7713172bafa18e2919a1d3ed7d}{
+float \hyperlink{classFitConfig_a71256d7713172bafa18e2919a1d3ed7d}{live\_\-time}}
+\label{classFitConfig_a71256d7713172bafa18e2919a1d3ed7d}
+
+\begin{DoxyCompactList}\small\item\em experiment live time in years \item\end{DoxyCompactList}\item 
+\hypertarget{classFitConfig_a1ff10d745bba35a46815c06887afebb1}{
+float \hyperlink{classFitConfig_a1ff10d745bba35a46815c06887afebb1}{efficiency}}
+\label{classFitConfig_a1ff10d745bba35a46815c06887afebb1}
+
+\begin{DoxyCompactList}\small\item\em overall efficiency correction \item\end{DoxyCompactList}\item 
+\hypertarget{classFitConfig_a29dbb355092eb72bf9ad50cc75c65fe9}{
+float \hyperlink{classFitConfig_a29dbb355092eb72bf9ad50cc75c65fe9}{burnin\_\-fraction}}
+\label{classFitConfig_a29dbb355092eb72bf9ad50cc75c65fe9}
+
+\begin{DoxyCompactList}\small\item\em fraction of steps to use for burn-\/in period \item\end{DoxyCompactList}\item 
+\hypertarget{classFitConfig_a792ef6696bc7629ccc34ff7eca66cd48}{
+std::vector$<$ \hyperlink{structSignal}{Signal} $>$ \hyperlink{classFitConfig_a792ef6696bc7629ccc34ff7eca66cd48}{signals}}
+\label{classFitConfig_a792ef6696bc7629ccc34ff7eca66cd48}
+
+\begin{DoxyCompactList}\small\item\em signal histograms and metadata \item\end{DoxyCompactList}\item 
+\hypertarget{classFitConfig_a6acc4eacaa1e3850e579c5f71ed08ef8}{
+std::string \hyperlink{classFitConfig_a6acc4eacaa1e3850e579c5f71ed08ef8}{output\_\-file}}
+\label{classFitConfig_a6acc4eacaa1e3850e579c5f71ed08ef8}
+
+\begin{DoxyCompactList}\small\item\em base filename for output \item\end{DoxyCompactList}\item 
+\hypertarget{classFitConfig_a1f8b954b6a0d648465558482b0932df7}{
+std::string \hyperlink{classFitConfig_a1f8b954b6a0d648465558482b0932df7}{signal\_\-name}}
+\label{classFitConfig_a1f8b954b6a0d648465558482b0932df7}
+
+\begin{DoxyCompactList}\small\item\em name of the signal that is the signal \item\end{DoxyCompactList}\item 
+\hypertarget{classFitConfig_aa39cafedaef6341b63e13effc548fc64}{
+\hyperlink{structRange}{Range}$<$ float $>$ \hyperlink{classFitConfig_aa39cafedaef6341b63e13effc548fc64}{e\_\-range}}
+\label{classFitConfig_aa39cafedaef6341b63e13effc548fc64}
+
+\begin{DoxyCompactList}\small\item\em range of energies to include in fit \item\end{DoxyCompactList}\item 
+\hypertarget{classFitConfig_a5c73e875b6a5a15683837cf3e16e5658}{
+\hyperlink{structRange}{Range}$<$ float $>$ \hyperlink{classFitConfig_a5c73e875b6a5a15683837cf3e16e5658}{r\_\-range}}
+\label{classFitConfig_a5c73e875b6a5a15683837cf3e16e5658}
+
+\begin{DoxyCompactList}\small\item\em range of radii to include in fit \item\end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Static Protected Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+static TH2F $\ast$ \hyperlink{classFitConfig_aa537cd3862464cad2927f418fc96dded}{load\_\-histogram} (std::string const filename, std::string const objname)
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Manages the configuration of a fit. A utility class for reading in configuration parameters from a JSON file. 
+
+\subsection{Constructor \& Destructor Documentation}
+\hypertarget{classFitConfig_af452a95ad4416b08111cffd41e2c8f5a}{
+\index{FitConfig@{FitConfig}!FitConfig@{FitConfig}}
+\index{FitConfig@{FitConfig}!FitConfig@{FitConfig}}
+\subsubsection[{FitConfig}]{\setlength{\rightskip}{0pt plus 5cm}FitConfig::FitConfig (std::string {\em filename})}}
+\label{classFitConfig_af452a95ad4416b08111cffd41e2c8f5a}
+Constructor
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em filename}]Name of the JSON file to load \end{DoxyParams}
+
+
+\subsection{Member Function Documentation}
+\hypertarget{classFitConfig_aa537cd3862464cad2927f418fc96dded}{
+\index{FitConfig@{FitConfig}!load\_\-histogram@{load\_\-histogram}}
+\index{load\_\-histogram@{load\_\-histogram}!FitConfig@{FitConfig}}
+\subsubsection[{load\_\-histogram}]{\setlength{\rightskip}{0pt plus 5cm}TH2F $\ast$ FitConfig::load\_\-histogram (std::string const  {\em filename}, \/  std::string const  {\em objname})\hspace{0.3cm}{\ttfamily  \mbox{[}static, protected\mbox{]}}}}
+\label{classFitConfig_aa537cd3862464cad2927f418fc96dded}
+Load an energy/radius ROOT TH2F from a file
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em filename}]name of ROOT file containing the PDF \item[{\em objname}]name of the PDF ROOT object (\char`\"{}pdf\char`\"{}) \end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+the PDF (a TH2F pointer) 
+\end{DoxyReturn}
+\hypertarget{classFitConfig_af39057bb8cece4c40f7f70afa139bbba}{
+\index{FitConfig@{FitConfig}!print@{print}}
+\index{print@{print}!FitConfig@{FitConfig}}
+\subsubsection[{print}]{\setlength{\rightskip}{0pt plus 5cm}void FitConfig::print () const}}
+\label{classFitConfig_af39057bb8cece4c40f7f70afa139bbba}
+Pretty-\/print the fit parameters \hypertarget{classFitConfig_ad79c573a375545a767dcfc1b8baea5e6}{
+\index{FitConfig@{FitConfig}!project1d@{project1d}}
+\index{project1d@{project1d}!FitConfig@{FitConfig}}
+\subsubsection[{project1d}]{\setlength{\rightskip}{0pt plus 5cm}TH1D $\ast$ FitConfig::project1d (TH2F $\ast$const  {\em hist2d}, \/  {\bf Range}$<$ float $>$ $\ast$const  {\em r\_\-range} = {\ttfamily NULL})\hspace{0.3cm}{\ttfamily  \mbox{[}static\mbox{]}}}}
+\label{classFitConfig_ad79c573a375545a767dcfc1b8baea5e6}
+Project a TH2F down to an energy-\/only TH1F, optionally cutting on radius.
+
+
+\begin{DoxyParams}{Parameters}
+\item[\mbox{$\leftarrow$} {\em hist2d}]the TH2F object to project \item[\mbox{$\leftarrow$} {\em r\_\-range}]a \hyperlink{structRange}{Range} defining the radial range to project \end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+a pointer to the resulting TH1D 
+\end{DoxyReturn}
+
+
+The documentation for this class was generated from the following files:\begin{DoxyCompactItemize}
+\item 
+config.h\item 
+config.cpp\end{DoxyCompactItemize}
