@@ -21,10 +21,10 @@
 } while (0)
 
 
-// compute the log likelihood given signal rates and normalizations
-__global__ void ll(const float* lut, const double* pars, const size_t ne,
+__global__ void ll(const float* lut, const float* pars, const size_t ne,
                    const size_t ns, double* sums) {
   int idx = threadIdx.x + blockIdx.x * blockDim.x;
+  sums[idx] = 0;
   for (int i=idx; i<(int)ne; i+=gridDim.x*blockDim.x) {
     double s = 0;
     for (size_t j=0; j<ns; j++) {
@@ -55,6 +55,19 @@ NLL::NLL(const std::vector<Signal>& signals, TNtuple* data) {
   CUDA_CHECK_ERROR(cudaMemcpy(this->lut_device, lut,
                               this->nevents * this->nsignals * sizeof(float),
                               cudaMemcpyHostToDevice));
+
+  // pre-allocate buffers for the normalizations and output sums,
+  // which change on every call
+  this->normalizations = new float[nsignals];
+  CUDA_CHECK_ERROR(cudaMalloc(&this->normalizations_device,
+                              nsignals * sizeof(float)));
+
+
+  this->blocksize = 256;
+  this->nblocks = 16;
+  this->nthreads = this->nblocks * this->blocksize;
+  this->sums = new double[this->nthreads];
+  CUDA_CHECK_ERROR(cudaMalloc(&this->sums_device, nthreads * sizeof(double)));
 }
 
 
@@ -62,12 +75,17 @@ NLL::~NLL() {
   delete this->lut;
   delete[] this->expectations;
   delete[] this->constraints;
+  delete[] this->normalizations;
+  delete[] this->sums;
 
   CUDA_CHECK_ERROR(cudaFree(this->lut_device));
+  CUDA_CHECK_ERROR(cudaFree(this->normalizations_device));
+  CUDA_CHECK_ERROR(cudaFree(this->sums_device));
 }
 
 
 float* NLL::build_lut(const std::vector<Signal>& signals, TNtuple* data) {
+  std::cout << "NLL::build_lut: Building P(x) lookup table" << std::endl;
   int nevents = data->GetEntries();
   float* lut = new float[signals.size() * nevents];
 
@@ -108,7 +126,7 @@ float* NLL::build_lut(const std::vector<Signal>& signals, TNtuple* data) {
 }
 
 
-double NLL::operator()(double* norms) {
+double NLL::operator()(float* norms) {
   double result = 0;
 
   // N + fractional constraints
@@ -123,41 +141,25 @@ double NLL::operator()(double* norms) {
     }
   }
 
-  // loop over events, on the gpu
-  size_t blocksize = 256;
-  size_t nblocks = 16;
-  size_t nthreads = nblocks * blocksize;
-
-  double* norms_device;
-  CUDA_CHECK_ERROR(cudaMalloc(&norms_device, this->nsignals * sizeof(double)));
-
-  CUDA_CHECK_ERROR(cudaMemcpy(norms_device, norms,
-                              this->nsignals * sizeof(double),
+  CUDA_CHECK_ERROR(cudaMemcpy(this->normalizations_device, norms,
+                              this->nsignals * sizeof(float),
                               cudaMemcpyHostToDevice));
 
-  double* sums_device;
-  CUDA_CHECK_ERROR(cudaMalloc(&sums_device, nthreads * sizeof(double)));
-  CUDA_CHECK_ERROR(cudaMemset(sums_device, 0, nthreads * sizeof(double)));
-
-  ll<<<nblocks, blocksize>>>(this->lut_device, norms_device, this->nevents,
-                             this->nsignals, sums_device);
+  ll<<<this->nblocks, this->blocksize>>>(this->lut_device,
+                                         this->normalizations_device,
+                                         this->nevents, this->nsignals,
+                                         sums_device);
 
   CUDA_CHECK_ERROR(cudaThreadSynchronize());
 
-  double* sums = new double[blocksize * nblocks];
-
-  CUDA_CHECK_ERROR(cudaMemcpy(sums, sums_device, nthreads * sizeof(double),
+  CUDA_CHECK_ERROR(cudaMemcpy(this->sums, this->sums_device,
+                              this->nthreads * sizeof(double),
                               cudaMemcpyDeviceToHost));
 
-  CUDA_CHECK_ERROR(cudaFree(norms_device));
-  CUDA_CHECK_ERROR(cudaFree(sums_device));
-
   double sum = 0;
-  for (size_t i=0; i<nthreads; i++) {
+  for (size_t i=0; i<this->nthreads; i++) {
     sum += sums[i];
   }
-
-  delete[] sums;
 
   result -= sum;
 

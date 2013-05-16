@@ -74,7 +74,7 @@ FitConfig::FitConfig(std::string filename) {
     Signal s;
     s.name = it.key().asString();
     s.title = signal_params.get("title", s.name).asString();
-    s.constraint = signal_params.get("constraint", 0).asFloat();
+    s.constraint = signal_params.get("constraint", 0.0).asFloat();
     s.nexpected = signal_params["rate"].asFloat() * this->live_time * this->efficiency;
     std::string filename = signal_params["filename"].asString();
 
@@ -84,8 +84,10 @@ FitConfig::FitConfig(std::string filename) {
 
     if (this->mode == 0) {
       s.histogram = dynamic_cast<TH1*>(project1d(h2d, &this->r_range));
-      std::cout << s.name << ": " <<  s.histogram->Integral() << " // " <<  h2d->Integral() << std::endl; //////////
-      s.nexpected *= (s.histogram->Integral() / h2d->Integral());
+      int x1 = s.histogram->GetXaxis()->FindBin(e_range.min);
+      int x2 = s.histogram->GetXaxis()->FindBin(e_range.max);
+      std::cout << s.name << ": " <<  s.histogram->Integral(x1, x2) << " // " <<  h2d->Integral() << std::endl; //////////
+      s.nexpected *= (s.histogram->Integral(x1, x2) / h2d->Integral());
       s.histogram->Rebin(rebin_e);
     }
     else if (this->mode == 1) {

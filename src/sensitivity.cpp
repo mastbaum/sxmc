@@ -8,6 +8,7 @@
 #include <TCanvas.h>
 #include <TH1F.h>
 #include <TRandom.h>
+#include <TRandom2.h>
 #include "config.h"
 #include "generator.h"
 #include "nll.h"
@@ -31,7 +32,7 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
                float burnin_fraction, std::string signal_name,
                float confidence, unsigned nexperiments) {
   TH1F* limits = new TH1F("limits", "Background-fluctuation sensitivity",
-                          100, 0, 50);
+                          300, 0, 300);
 
   for (unsigned i=0; i<nexperiments; i++) {
     std::cout << "Experiment " << i << " / " << nexperiments << std::endl;
@@ -41,7 +42,11 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
     for (size_t i=0; i<signals.size(); i++) {
       norms[i] = signals[i].nexpected;
     }
+    TCanvas c2;
+    c2.SetLogy();
     TNtuple* data = gen(norms);
+    data->Draw("e","","e");
+    c2.SaveAs("ee.pdf");
 
     // run mcmc
     TNtuple* lspace = mcmc(signals, data, steps, burnin_fraction);
@@ -71,6 +76,10 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
 
 int main(int argc, char* argv[]) {
   assert(argc == 2);
+
+  // replace gRandom with something a little faster
+  delete gRandom;
+  gRandom = new TRandom2(0);
   gRandom->SetSeed(0);
 
   // load configuration from json file

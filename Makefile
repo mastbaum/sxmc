@@ -1,8 +1,8 @@
 CUDA_INCLUDE = -I$(CUDA_ROOT)/include
-CUDA_CFLAGS = -arch=sm_30 -use_fast_math -I$(ROOTSYS)/include
+CUDA_CFLAGS = -arch=sm_30 -O3 -use_fast_math -I$(ROOTSYS)/include
 CUDA_LFLAGS = -L$(CUDA_ROOT)/lib64 -lcudart -L$(ROOTSYS)/lib -lCore -lCint -lRIO -lMathCore -lm
 INCLUDE = -Isrc -I$(RATROOT)/include -I$(ROOTSYS)/include -I$(RATROOT)/src/stlplus
-CFLAGS = -DVERBOSE=true -g $(INCLUDE) 
+CFLAGS = -DVERBOSE=true -O3 $(INCLUDE) 
 GCCFLAGS = --std=c++0x -Wall -Werror -ffast-math -fdiagnostics-show-option
 LFLAGS = -L$(RATROOT)/lib -lRATEvent_$(RATSYSTEM) $(shell root-config --libs) -ljsoncpp
 
@@ -37,7 +37,6 @@ $(OBJ_DIR)/%.o: src/%.cpp
 	test -d build || mkdir build
 	$(CC) -c -o $@ $< $(GCCFLAGS) $(CFLAGS) $(LFLAGS)
 
-#$(OBJ_DIR)/%o: src/%.cu
 $(OBJ_DIR)/nll.o:
 	test -d build || mkdir build
 	$(NVCC) -c -o build/nll.o src/nll.cu $(CUDA_CFLAGS) $(CUDA_LFLAGS)
