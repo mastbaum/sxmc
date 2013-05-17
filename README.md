@@ -8,12 +8,12 @@ Building
 --------
 `sxmc` requires the following libraries:
 
-* (ROOT)[http://root.cern.ch]
+* [ROOT](http://root.cern.ch)
 * RAT (to make PDFs from MC files)
-* (JsonCpp)[http://jsoncpp.sourceforge.net]
-* (Doxygen)[http://doxygen.org] (if building documentation)
+* [JsonCpp](http://jsoncpp.sourceforge.net)
+* [Doxygen](http://doxygen.org) (if building documentation)
 
-It also uses (hemi)[https://github.com/harrism/hemi], which is included as a
+It also uses [hemi](https://github.com/harrism/hemi), which is included as a
 git submodule. After cloning `sxmc`, run:
 
     $ git submodule init
