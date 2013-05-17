@@ -4,7 +4,10 @@
 #include <assert.h>
 #include <cuda.h>
 #include <hemi/hemi.h>
+#ifndef __HEMI_ARRAY_H__
+#define __HEMI_ARRAY_H__
 #include <hemi/array.h>
+#endif
 #include <TNtuple.h>
 #include <TH1D.h>
 #include <TH2F.h>
@@ -12,30 +15,23 @@
 #include "signals.h"
 #include "nll.h"
 
-// macro to print error and abort on cuda errors, c/o stan
-#define CUDA_CHECK_ERROR(call) do { \
-  cudaError err = call; \
-  if (cudaSuccess != err) { \
-    fprintf(stderr, "Cuda error in file '%s' in line %i: %s.\n", \
-            __FILE__, __LINE__, cudaGetErrorString(err)); \
-    exit(EXIT_FAILURE); \
-  } \
-} while (0)
-
+#define DEBUG  // let HEMI print errors
 
 HEMI_KERNEL(ll)(const float* lut, const float* pars, const size_t ne,
                 const size_t ns, double* sums) {
   int offset = hemiGetElementOffset();
   int stride = hemiGetElementStride();
 
-  sums[offset] = 0;
+  double sum = 0;
   for (int i=offset; i<(int)ne; i+=stride) {
     double s = 0;
     for (size_t j=0; j<ns; j++) {
-      s += pars[j] * lut[i*ns+j];
+      s += pars[j] * lut[i * ns + j];
     }
-    sums[offset] += log(s);
+    sum += log(s);
   }
+
+  sums[offset] = sum;
 }
 
 
@@ -43,55 +39,41 @@ NLL::NLL(const std::vector<Signal>& signals, TNtuple* data) {
   this->nsignals = signals.size();
   this->nevents = data->GetEntries();
 
-  this->expectations = new double[nsignals];
-  this->constraints = new double[nsignals];
+  this->expectations = new hemi::Array<float>(nsignals, true);
+  this->constraints = new hemi::Array<float>(nsignals, true);
 
   for (size_t i=0; i<nsignals; i++) {
-    this->expectations[i] = signals[i].nexpected;
-    this->constraints[i] = signals[i].constraint;
+    this->expectations->writeOnlyHostPtr()[i] = signals[i].nexpected;
+    this->constraints->writeOnlyHostPtr()[i] = signals[i].constraint;
   }
 
   this->lut = NLL::build_lut(signals, data);
 
-  CUDA_CHECK_ERROR(cudaMalloc(&this->lut_device,
-                              this->nevents * this->nsignals * sizeof(float)));
-
-  CUDA_CHECK_ERROR(cudaMemcpy(this->lut_device, lut,
-                              this->nevents * this->nsignals * sizeof(float),
-                              cudaMemcpyHostToDevice));
-
   // pre-allocate buffers for the normalizations and output sums,
   // which change on every call
-  this->normalizations = new float[nsignals];
-  CUDA_CHECK_ERROR(cudaMalloc(&this->normalizations_device,
-                              nsignals * sizeof(float)));
-
+  this->normalizations = new hemi::Array<float>(nsignals, true);
 
   this->blocksize = 256;
   this->nblocks = 16;
   this->nthreads = this->nblocks * this->blocksize;
-  this->sums = new double[this->nthreads];
-  CUDA_CHECK_ERROR(cudaMalloc(&this->sums_device, nthreads * sizeof(double)));
+  this->sums = new hemi::Array<double>(this->nthreads, true);
+  this->sums->writeOnlyHostPtr();  // no-op to set hemi::Array validity
 }
 
 
 NLL::~NLL() {
   delete this->lut;
-  delete[] this->expectations;
-  delete[] this->constraints;
-  delete[] this->normalizations;
-  delete[] this->sums;
-
-  CUDA_CHECK_ERROR(cudaFree(this->lut_device));
-  CUDA_CHECK_ERROR(cudaFree(this->normalizations_device));
-  CUDA_CHECK_ERROR(cudaFree(this->sums_device));
+  delete this->expectations;
+  delete this->constraints;
+  delete this->normalizations;
+  delete this->sums;
 }
 
 
-float* NLL::build_lut(const std::vector<Signal>& signals, TNtuple* data) {
+hemi::Array<float>* NLL::build_lut(const std::vector<Signal>& signals, TNtuple* data) {
   std::cout << "NLL::build_lut: Building P(x) lookup table" << std::endl;
   int nevents = data->GetEntries();
-  float* lut = new float[signals.size() * nevents];
+  hemi::Array<float>* lut = new hemi::Array<float>(signals.size() * nevents, true);
 
   std::vector<float> minima;
   for (size_t i=0; i<signals.size(); i++) {
@@ -122,7 +104,7 @@ float* NLL::build_lut(const std::vector<Signal>& signals, TNtuple* data) {
       if (v <= 0) {
         v = minima[j];
       }
-      lut[i * signals.size() + j] = v;
+      lut->writeOnlyHostPtr()[i * signals.size() + j] = v;
     }
   }
 
@@ -139,29 +121,25 @@ double NLL::operator()(float* norms) {
       return 1e10;
     }
     result += norms[i];
-    if (this->constraints[i] > 0) {
-      result += 0.5 * pow((norms[i]/this->expectations[i] - 1) /
-                          this->constraints[i], 2);
+    if (this->constraints->readOnlyHostPtr()[i] > 0) {
+      result += 0.5 * pow((norms[i]/this->expectations->readOnlyHostPtr()[i] - 1) /
+                          this->constraints->readOnlyHostPtr()[i], 2);
     }
   }
 
-  CUDA_CHECK_ERROR(cudaMemcpy(this->normalizations_device, norms,
-                              this->nsignals * sizeof(float),
-                              cudaMemcpyHostToDevice));
+  for (size_t i=0; i<this->nsignals; i++) {
+    this->normalizations->writeOnlyHostPtr()[i] = norms[i];
+  }
 
   HEMI_KERNEL_LAUNCH(ll, this->nblocks, this->blocksize, 0, 0,
-                     this->lut_device, this->normalizations_device,
-                     this->nevents, this->nsignals, sums_device);
-
-  CUDA_CHECK_ERROR(cudaThreadSynchronize());
-
-  CUDA_CHECK_ERROR(cudaMemcpy(this->sums, this->sums_device,
-                              this->nthreads * sizeof(double),
-                              cudaMemcpyDeviceToHost));
+                     this->lut->readOnlyPtr(),
+                     this->normalizations->readOnlyPtr(),
+                     this->nevents, this->nsignals,
+                     this->sums->ptr());
 
   double sum = 0;
   for (size_t i=0; i<this->nthreads; i++) {
-    sum += sums[i];
+    sum += this->sums->readOnlyHostPtr()[i];
   }
 
   result -= sum;
