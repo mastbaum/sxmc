@@ -8,17 +8,29 @@ Building
 --------
 `sxmc` requires the following libraries:
 
-* CUDA (and the nvcc compiler)
-* JsonCpp
-* ROOT
+* (ROOT)[http://root.cern.ch]
 * RAT (to make PDFs from MC files)
-* Doxygen (if building documentation)
+* (JsonCpp)[http://jsoncpp.sourceforge.net]
+* (Doxygen)[http://doxygen.org] (if building documentation)
 
-It also requires a CUDA-enabled Nvidia GPU.
+It also uses (hemi)[https://github.com/harrism/hemi], which is included as a
+git submodule. After cloning `sxmc`, run:
 
-To build, run `make` and specify a `CUDA_ROOT` environment variable. E.g.,
+    $ git submodule init
+    $ git submodule update
 
-    $ CUDA_ROOT=/opt/cuda-5.0 make
+`sxmc` runs much faster with the help of a CUDA-enabled GPU. To build with GPU
+support, set `CUDA_ROOT` to point to your installation of the CUDA tools:
+
+    $ CUDA_ROOT=/usr/local/cuda make
+
+If no GPU is available, `sxmc` will simply loop instead of running things in
+parallel. To build without GPU support:
+
+    $ make
+
+You still need to have the CUDA headers installed, but no libraries or hardware
+are required.
 
 Documentation
 -------------

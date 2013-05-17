@@ -7,12 +7,17 @@
  * evaluation consists of looping over events and scaling the LUT entries by
  * the desired parameters.
  *
- * This time-consuming loop is run on a GPU using CUDA.
+ * This time-consuming loop will run on a GPU using CUDA, if compiled with GPU
+ * support.
  */
 
 #ifndef __NLL_H__
 #define __NLL_H__
 
+#ifndef __HEMI_ARRAY_H__
+#define __HEMI_ARRAY_H__
+#include <hemi/array.h>
+#endif
 #include "signals.h"
 
 class NLL {
@@ -42,7 +47,7 @@ class NLL {
      * \param signals set of Signals defining the PDFs
      * \param data TNtuple containing the experiment's dataset
      */
-    static float* build_lut(const std::vector<Signal>& signals, TNtuple* data);
+    static hemi::Array<float>* build_lut(const std::vector<Signal>& signals, TNtuple* data);
 
   private:
     size_t blocksize;  //!< number of threads per block
@@ -50,14 +55,11 @@ class NLL {
     size_t nthreads;  //!< number of CUDA threads to run
     unsigned nsignals;  //!< number of signal dimensions
     unsigned nevents;  //!< number of events in dataset
-    double* expectations;  //!< signals expectation values
-    double* constraints;  //!< fractional constraints
-    double* sums;  //!< output sums, host side
-    double* sums_device;  //!< output sums, device side
-    float* normalizations;  //!< normalizations, host side
-    float* normalizations_device;  //!< normalizations, device side
-    float* lut;  //!< lookup table, host side
-    float* lut_device;  //!< lookup table, device side
+    hemi::Array<float>* expectations;  //!< signals expectation values
+    hemi::Array<float>* constraints;  //!< fractional constraints
+    hemi::Array<float>* normalizations;  //!< normalizations
+    hemi::Array<float>* lut;  //!< lookup table
+    hemi::Array<double>* sums;  //!< output sums
 };
 
 #endif  // __NLL_H__

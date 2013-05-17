@@ -24,7 +24,7 @@ class FakeDataGenerator {
     FakeDataGenerator(std::vector<Signal> signals, Range<float> _e_range,
                       Range<float> _r_range)
       : e_range(_e_range), r_range(_r_range) {
-      for (auto it=signals.cbegin(); it!=signals.cend(); it++) {
+      for (std::vector<Signal>::const_iterator it=signals.begin(); it!=signals.end(); it++) {
         this->pdfs.push_back(it->histogram);
       }
     }

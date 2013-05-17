@@ -27,7 +27,7 @@ TNtuple* FakeDataGenerator::operator()(float* norms, bool poisson) {
       if (poisson && nexpected > 0) {
         nobserved = gRandom->Poisson(nexpected);
       }
-      for (int i=0; i<nobserved; i++) {
+      for (int j=0; j<nobserved; j++) {
         do {
           ht->GetRandom2(r, e);
         } while(e > e_range.max || e < e_range.min ||
@@ -46,7 +46,7 @@ TNtuple* FakeDataGenerator::operator()(float* norms, bool poisson) {
       if (poisson && nexpected > 0) {
         nobserved = gRandom->Poisson(nexpected);
       }
-      for (int i=0; i<nobserved; i++) {
+      for (int j=0; j<nobserved; j++) {
         do {
           e = ht->GetRandom();
         } while(e > e_range.max || e < e_range.min);
