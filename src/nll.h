@@ -7,7 +7,8 @@
  * evaluation consists of looping over events and scaling the LUT entries by
  * the desired parameters.
  *
- * This time-consuming loop is run on a GPU using CUDA.
+ * This time-consuming loop will run on a GPU using CUDA, if compiled with GPU
+ * support.
  */
 
 #ifndef __NLL_H__
