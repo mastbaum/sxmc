@@ -39,17 +39,36 @@ Monte Carlo.</p>
 <p><code>sxmc</code> requires the following libraries:</p>
 
 <ul>
-<li>CUDA (and the nvcc compiler)</li>
-<li>JsonCpp</li>
-<li>ROOT</li>
+<li><a href="http://root.cern.ch">ROOT</a></li>
 <li>RAT (to make PDFs from MC files)</li>
-<li>Doxygen (if building documentation)</li>
-</ul><p>It also requires a CUDA-enabled Nvidia GPU.</p>
+<li><a href="http://jsoncpp.sourceforge.net">JsonCpp</a></li>
+<li><a href="http://doxygen.org">Doxygen</a> (if building documentation)</li>
+</ul>
 
-<p>To build, run <code>make</code> and specify a <code>CUDA_ROOT</code> environment variable. E.g.,</p>
+<p>It also uses (hemi)[https://github.com/harrism/hemi], which is included as a
+git submodule. After cloning `sxmc`, run:</p>
 
-<pre><code>$ CUDA_ROOT=/opt/cuda-5.0 make
-</code></pre>
+<pre>
+    $ git submodule init
+    $ git submodule update
+</pre>
+
+<p><code>sxmc</code> runs much faster with the help of a CUDA-enabled GPU. To build with GPU
+support, set `CUDA_ROOT` to point to your installation of the CUDA tools:</p>
+
+<pre>
+    $ CUDA_ROOT=/usr/local/cuda make
+</pre>
+
+<p>If no GPU is available, <code>sxmc</code> will simply loop instead of running things in
+parallel. To build without GPU support:</p>
+
+<pre>
+    $ make
+</pre>
+
+<p>You still need to have the CUDA headers installed, but no libraries or hardware
+are required.</p>
 
 <h2>Documentation</h2>
 
