@@ -131,6 +131,7 @@ double NLL::operator()(float* norms) {
     this->normalizations->writeOnlyHostPtr()[i] = norms[i];
   }
 
+  // sum of log(N * Pj(xi))
   HEMI_KERNEL_LAUNCH(ll, this->nblocks, this->blocksize, 0, 0,
                      this->lut->readOnlyPtr(),
                      this->normalizations->readOnlyPtr(),

@@ -23,7 +23,7 @@ TNtuple* FakeDataGenerator::operator()(float* norms, bool poisson) {
     // shortcut: generate only events passing cuts
     if (this->pdfs[i]->IsA() == TH2F::Class()) {
       TH2F* ht = dynamic_cast<TH2F*>(this->pdfs[i]);
-      int nobserved = nexpected;
+      float nobserved = nexpected;
       if (poisson && nexpected > 0) {
         nobserved = gRandom->Poisson(nexpected);
       }
@@ -42,7 +42,7 @@ TNtuple* FakeDataGenerator::operator()(float* norms, bool poisson) {
     }
     else if (this->pdfs[i]->IsA() == TH1D::Class()) {
       TH1D* ht = dynamic_cast<TH1D*>(this->pdfs[i]);
-      int nobserved = nexpected;
+      float nobserved = nexpected;
       if (poisson && nexpected > 0) {
         nobserved = gRandom->Poisson(nexpected);
       }

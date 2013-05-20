@@ -43,9 +43,9 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
       norms[i] = signals[i].nexpected;
     }
     TCanvas c2;
-    c2.SetLogy();
+    c2.SetLogz();
     TNtuple* data = gen(norms);
-    data->Draw("e","","e");
+    data->Draw("e:r","","col z");
     c2.SaveAs("ee.pdf");
 
     // run mcmc
@@ -92,6 +92,7 @@ int main(int argc, char* argv[]) {
                          fc.burnin_fraction, fc.signal_name,
                          fc.confidence, fc.experiments);
 
+  // plot distribution of limits
   TCanvas c1;
   limits->Draw();
   c1.SaveAs((fc.output_file + "_limits.pdf").c_str());

@@ -35,12 +35,7 @@ FitConfig::FitConfig(std::string filename) {
   assert(experiment_params.isMember("live_time"));
   this->live_time = experiment_params["live_time"].asFloat();
   this->confidence = experiment_params["confidence"].asFloat();
-  if (experiment_params.isMember("efficiency")) {
-    this->efficiency = experiment_params["efficiency"].asFloat();
-  }
-  else {
-    this->efficiency = 1;
-  }
+  this->efficiency = experiment_params.get("efficiency", 1.0).asFloat();
 
   // fit parameters
   const Json::Value fit_params = root["fit"];

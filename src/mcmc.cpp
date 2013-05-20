@@ -24,7 +24,7 @@ TNtuple* mcmc(std::vector<Signal> signals, TNtuple* data, unsigned nsteps,
   float* newnorms = new float[signals.size()];
   float* vals = new float[signals.size() + 1];  // norms + likelihood
   for (size_t i=0; i<signals.size(); i++) {
-    norms[i] = signals[i].nexpected; // gRandom->Gaus(signals[i].nexpected, 5);
+    norms[i] = signals[i].nexpected;
   }
 
   float sigma = 0.125; //0.75;  // FIXME: make this adaptive during burn-in, or settable
