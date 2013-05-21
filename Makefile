@@ -16,7 +16,7 @@ CC += --compiler-options "$(GCCFLAGS) -Wno-unused-function"
 endif
 
 OBJ_DIR = build
-SOURCES = $(filter-out src/nll.cpp, $(wildcard src/*.cpp))
+SOURCES = $(filter-out src/mcmc.cpp, $(wildcard src/*.cpp))
 OBJECTS = $(SOURCES:src/%.cpp=$(OBJ_DIR)/%.o)
 EXE = sensitivity
 
@@ -28,7 +28,7 @@ ifndef ROOTSYS
 $(error ROOTSYS is not set)
 endif
 
-all: $(OBJ_DIR)/nll.o $(OBJECTS) $(EXE)
+all: $(OBJ_DIR)/mcmc.o $(OBJECTS) $(EXE)
 
 .PHONY: doc
 
@@ -42,11 +42,11 @@ $(OBJ_DIR)/%.o: src/%.cpp
 	test -d build || mkdir build
 	$(CC) -c -o $@ $< $(CFLAGS) $(LFLAGS)
 
-$(OBJ_DIR)/nll.o: src/nll.cpp
+$(OBJ_DIR)/mcmc.o: src/mcmc.cpp
 	test -d build || mkdir build
 	$(CUDACC) -c -o $@ $< $(CFLAGS) $(LFLAGS)
 
-$(EXE): $(OBJECTS) $(CUDA_OBJECTS) $(OBJ_DIR)/nll.o
+$(EXE): $(OBJECTS) $(CUDA_OBJECTS) $(OBJ_DIR)/mcmc.o
 	test -d bin || mkdir bin
 	$(CC) -o bin/$@ $^ $(CFLAGS) $(LFLAGS) $(CUDA_LFLAGS)
 

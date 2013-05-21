@@ -11,7 +11,6 @@
 #include <TRandom2.h>
 #include "config.h"
 #include "generator.h"
-#include "nll.h"
 #include "mcmc.h"
 
 // find the x value that a fraction 1-CL/2 of the distribution falls above
@@ -49,7 +48,9 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
     c2.SaveAs("ee.pdf");
 
     // run mcmc
-    TNtuple* lspace = mcmc(signals, data, steps, burnin_fraction);
+    MCMC mcmc(signals, data);
+    TNtuple* lspace = mcmc(10, burnin_fraction);
+    //TNtuple* lspace = mcmc(signals, data, steps, burnin_fraction);
 
     // calculate signal sensitivity
     TH1F hproj("hproj", "hproj", 1000, 0, 100);
