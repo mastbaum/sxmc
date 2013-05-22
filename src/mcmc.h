@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cmath>
+#include <string>
 #include <cuda.h>
 #include <hemi/hemi.h>
 #include "signals.h"
@@ -105,6 +106,7 @@ class MCMC {
     hemi::Array<float>* constraints;  //!< signal rate gaussian constraints
     hemi::Array<float>* lut;  //!< Event/PDF probability lookup table
     hemi::Array<RNGState>* rngs;  //!< CURAND RNGs, ignored in CPU mode
+    std::vector<std::string> signal_names;  //!< string name of each signal
 };
 
 #endif  // __MCMC_H__

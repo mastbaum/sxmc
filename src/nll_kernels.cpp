@@ -25,7 +25,8 @@ __global__ void init_device_rngs(int nthreads, unsigned long long seed,
 }
 #endif
 
-HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng, float sigma,
+HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
+                             const float* sigma,
                              const float* current_vector,
                              float* proposed_vector) {
   int offset = hemiGetElementOffset();
@@ -34,9 +35,9 @@ HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng, float sigma,
   for (int i=offset; i<(int)nthreads; i+=stride) {
 #ifdef HEMI_DEV_CODE
     float u = curand_normal(&rng[i]);
-    proposed_vector[i] = current_vector[i] + sigma * u;
+    proposed_vector[i] = current_vector[i] + sigma[i] * u;
 #else
-    float u = gRandom->Gaus(current_vector[i], sigma);
+    float u = gRandom->Gaus(current_vector[i], sigma[i]);
     proposed_vector[i] = u;
 #endif
   }

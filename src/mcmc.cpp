@@ -1,13 +1,17 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <string>
 #include <assert.h>
 #include <hemi/hemi.h>
 #include <TH1D.h>
+#include <TH1F.h>
 #include <TH2F.h>
+#include <TF1.h>
 #include <TNtuple.h>
 #include <TRandom.h>
 #include <TStopwatch.h>
+#include <TDirectory.h>
 #include "mcmc.h"
 #include "signals.h"
 
@@ -46,8 +50,10 @@ MCMC::MCMC(const std::vector<Signal>& signals, TNtuple* data) {
   // list of variables for output ntuple
   for (size_t i=0; i<signals.size(); i++) {
     this->varlist += (signals[i].name + ":");
+    this->signal_names.push_back(signals[i].name);
   }
   this->varlist += "likelihood";
+  this->signal_names.push_back("likelihood");
 
   this->rngs = new hemi::Array<RNGState>(this->nsignals, true);
 
@@ -80,8 +86,6 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
 
   unsigned burnin_steps = nsteps * burnin_fraction;
 
-  float sigma = 5.0;  // FIXME make adaptive
-
   // Ntuple to hold likelihood space
   TNtuple* nt = new TNtuple("lspace", "Likelihood space",
                             this->varlist.c_str());
@@ -101,6 +105,15 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
 
   hemi::Array<double> proposed_nll(1, true);
   proposed_nll.writeOnlyHostPtr();
+
+  // initial standard deviations for each dimension
+  hemi::Array<float> sigma(this->nsignals, true);
+  for (size_t i=0; i<this->nsignals; i++) {
+    float expectation = this->expectations->readOnlyHostPtr()[i];
+    float constraint = this->constraints->readOnlyHostPtr()[i];
+    float width = (constraint > 0 ? constraint : 1.0 / sqrt(expectation));
+    sigma.writeOnlyHostPtr()[i] = 5; //0.5 * width;
+  }
 
   // buffers for computing event term in nll
   hemi::Array<double> event_partial_sums(this->nnllthreads, true);
@@ -125,8 +138,46 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
   TStopwatch timer;
   timer.Start();
   for (unsigned i=0; i<nsteps; i++) {
+    // re-tune jump distribution based on burn-in phase
+    if (i == burnin_steps) {
+      std::cout << "MCMC: Burn-in phase completed after " << burnin_steps
+                << " steps" << std::endl;
+
+      // fit a Gaussian in each dimension to estimate distribution width
+      for (size_t j=0; j<this->nsignals; j++) {
+        std::string name = this->signal_names[j];
+        nt->Draw((name + ">>hsproj").c_str());
+        TH1F* hsproj = (TH1F*) gDirectory->Get("hsproj");
+
+        if (!hsproj) {
+          std::cerr << "MCMC: failed to get signal projection" << std::endl;
+          continue;
+        }
+
+        hsproj->Fit("gaus", "q");
+        TF1* fsproj = hsproj->GetFunction("gaus");
+
+        if (!fsproj) {
+          std::cerr << "MCMC: failed to fit signal projection" << std::endl;
+          continue;
+        }
+
+        double fit_width = fsproj->GetParameter(2);
+        const float scale_factor = 2.6;  // e!?
+
+        sigma.writeOnlyHostPtr()[j] = scale_factor * fit_width;
+        std::cout << "MCMC: Rescaling jump sigma: " << name << " "
+                  << scale_factor * fit_width << std::endl;
+
+        hsproj->Delete();
+      }
+
+      nt->Reset();
+    }
+
     HEMI_KERNEL_LAUNCH(pick_new_vector, 8, 8, 0, 0,
-                       this->nsignals, this->rngs->ptr(), sigma,
+                       this->nsignals, this->rngs->ptr(),
+                       sigma.readOnlyPtr(),
                        current_vector.readOnlyPtr(),
                        proposed_vector.writeOnlyPtr());
 
@@ -160,13 +211,7 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
          // last element is the likelihood
          jump_vector[this->nsignals] = jump_buffer.readOnlyHostPtr()[j*(this->nsignals+1)+this->nsignals];
 
-        //for (unsigned i=0; i<=this->nsignals; i++) {
-        //  std::cout << jump_vector[i] << " ";
-        //}
-        //std::cout << std::endl;
-        if (i > burnin_steps) {
-          nt->Fill(jump_vector);
-        }
+         nt->Fill(jump_vector);
       }
 
       // reset counter

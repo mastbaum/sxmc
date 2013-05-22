@@ -52,11 +52,12 @@ __global__ void init_device_rngs(int nthreads, unsigned long long seed,
  *
  * \param nthreads Number of threads == length of vectors
  * \param rng CUDA RNG states, ignored on CPU
- * \param sigma Standard deviation to sample
+ * \param sigma Standard deviations to sample for each dimension
  * \param current_vector Vector of current parameters
  * \param proposed_vector Output vector of proposed parameters
  */
-HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng, float sigma,
+HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
+                             const float* sigma,
                              const float* current_vector,
                              float* proposed_vector);
 
