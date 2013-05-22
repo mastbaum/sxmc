@@ -1,0 +1,175 @@
+\hypertarget{classMCMC}{
+\section{MCMC Class Reference}
+\label{classMCMC}\index{MCMC@{MCMC}}
+}
+
+
+Markov Chain Monte Carlo simulator.  
+
+
+
+
+{\ttfamily \#include $<$mcmc.h$>$}
+
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{classMCMC_a6b770d2197d45c0fcc136294fbeec672}{MCMC} (const std::vector$<$ \hyperlink{structSignal}{Signal} $>$ \&signals, TNtuple $\ast$data)
+\item 
+\hyperlink{classMCMC_a2d7d02c0892819ff5c9f91bc377d1def}{$\sim$MCMC} ()
+\item 
+TNtuple $\ast$ \hyperlink{classMCMC_ac76eeacb8a362af4c62c596380b8da64}{operator()} (unsigned nsteps, float burnin\_\-fraction, unsigned sync\_\-interval=1000)
+\item 
+hemi::Array$<$ float $>$ $\ast$ \hyperlink{classMCMC_ab6a9587552fd9b23c2d13d97b791f05a}{build\_\-lut} (const std::vector$<$ \hyperlink{structSignal}{Signal} $>$ \&signals, TNtuple $\ast$data)
+\end{DoxyCompactItemize}
+\subsection*{Protected Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+void \hyperlink{classMCMC_a1ed0f9d2fdc8aafec039dfa023289490}{nll} (const float $\ast$v, double $\ast$nll, double $\ast$event\_\-partial\_\-sums, double $\ast$event\_\-total\_\-sum)
+\end{DoxyCompactItemize}
+\subsection*{Private Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\hypertarget{classMCMC_a417ddd0a6fdee2ea401d3d1ac727171a}{
+unsigned \hyperlink{classMCMC_a417ddd0a6fdee2ea401d3d1ac727171a}{nsignals}}
+\label{classMCMC_a417ddd0a6fdee2ea401d3d1ac727171a}
+
+\begin{DoxyCompactList}\small\item\em number of signals \item\end{DoxyCompactList}\item 
+\hypertarget{classMCMC_a65d836666d35f0c4ffb3f94b84082cbc}{
+unsigned \hyperlink{classMCMC_a65d836666d35f0c4ffb3f94b84082cbc}{nevents}}
+\label{classMCMC_a65d836666d35f0c4ffb3f94b84082cbc}
+
+\begin{DoxyCompactList}\small\item\em number of events \item\end{DoxyCompactList}\item 
+\hypertarget{classMCMC_a1da299776614208fe3cbd4b3e7dad36e}{
+unsigned \hyperlink{classMCMC_a1da299776614208fe3cbd4b3e7dad36e}{nnllblocks}}
+\label{classMCMC_a1da299776614208fe3cbd4b3e7dad36e}
+
+\begin{DoxyCompactList}\small\item\em number of cuda blocks for nll partial sums \item\end{DoxyCompactList}\item 
+\hypertarget{classMCMC_a52384b7e58b83ab2abd279071b08ad84}{
+unsigned \hyperlink{classMCMC_a52384b7e58b83ab2abd279071b08ad84}{nllblocksize}}
+\label{classMCMC_a52384b7e58b83ab2abd279071b08ad84}
+
+\begin{DoxyCompactList}\small\item\em size of cuda blocks for nll partial sums \item\end{DoxyCompactList}\item 
+\hypertarget{classMCMC_af09948388cb5534d9a563a943979eecd}{
+unsigned \hyperlink{classMCMC_af09948388cb5534d9a563a943979eecd}{nnllthreads}}
+\label{classMCMC_af09948388cb5534d9a563a943979eecd}
+
+\begin{DoxyCompactList}\small\item\em number of threads for nll partial sums \item\end{DoxyCompactList}\item 
+\hypertarget{classMCMC_a67d0ec8275be35be9bbb74fae8821bc6}{
+unsigned \hyperlink{classMCMC_a67d0ec8275be35be9bbb74fae8821bc6}{nreducethreads}}
+\label{classMCMC_a67d0ec8275be35be9bbb74fae8821bc6}
+
+\begin{DoxyCompactList}\small\item\em number of threads to use in partial sum reduction kernel \item\end{DoxyCompactList}\item 
+\hypertarget{classMCMC_a2259fe2a0027b6b3916e67fbf535e5a7}{
+unsigned \hyperlink{classMCMC_a2259fe2a0027b6b3916e67fbf535e5a7}{blocksize}}
+\label{classMCMC_a2259fe2a0027b6b3916e67fbf535e5a7}
+
+\begin{DoxyCompactList}\small\item\em size of blocks for per-\/signal kernels \item\end{DoxyCompactList}\item 
+\hypertarget{classMCMC_a9e11b4edfaa324abccebd15e5dc96be0}{
+unsigned \hyperlink{classMCMC_a9e11b4edfaa324abccebd15e5dc96be0}{nblocks}}
+\label{classMCMC_a9e11b4edfaa324abccebd15e5dc96be0}
+
+\begin{DoxyCompactList}\small\item\em number of blocks for per-\/signal kernels \item\end{DoxyCompactList}\item 
+\hypertarget{classMCMC_a64e03c6f7d909bdd78ab47e82a378979}{
+std::string \hyperlink{classMCMC_a64e03c6f7d909bdd78ab47e82a378979}{varlist}}
+\label{classMCMC_a64e03c6f7d909bdd78ab47e82a378979}
+
+\begin{DoxyCompactList}\small\item\em string identifier list for ntuple indexing \item\end{DoxyCompactList}\item 
+\hypertarget{classMCMC_afe9e36e8bd4bc6658f751ad43b0d58dd}{
+hemi::Array$<$ float $>$ $\ast$ \hyperlink{classMCMC_afe9e36e8bd4bc6658f751ad43b0d58dd}{expectations}}
+\label{classMCMC_afe9e36e8bd4bc6658f751ad43b0d58dd}
+
+\begin{DoxyCompactList}\small\item\em signal rate expectation values \item\end{DoxyCompactList}\item 
+\hypertarget{classMCMC_a78188ea2b8b1ebc7fde5d82373601532}{
+hemi::Array$<$ float $>$ $\ast$ \hyperlink{classMCMC_a78188ea2b8b1ebc7fde5d82373601532}{constraints}}
+\label{classMCMC_a78188ea2b8b1ebc7fde5d82373601532}
+
+\begin{DoxyCompactList}\small\item\em signal rate gaussian constraints \item\end{DoxyCompactList}\item 
+\hypertarget{classMCMC_a9ddda71766bb7340985199d8d0557bb6}{
+hemi::Array$<$ float $>$ $\ast$ \hyperlink{classMCMC_a9ddda71766bb7340985199d8d0557bb6}{lut}}
+\label{classMCMC_a9ddda71766bb7340985199d8d0557bb6}
+
+\begin{DoxyCompactList}\small\item\em Event/PDF probability lookup table. \item\end{DoxyCompactList}\item 
+\hypertarget{classMCMC_a84bc0adf94974a520b1227190f020917}{
+hemi::Array$<$ \hyperlink{nll__kernels_8h_aa4f3692120f92f1d2ab38f02ca8f86ad}{RNGState} $>$ $\ast$ \hyperlink{classMCMC_a84bc0adf94974a520b1227190f020917}{rngs}}
+\label{classMCMC_a84bc0adf94974a520b1227190f020917}
+
+\begin{DoxyCompactList}\small\item\em CURAND RNGs, ignored in CPU mode. \item\end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Markov Chain Monte Carlo simulator. Given a set of signal PDFs and a dataset, random walk to map out the likelihood space. 
+
+\subsection{Constructor \& Destructor Documentation}
+\hypertarget{classMCMC_a6b770d2197d45c0fcc136294fbeec672}{
+\index{MCMC@{MCMC}!MCMC@{MCMC}}
+\index{MCMC@{MCMC}!MCMC@{MCMC}}
+\subsubsection[{MCMC}]{\setlength{\rightskip}{0pt plus 5cm}MCMC::MCMC (const std::vector$<$ {\bf Signal} $>$ \& {\em signals}, \/  TNtuple $\ast$ {\em data})}}
+\label{classMCMC_a6b770d2197d45c0fcc136294fbeec672}
+Constructor
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em signals}]List of Signals defining the PDFs and expectations \item[{\em data}]The dataset as a TNtuple with fields \char`\"{}e:r\char`\"{} \end{DoxyParams}
+\hypertarget{classMCMC_a2d7d02c0892819ff5c9f91bc377d1def}{
+\index{MCMC@{MCMC}!$\sim$MCMC@{$\sim$MCMC}}
+\index{$\sim$MCMC@{$\sim$MCMC}!MCMC@{MCMC}}
+\subsubsection[{$\sim$MCMC}]{\setlength{\rightskip}{0pt plus 5cm}MCMC::$\sim$MCMC ()}}
+\label{classMCMC_a2d7d02c0892819ff5c9f91bc377d1def}
+Destructor
+
+Free HEMI arrays 
+
+\subsection{Member Function Documentation}
+\hypertarget{classMCMC_ab6a9587552fd9b23c2d13d97b791f05a}{
+\index{MCMC@{MCMC}!build\_\-lut@{build\_\-lut}}
+\index{build\_\-lut@{build\_\-lut}!MCMC@{MCMC}}
+\subsubsection[{build\_\-lut}]{\setlength{\rightskip}{0pt plus 5cm}hemi::Array$<$ float $>$ $\ast$ MCMC::build\_\-lut (const std::vector$<$ {\bf Signal} $>$ \& {\em signals}, \/  TNtuple $\ast$ {\em data})}}
+\label{classMCMC_ab6a9587552fd9b23c2d13d97b791f05a}
+Build Pj(xi) lookup table
+
+Build a table with nevents rows and nsignals columns, containing the value of normalized PDF j evaluted at event i.
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em signals}]Signals defining the PDFs \item[{\em data}]TNtuple defining the dataset \end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+HEMI array of probabilities, indexed as noted above 
+\end{DoxyReturn}
+\hypertarget{classMCMC_a1ed0f9d2fdc8aafec039dfa023289490}{
+\index{MCMC@{MCMC}!nll@{nll}}
+\index{nll@{nll}!MCMC@{MCMC}}
+\subsubsection[{nll}]{\setlength{\rightskip}{0pt plus 5cm}void MCMC::nll (const float $\ast$ {\em v}, \/  double $\ast$ {\em nll}, \/  double $\ast$ {\em event\_\-partial\_\-sums}, \/  double $\ast$ {\em event\_\-total\_\-sum})\hspace{0.3cm}{\ttfamily  \mbox{[}protected\mbox{]}}}}
+\label{classMCMC_a1ed0f9d2fdc8aafec039dfa023289490}
+Evaluate the NLL function
+
+-\/logL = sum(Nj) + 1/2$\ast$sum((r-\/r')$^\wedge$2/s$^\wedge$2) -\/ sum(log(sum(Nj$\ast$Pj(xi))))
+
+Nothing is returned -\/-\/ the output stays in the nll array, so it can stay on the device.
+
+This is done in three steps, to support running on the GPU:
+
+1. Compute partial sums of chunks of events for the last term 2. Total up partial sums from step 1 3. Add normalization and other constraints with sum from step 2
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em v}]Parameter vector at which to evaluate \item[{\em nll}]Container for output NLL value \item[{\em event\_\-partial\_\-sums}]Pre-\/allocated buffer for event term calculation \item[{\em event\_\-total\_\-sum}]Pre-\/allocated buffer for event term total \end{DoxyParams}
+\hypertarget{classMCMC_ac76eeacb8a362af4c62c596380b8da64}{
+\index{MCMC@{MCMC}!operator()@{operator()}}
+\index{operator()@{operator()}!MCMC@{MCMC}}
+\subsubsection[{operator()}]{\setlength{\rightskip}{0pt plus 5cm}TNtuple $\ast$ MCMC::operator() (unsigned {\em nsteps}, \/  float {\em burnin\_\-fraction}, \/  unsigned {\em sync\_\-interval} = {\ttfamily 1000})}}
+\label{classMCMC_ac76eeacb8a362af4c62c596380b8da64}
+Perform walk.
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em nsteps}]Number of random-\/walk steps to take \item[{\em burnin\_\-fraction}]Fraction of initial steps to throw out \item[{\em sync\_\-interval}]How often to copy accepted from GPU to storage \end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+TNtuple containing accepted points and their likelihoods 
+\end{DoxyReturn}
+
+
+The documentation for this class was generated from the following files:\begin{DoxyCompactItemize}
+\item 
+mcmc.h\item 
+mcmc.cpp\end{DoxyCompactItemize}

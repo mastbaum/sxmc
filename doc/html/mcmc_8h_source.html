@@ -38,27 +38,72 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
   <div class="tabs">
     <ul>
       <li><a href="files.html"><span>File&nbsp;List</span></a></li>
+      <li><a href="globals.html"><span>File&nbsp;Members</span></a></li>
     </ul>
   </div>
 <h1>mcmc.h</h1><div class="fragment"><pre class="fragment"><a name="l00001"></a>00001 <span class="preprocessor">#ifndef __MCMC_H__</span>
 <a name="l00002"></a>00002 <span class="preprocessor"></span><span class="preprocessor">#define __MCMC_H__</span>
 <a name="l00003"></a>00003 <span class="preprocessor"></span>
 <a name="l00004"></a>00004 <span class="preprocessor">#include &lt;vector&gt;</span>
-<a name="l00005"></a>00005 <span class="preprocessor">#include &lt;TNtuple.h&gt;</span>
-<a name="l00006"></a>00006 <span class="preprocessor">#include &quot;signals.h&quot;</span>
-<a name="l00007"></a>00007 
-<a name="l00009"></a>00009 TNtuple* mcmc(std::vector&lt;Signal&gt; signals, TNtuple* data, <span class="keywordtype">unsigned</span> nsteps,
-<a name="l00010"></a>00010               <span class="keywordtype">float</span> burnin_fraction);
-<a name="l00011"></a>00011 
-<a name="l00012"></a>00012 <span class="preprocessor">#endif  // __MCMC_H__</span>
-<a name="l00013"></a>00013 <span class="preprocessor"></span>
+<a name="l00005"></a>00005 <span class="preprocessor">#include &lt;cmath&gt;</span>
+<a name="l00006"></a>00006 <span class="preprocessor">#include &lt;cuda.h&gt;</span>
+<a name="l00007"></a>00007 <span class="preprocessor">#include &lt;hemi/hemi.h&gt;</span>
+<a name="l00008"></a>00008 <span class="preprocessor">#include &quot;signals.h&quot;</span>
+<a name="l00009"></a>00009 <span class="preprocessor">#include &quot;<a class="code" href="nll__kernels_8h.html" title="CUDA/HEMI kernels supporting NLL calculation.">nll_kernels.h</a>&quot;</span>
+<a name="l00010"></a>00010 
+<a name="l00011"></a>00011 <span class="preprocessor">#ifdef __CUDACC__</span>
+<a name="l00012"></a>00012 <span class="preprocessor"></span><span class="preprocessor">#include &lt;curand_kernel.h&gt;</span>
+<a name="l00013"></a>00013 <span class="preprocessor">#endif</span>
+<a name="l00014"></a>00014 <span class="preprocessor"></span>
+<a name="l00015"></a>00015 <span class="preprocessor">#ifndef __HEMI_ARRAY_H__</span>
+<a name="l00016"></a>00016 <span class="preprocessor"></span><span class="preprocessor">#define __HEMI_ARRAY_H__</span>
+<a name="l00017"></a>00017 <span class="preprocessor"></span><span class="preprocessor">#include &lt;hemi/array.h&gt;</span>
+<a name="l00018"></a>00018 <span class="preprocessor">#endif</span>
+<a name="l00019"></a>00019 <span class="preprocessor"></span>
+<a name="l00020"></a>00020 <span class="keyword">class </span>TNtuple;
+<a name="l00021"></a>00021 
+<a name="l00029"></a><a class="code" href="classMCMC.html">00029</a> <span class="keyword">class </span><a class="code" href="classMCMC.html" title="Markov Chain Monte Carlo simulator.">MCMC</a> {
+<a name="l00030"></a>00030   <span class="keyword">public</span>:
+<a name="l00037"></a>00037     <a class="code" href="classMCMC.html#a6b770d2197d45c0fcc136294fbeec672">MCMC</a>(<span class="keyword">const</span> std::vector&lt;Signal&gt;&amp; signals, TNtuple* data);
+<a name="l00038"></a>00038 
+<a name="l00044"></a>00044      <a class="code" href="classMCMC.html#a2d7d02c0892819ff5c9f91bc377d1def">~MCMC</a>();
+<a name="l00045"></a>00045 
+<a name="l00054"></a>00054     TNtuple* <a class="code" href="classMCMC.html#ac76eeacb8a362af4c62c596380b8da64">operator()</a>(<span class="keywordtype">unsigned</span> nsteps, <span class="keywordtype">float</span> burnin_fraction,
+<a name="l00055"></a>00055                         <span class="keywordtype">unsigned</span> sync_interval=1000);
+<a name="l00056"></a>00056 
+<a name="l00067"></a>00067     hemi::Array&lt;float&gt;* <a class="code" href="classMCMC.html#ab6a9587552fd9b23c2d13d97b791f05a">build_lut</a>(<span class="keyword">const</span> std::vector&lt;Signal&gt;&amp; signals,
+<a name="l00068"></a>00068                                         TNtuple* data);
+<a name="l00069"></a>00069 
+<a name="l00070"></a>00070   <span class="keyword">protected</span>:
+<a name="l00090"></a>00090     <span class="keywordtype">void</span> <a class="code" href="classMCMC.html#a1ed0f9d2fdc8aafec039dfa023289490">nll</a>(<span class="keyword">const</span> <span class="keywordtype">float</span>* v, <span class="keywordtype">double</span>* <a class="code" href="classMCMC.html#a1ed0f9d2fdc8aafec039dfa023289490">nll</a>,
+<a name="l00091"></a>00091              <span class="keywordtype">double</span>* event_partial_sums,
+<a name="l00092"></a>00092              <span class="keywordtype">double</span>* event_total_sum);
+<a name="l00093"></a>00093 
+<a name="l00094"></a>00094   <span class="keyword">private</span>:
+<a name="l00095"></a><a class="code" href="classMCMC.html#a417ddd0a6fdee2ea401d3d1ac727171a">00095</a>     <span class="keywordtype">unsigned</span> <a class="code" href="classMCMC.html#a417ddd0a6fdee2ea401d3d1ac727171a" title="number of signals">nsignals</a>;  
+<a name="l00096"></a><a class="code" href="classMCMC.html#a65d836666d35f0c4ffb3f94b84082cbc">00096</a>     <span class="keywordtype">unsigned</span> <a class="code" href="classMCMC.html#a65d836666d35f0c4ffb3f94b84082cbc" title="number of events">nevents</a>;  
+<a name="l00097"></a><a class="code" href="classMCMC.html#a1da299776614208fe3cbd4b3e7dad36e">00097</a>     <span class="keywordtype">unsigned</span> <a class="code" href="classMCMC.html#a1da299776614208fe3cbd4b3e7dad36e" title="number of cuda blocks for nll partial sums">nnllblocks</a>;  
+<a name="l00098"></a><a class="code" href="classMCMC.html#a52384b7e58b83ab2abd279071b08ad84">00098</a>     <span class="keywordtype">unsigned</span> <a class="code" href="classMCMC.html#a52384b7e58b83ab2abd279071b08ad84" title="size of cuda blocks for nll partial sums">nllblocksize</a>;  
+<a name="l00099"></a><a class="code" href="classMCMC.html#af09948388cb5534d9a563a943979eecd">00099</a>     <span class="keywordtype">unsigned</span> <a class="code" href="classMCMC.html#af09948388cb5534d9a563a943979eecd" title="number of threads for nll partial sums">nnllthreads</a>;  
+<a name="l00100"></a><a class="code" href="classMCMC.html#a67d0ec8275be35be9bbb74fae8821bc6">00100</a>     <span class="keywordtype">unsigned</span> <a class="code" href="classMCMC.html#a67d0ec8275be35be9bbb74fae8821bc6" title="number of threads to use in partial sum reduction kernel">nreducethreads</a>; 
+<a name="l00101"></a><a class="code" href="classMCMC.html#a2259fe2a0027b6b3916e67fbf535e5a7">00101</a>     <span class="keywordtype">unsigned</span> <a class="code" href="classMCMC.html#a2259fe2a0027b6b3916e67fbf535e5a7" title="size of blocks for per-signal kernels">blocksize</a>;  
+<a name="l00102"></a><a class="code" href="classMCMC.html#a9e11b4edfaa324abccebd15e5dc96be0">00102</a>     <span class="keywordtype">unsigned</span> <a class="code" href="classMCMC.html#a9e11b4edfaa324abccebd15e5dc96be0" title="number of blocks for per-signal kernels">nblocks</a>;  
+<a name="l00103"></a><a class="code" href="classMCMC.html#a64e03c6f7d909bdd78ab47e82a378979">00103</a>     std::string <a class="code" href="classMCMC.html#a64e03c6f7d909bdd78ab47e82a378979" title="string identifier list for ntuple indexing">varlist</a>;  
+<a name="l00104"></a><a class="code" href="classMCMC.html#afe9e36e8bd4bc6658f751ad43b0d58dd">00104</a>     hemi::Array&lt;float&gt;* <a class="code" href="classMCMC.html#afe9e36e8bd4bc6658f751ad43b0d58dd" title="signal rate expectation values">expectations</a>;  
+<a name="l00105"></a><a class="code" href="classMCMC.html#a78188ea2b8b1ebc7fde5d82373601532">00105</a>     hemi::Array&lt;float&gt;* <a class="code" href="classMCMC.html#a78188ea2b8b1ebc7fde5d82373601532" title="signal rate gaussian constraints">constraints</a>;  
+<a name="l00106"></a><a class="code" href="classMCMC.html#a9ddda71766bb7340985199d8d0557bb6">00106</a>     hemi::Array&lt;float&gt;* <a class="code" href="classMCMC.html#a9ddda71766bb7340985199d8d0557bb6" title="Event/PDF probability lookup table.">lut</a>;  
+<a name="l00107"></a><a class="code" href="classMCMC.html#a84bc0adf94974a520b1227190f020917">00107</a>     hemi::Array&lt;RNGState&gt;* <a class="code" href="classMCMC.html#a84bc0adf94974a520b1227190f020917" title="CURAND RNGs, ignored in CPU mode.">rngs</a>;  
+<a name="l00108"></a>00108 };
+<a name="l00109"></a>00109 
+<a name="l00110"></a>00110 <span class="preprocessor">#endif  // __MCMC_H__</span>
+<a name="l00111"></a>00111 <span class="preprocessor"></span>
 </pre></div></div>
 <!--- window showing the filter options -->
 <div id="MSearchSelectWindow"
      onmouseover="return searchBox.OnSearchSelectShow()"
      onmouseout="return searchBox.OnSearchSelectHide()"
      onkeydown="return searchBox.OnSearchSelectKey(event)">
-<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&nbsp;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&nbsp;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&nbsp;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&nbsp;</span>Variables</a></div>
+<a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(0)"><span class="SelectionMark">&nbsp;</span>All</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(1)"><span class="SelectionMark">&nbsp;</span>Classes</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(2)"><span class="SelectionMark">&nbsp;</span>Files</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(3)"><span class="SelectionMark">&nbsp;</span>Functions</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(4)"><span class="SelectionMark">&nbsp;</span>Variables</a><a class="SelectItem" href="javascript:void(0)" onclick="searchBox.OnSelectItem(5)"><span class="SelectionMark">&nbsp;</span>Typedefs</a></div>
 
 <!-- iframe showing the search results (closed by default) -->
 <div id="MSearchResultsWindow">
@@ -67,7 +112,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </iframe>
 </div>
 
-<hr class="footer"/><address style="text-align: right;"><small>Generated on Thu May 16 16:49:34 2013 for sxmc by&nbsp;
+<hr class="footer"/><address style="text-align: right;"><small>Generated on Wed May 22 15:57:24 2013 for sxmc by&nbsp;
 <a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.6.3 </small></address>
 </body>

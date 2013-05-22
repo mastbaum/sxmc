@@ -1,0 +1,80 @@
+\hypertarget{sensitivity_8cpp}{
+\section{sensitivity.cpp File Reference}
+\label{sensitivity_8cpp}\index{sensitivity.cpp@{sensitivity.cpp}}
+}
+
+
+Calculate sensitivity with an \hyperlink{classMCMC}{MCMC}.  
+
+
+{\ttfamily \#include $<$iostream$>$}\par
+{\ttfamily \#include $<$string$>$}\par
+{\ttfamily \#include $<$algorithm$>$}\par
+{\ttfamily \#include $<$assert.h$>$}\par
+{\ttfamily \#include $<$TFile.h$>$}\par
+{\ttfamily \#include $<$TH1F.h$>$}\par
+{\ttfamily \#include $<$TNtuple.h$>$}\par
+{\ttfamily \#include $<$TCanvas.h$>$}\par
+{\ttfamily \#include $<$TRandom.h$>$}\par
+{\ttfamily \#include $<$TRandom2.h$>$}\par
+{\ttfamily \#include \char`\"{}config.h\char`\"{}}\par
+{\ttfamily \#include \char`\"{}generator.h\char`\"{}}\par
+{\ttfamily \#include \char`\"{}mcmc.h\char`\"{}}\par
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+double \hyperlink{sensitivity_8cpp_a0039b283b17043ad4a35bc9ea0a6d1b3}{upper\_\-limit} (TH1F $\ast$h, double cl=0.682)
+\item 
+TH1F $\ast$ \hyperlink{sensitivity_8cpp_ab0aebb9dd25d9de04ecb6237c4ce9d9f}{ensemble} (std::vector$<$ \hyperlink{structSignal}{Signal} $>$ \&signals, \hyperlink{structRange}{Range}$<$ float $>$ \&e\_\-range, \hyperlink{structRange}{Range}$<$ float $>$ \&r\_\-range, unsigned steps, float burnin\_\-fraction, std::string signal\_\-name, float confidence, unsigned nexperiments)
+\item 
+int \hyperlink{sensitivity_8cpp_a0ddf1224851353fc92bfbff6f499fa97}{main} (int argc, char $\ast$argv\mbox{[}$\,$\mbox{]})
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Calculate sensitivity with an \hyperlink{classMCMC}{MCMC}. An ensemble of fake experiments is generated and each fit with an \hyperlink{classMCMC}{MCMC}, with parameters defined in the JSON configuration file. Limits are calculated for each. 
+
+\subsection{Function Documentation}
+\hypertarget{sensitivity_8cpp_ab0aebb9dd25d9de04ecb6237c4ce9d9f}{
+\index{sensitivity.cpp@{sensitivity.cpp}!ensemble@{ensemble}}
+\index{ensemble@{ensemble}!sensitivity.cpp@{sensitivity.cpp}}
+\subsubsection[{ensemble}]{\setlength{\rightskip}{0pt plus 5cm}TH1F$\ast$ ensemble (std::vector$<$ {\bf Signal} $>$ \& {\em signals}, \/  {\bf Range}$<$ float $>$ \& {\em e\_\-range}, \/  {\bf Range}$<$ float $>$ \& {\em r\_\-range}, \/  unsigned {\em steps}, \/  float {\em burnin\_\-fraction}, \/  std::string {\em signal\_\-name}, \/  float {\em confidence}, \/  unsigned {\em nexperiments})}}
+\label{sensitivity_8cpp_ab0aebb9dd25d9de04ecb6237c4ce9d9f}
+Run an ensemble of independent fake experiments
+
+Run experiments, fit with mcmc, and tabulate background-\/fluctuation sensitivity for each, creating a histogram of limits. The estimated sensitivity is the median of the limits of the ensemble.
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em signals}]List of Signals defining PDFs, rates, etc. \item[{\em e\_\-range}]Energy range to consider \item[{\em r\_\-range}]Radial range to consider \item[{\em steps}]Number of \hyperlink{classMCMC}{MCMC} random walk steps to take \item[{\em burnin\_\-fraction}]Fraction of initial \hyperlink{classMCMC}{MCMC} steps to throw out \item[{\em signal\_\-name}]The name of the \hyperlink{structSignal}{Signal} that is the signal \item[{\em confidence}]Desired confidence level for limits \item[{\em nexperiments}]Number of fake experiments to run \end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+A histogram of limits from the experiments 
+\end{DoxyReturn}
+\hypertarget{sensitivity_8cpp_a0ddf1224851353fc92bfbff6f499fa97}{
+\index{sensitivity.cpp@{sensitivity.cpp}!main@{main}}
+\index{main@{main}!sensitivity.cpp@{sensitivity.cpp}}
+\subsubsection[{main}]{\setlength{\rightskip}{0pt plus 5cm}int main (int {\em argc}, \/  char $\ast$ {\em argv}\mbox{[}$\,$\mbox{]})}}
+\label{sensitivity_8cpp_a0ddf1224851353fc92bfbff6f499fa97}
+Run the sensitivity calculation
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em argc}]Argument count: must be 2 \item[{\em argv}]Arguments: executable path and configuration filename \end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+0 on success, non-\/zero on failure 
+\end{DoxyReturn}
+\hypertarget{sensitivity_8cpp_a0039b283b17043ad4a35bc9ea0a6d1b3}{
+\index{sensitivity.cpp@{sensitivity.cpp}!upper\_\-limit@{upper\_\-limit}}
+\index{upper\_\-limit@{upper\_\-limit}!sensitivity.cpp@{sensitivity.cpp}}
+\subsubsection[{upper\_\-limit}]{\setlength{\rightskip}{0pt plus 5cm}double upper\_\-limit (TH1F $\ast$ {\em h}, \/  double {\em cl} = {\ttfamily 0.682})}}
+\label{sensitivity_8cpp_a0039b283b17043ad4a35bc9ea0a6d1b3}
+Find an upper limit
+
+Locate the x value that a fraction 1-\/CL/2 of the distribution falls above. This may over-\/cover due to finite histogram bin widths.
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em h}]1D histogram to calculate limit on \item[{\em cl}]Confidence level \end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+The nearest bin edge covering at least the desired confidence 
+\end{DoxyReturn}

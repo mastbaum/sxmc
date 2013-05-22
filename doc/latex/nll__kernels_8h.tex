@@ -1,0 +1,116 @@
+\hypertarget{nll__kernels_8h}{
+\section{nll\_\-kernels.h File Reference}
+\label{nll__kernels_8h}\index{nll\_\-kernels.h@{nll\_\-kernels.h}}
+}
+
+
+CUDA/HEMI kernels supporting NLL calculation.  
+
+
+{\ttfamily \#include $<$cuda.h$>$}\par
+{\ttfamily \#include $<$hemi/hemi.h$>$}\par
+{\ttfamily \#include $<$curand\_\-kernel.h$>$}\par
+{\ttfamily \#include $<$hemi/array.h$>$}\par
+\subsection*{Typedefs}
+\begin{DoxyCompactItemize}
+\item 
+\hypertarget{nll__kernels_8h_aa4f3692120f92f1d2ab38f02ca8f86ad}{
+typedef curandStateXORWOW \hyperlink{nll__kernels_8h_aa4f3692120f92f1d2ab38f02ca8f86ad}{RNGState}}
+\label{nll__kernels_8h_aa4f3692120f92f1d2ab38f02ca8f86ad}
+
+\begin{DoxyCompactList}\small\item\em Defines RNG for CURAND, ignored in CPU mode. \item\end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+\_\-\_\-global\_\-\_\- void \hyperlink{nll__kernels_8h_ade16645a3fc2a5d0a67354d902d52aa5}{init\_\-device\_\-rngs} (int nthreads, unsigned long long seed, curandState $\ast$state)
+\item 
+HEMI\_\-KERNEL() \hyperlink{nll__kernels_8h_a9b78788c5fabcfb7655f71ed40b36e03}{pick\_\-new\_\-vector} (int nthreads, \hyperlink{nll__kernels_8h_aa4f3692120f92f1d2ab38f02ca8f86ad}{RNGState} $\ast$rng, float sigma, const float $\ast$current\_\-vector, float $\ast$proposed\_\-vector)
+\item 
+HEMI\_\-KERNEL() \hyperlink{nll__kernels_8h_acb85d3dec6f0596b9806161d0b6bd33c}{jump\_\-decider} (\hyperlink{nll__kernels_8h_aa4f3692120f92f1d2ab38f02ca8f86ad}{RNGState} $\ast$rng, double $\ast$nll\_\-current, const double $\ast$nll\_\-proposed, float $\ast$v\_\-current, const float $\ast$v\_\-proposed, unsigned ns, int $\ast$counter, float $\ast$jump\_\-buffer)
+\item 
+HEMI\_\-KERNEL() \hyperlink{nll__kernels_8h_a42069941e2cc3aa0e853ba36a715324c}{nll\_\-event\_\-chunks} (const float $\ast$lut, const float $\ast$pars, const size\_\-t ne, const size\_\-t ns, double $\ast$sums)
+\item 
+HEMI\_\-KERNEL() \hyperlink{nll__kernels_8h_a469a8ed50868bf7ab77d63e305514c94}{nll\_\-event\_\-reduce} (const size\_\-t nthreads, const double $\ast$sums, double $\ast$total\_\-sum)
+\item 
+HEMI\_\-KERNEL() \hyperlink{nll__kernels_8h_a196d25063779ba3aa1c635339d8ee526}{nll\_\-total} (const size\_\-t ns, const float $\ast$pars, const float $\ast$expectations, const float $\ast$constraints, const double $\ast$events\_\-total, double $\ast$nll)
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+CUDA/HEMI kernels supporting NLL calculation. 
+
+\subsection{Function Documentation}
+\hypertarget{nll__kernels_8h_ade16645a3fc2a5d0a67354d902d52aa5}{
+\index{nll\_\-kernels.h@{nll\_\-kernels.h}!init\_\-device\_\-rngs@{init\_\-device\_\-rngs}}
+\index{init\_\-device\_\-rngs@{init\_\-device\_\-rngs}!nll_kernels.h@{nll\_\-kernels.h}}
+\subsubsection[{init\_\-device\_\-rngs}]{\setlength{\rightskip}{0pt plus 5cm}\_\-\_\-global\_\-\_\- void init\_\-device\_\-rngs (int {\em nthreads}, \/  unsigned long long {\em seed}, \/  curandState $\ast$ {\em state})}}
+\label{nll__kernels_8h_ade16645a3fc2a5d0a67354d902d52aa5}
+Initialize device-\/side RNGs.
+
+Generators all have the same seed but a different offset in the sequence.
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em nthreads}]Number of threads (same as the number of states) \item[{\em seed}]Random seed shared by all generators \item[{\em state}]Array of CUDA RNG states \end{DoxyParams}
+\hypertarget{nll__kernels_8h_acb85d3dec6f0596b9806161d0b6bd33c}{
+\index{nll\_\-kernels.h@{nll\_\-kernels.h}!jump\_\-decider@{jump\_\-decider}}
+\index{jump\_\-decider@{jump\_\-decider}!nll_kernels.h@{nll\_\-kernels.h}}
+\subsubsection[{jump\_\-decider}]{\setlength{\rightskip}{0pt plus 5cm}HEMI\_\-KERNEL() jump\_\-decider ({\bf RNGState} $\ast$ {\em rng}, \/  double $\ast$ {\em nll\_\-current}, \/  const double $\ast$ {\em nll\_\-proposed}, \/  float $\ast$ {\em v\_\-current}, \/  const float $\ast$ {\em v\_\-proposed}, \/  unsigned {\em ns}, \/  int $\ast$ {\em counter}, \/  float $\ast$ {\em jump\_\-buffer})}}
+\label{nll__kernels_8h_acb85d3dec6f0596b9806161d0b6bd33c}
+Decide whether to accept a random \hyperlink{classMCMC}{MCMC} step
+
+Compare likelihoods of current and proposed parameter vectors. If the step is accepted, store it in a buffer which can be flushed periodically, minimizing transfer overhead.
+
+The step buffer is an (Nsignals + 1 x Nsteps) matrix, where the last column contains the likelihood value.
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em rng}]Random-\/number generator states, used in GPU mode only \item[{\em nll\_\-current}]The NLL of the current parameters \item[{\em nll\_\-proposed}]the NLL of the proposed parameters \item[{\em v\_\-current}]The current parameters \item[{\em v\_\-proposed}]The proposed parameters \item[{\em ns}]The number of signals \item[{\em counter}]The number of steps in the buffer \item[{\em jump\_\-buffer}]The step buffer \end{DoxyParams}
+\hypertarget{nll__kernels_8h_a42069941e2cc3aa0e853ba36a715324c}{
+\index{nll\_\-kernels.h@{nll\_\-kernels.h}!nll\_\-event\_\-chunks@{nll\_\-event\_\-chunks}}
+\index{nll\_\-event\_\-chunks@{nll\_\-event\_\-chunks}!nll_kernels.h@{nll\_\-kernels.h}}
+\subsubsection[{nll\_\-event\_\-chunks}]{\setlength{\rightskip}{0pt plus 5cm}HEMI\_\-KERNEL() nll\_\-event\_\-chunks (const float $\ast$ {\em lut}, \/  const float $\ast$ {\em pars}, \/  const size\_\-t {\em ne}, \/  const size\_\-t {\em ns}, \/  double $\ast$ {\em sums})}}
+\label{nll__kernels_8h_a42069941e2cc3aa0e853ba36a715324c}
+NLL Part 1
+
+Calculate -\/sum(log(sum(Nj $\ast$ Pj(xi)))) contribution to NLL.
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em lut}]Pj(xi) lookup table \item[{\em pars}]Event rates (normalizations) for each signal \item[{\em ne}]Number of events in the data \item[{\em ns}]Number of signals \item[{\em sums}]Output sums for subsets of events \end{DoxyParams}
+\hypertarget{nll__kernels_8h_a469a8ed50868bf7ab77d63e305514c94}{
+\index{nll\_\-kernels.h@{nll\_\-kernels.h}!nll\_\-event\_\-reduce@{nll\_\-event\_\-reduce}}
+\index{nll\_\-event\_\-reduce@{nll\_\-event\_\-reduce}!nll_kernels.h@{nll\_\-kernels.h}}
+\subsubsection[{nll\_\-event\_\-reduce}]{\setlength{\rightskip}{0pt plus 5cm}HEMI\_\-KERNEL() nll\_\-event\_\-reduce (const size\_\-t {\em nthreads}, \/  const double $\ast$ {\em sums}, \/  double $\ast$ {\em total\_\-sum})}}
+\label{nll__kernels_8h_a469a8ed50868bf7ab77d63e305514c94}
+NLL Part 2
+
+Total up the partial sums from Part 1
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em nthreads}]Number of threads == number of sums to total \item[{\em sums}]The partial sums \item[{\em total\_\-sum}]Output: the total sum \end{DoxyParams}
+\hypertarget{nll__kernels_8h_a196d25063779ba3aa1c635339d8ee526}{
+\index{nll\_\-kernels.h@{nll\_\-kernels.h}!nll\_\-total@{nll\_\-total}}
+\index{nll\_\-total@{nll\_\-total}!nll_kernels.h@{nll\_\-kernels.h}}
+\subsubsection[{nll\_\-total}]{\setlength{\rightskip}{0pt plus 5cm}HEMI\_\-KERNEL() nll\_\-total (const size\_\-t {\em ns}, \/  const float $\ast$ {\em pars}, \/  const float $\ast$ {\em expectations}, \/  const float $\ast$ {\em constraints}, \/  const double $\ast$ {\em events\_\-total}, \/  double $\ast$ {\em nll})}}
+\label{nll__kernels_8h_a196d25063779ba3aa1c635339d8ee526}
+NLL Part 3
+
+Calculate overall normalization and constraints contributions to NLL, add in the event term to get the total.
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em ns}]Number of signals \item[{\em pars}]Event rates (normalizations) for each signal \item[{\em expectations}]Expected rates for each signal \item[{\em constraints}]Fractional constraints for each signal \item[{\em events\_\-total}]Sum of event term contribution \item[{\em nll}]The total NLL \end{DoxyParams}
+\hypertarget{nll__kernels_8h_a9b78788c5fabcfb7655f71ed40b36e03}{
+\index{nll\_\-kernels.h@{nll\_\-kernels.h}!pick\_\-new\_\-vector@{pick\_\-new\_\-vector}}
+\index{pick\_\-new\_\-vector@{pick\_\-new\_\-vector}!nll_kernels.h@{nll\_\-kernels.h}}
+\subsubsection[{pick\_\-new\_\-vector}]{\setlength{\rightskip}{0pt plus 5cm}HEMI\_\-KERNEL() pick\_\-new\_\-vector (int {\em nthreads}, \/  {\bf RNGState} $\ast$ {\em rng}, \/  float {\em sigma}, \/  const float $\ast$ {\em current\_\-vector}, \/  float $\ast$ {\em proposed\_\-vector})}}
+\label{nll__kernels_8h_a9b78788c5fabcfb7655f71ed40b36e03}
+Pick a new position distributed around the given one.
+
+Uses CURAND XORWOW generator on GPU, or ROOT's gRandom on the CPU.
+
+
+\begin{DoxyParams}{Parameters}
+\item[{\em nthreads}]Number of threads == length of vectors \item[{\em rng}]CUDA RNG states, ignored on CPU \item[{\em sigma}]Standard deviation to sample \item[{\em current\_\-vector}]Vector of current parameters \item[{\em proposed\_\-vector}]Output vector of proposed parameters \end{DoxyParams}
