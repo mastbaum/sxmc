@@ -94,7 +94,7 @@ HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
   int offset = hemiGetElementOffset();
   int stride = hemiGetElementStride();
 
-#ifdef __CUDACC__
+#ifdef HEMI_DEV_CODE
   extern __shared__ double block_sums[];
 #else
   double block_sums[1];
@@ -106,7 +106,7 @@ HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
   }
   block_sums[offset] = thread_sum;
 
-#ifdef __CUDACC__
+#ifdef HEMI_DEV_CODE
   // Shared memory reduction
   __syncthreads();
   for (int i = blockDim.x/2; i > 0; i >>= 1)
