@@ -9,7 +9,6 @@ Building
 `sxmc` requires the following libraries:
 
 * [ROOT](http://root.cern.ch)
-* RAT (to make PDFs from MC files)
 * [JsonCpp](http://jsoncpp.sourceforge.net)
 * [Doxygen](http://doxygen.org) (if building documentation)
 
@@ -52,9 +51,4 @@ Usage
 
 3. To calculate signal sensitivity, run:
    `$ ./bin/sensitivity config/your_file.json`
-
-Configuration Files
--------------------
-The fit is controlled via a JSON-format configuration file. See
-`config/example.json` for an annotated example.
 

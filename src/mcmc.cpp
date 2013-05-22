@@ -80,7 +80,7 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
 
   unsigned burnin_steps = nsteps * burnin_fraction;
 
-  float sigma = 0.05;  // FIXME make adaptive
+  float sigma = 5.0;  // FIXME make adaptive
 
   // Ntuple to hold likelihood space
   TNtuple* nt = new TNtuple("lspace", "Likelihood space",

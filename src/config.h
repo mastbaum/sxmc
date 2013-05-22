@@ -1,10 +1,3 @@
-/**
- * \class FitConfig
- * \brief Manages the configuration of a fit
- *
- * A utility class for reading in configuration parameters from a JSON file.
- */
-
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
@@ -16,6 +9,12 @@
 class TH1D;
 class TH2F;
 
+/**
+ * \class FitConfig
+ * \brief Manages the configuration of a fit
+ *
+ * A utility class for reading in configuration parameters from a JSON file.
+ */
 class FitConfig {
   public:
     /**

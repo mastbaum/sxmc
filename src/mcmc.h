@@ -1,11 +1,3 @@
-/**
- * \class MCMC
- * \brief Markov Chain Monte Carlo simulator
- *
- * Given a set of signal PDFs and a dataset, random walk to map out the
- * likelihood space.
- */
-
 #ifndef __MCMC_H__
 #define __MCMC_H__
 
@@ -27,6 +19,13 @@
 
 class TNtuple;
 
+/**
+ * \class MCMC
+ * \brief Markov Chain Monte Carlo simulator
+ *
+ * Given a set of signal PDFs and a dataset, random walk to map out the
+ * likelihood space.
+ */
 class MCMC {
   public:
     /**

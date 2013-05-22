@@ -1,3 +1,9 @@
+#ifndef __GENERATOR_H__
+#define __GENERATOR_H__
+
+#include "utils.h"
+#include "signals.h"
+
 /**
  * \class FakeDataGenerator
  * \brief Generate fake data sets
@@ -5,13 +11,6 @@
  * Make fake data set Ntuples by sampling PDFs according to given
  * normalizations.
  */
-
-#ifndef __GENERATOR_H__
-#define __GENERATOR_H__
-
-#include "utils.h"
-#include "signals.h"
-
 class FakeDataGenerator {
   public:
     /**

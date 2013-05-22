@@ -1,13 +1,12 @@
+#ifndef __SIGNALS_H__
+#define __SIGNALS_H__
+
 /**
- * \class Signal
+ * \struct Signal
  * \brief A container for signal metadata and PDFs
  *
  * (Not to be confused with signal.h, which defines UNIX signals.)
  */
-
-#ifndef __SIGNALS_H__
-#define __SIGNALS_H__
-
 struct Signal {
   std::string name;  //!< string identifier
   std::string title;  //!< histogram title in ROOT-LaTeX format
