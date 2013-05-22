@@ -1,3 +1,11 @@
+/**
+ * \class MCMC
+ * \brief Markov Chain Monte Carlo simulator
+ *
+ * Given a set of signal PDFs and a dataset, random walk to map out the
+ * likelihood space.
+ */
+
 #ifndef __MCMC_H__
 #define __MCMC_H__
 
@@ -6,6 +14,7 @@
 #include <cuda.h>
 #include <hemi/hemi.h>
 #include "signals.h"
+#include "nll_kernels.h"
 
 #ifdef __CUDACC__
 #include <curand_kernel.h>
@@ -16,98 +25,8 @@
 #include <hemi/array.h>
 #endif
 
-#ifdef __CUDACC__
-typedef curandState RNGState;
-#else
-typedef int RNGState;  // ignored by CPU code
-#endif
-
 class TNtuple;
 
-#ifdef __CUDACC__
-/**
- * Initialize device-side RNGs.
- *
- * Generators all have the same seed but a different offset in the sequence.
- *
- * \param nthreads Number of threads (same as the number of states)
- * \param seed Random seed shared by all generators
- * \param state Array of CUDA RNG states
- */
-__global__ void init_device_rngs(int nthreads, unsigned long long seed,
-                                 curandState* state);
-#endif
-
-
-/**
- * Pick a new position distributed around the given one.
- *
- * Uses CURAND XORWOW generator on GPU, or ROOT's gRandom on the CPU.
- *
- * \param nthreads Number of threads == length of vectors
- * \param rng CUDA RNG states, ignored on CPU
- * \param sigma Standard deviation to sample
- * \param current_vector Vector of current parameters
- * \param proposed_vector Output vector of proposed parameters
- */
-HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng, float sigma,
-                             float* current_vector, float* proposed_vector);
-
-
-/**
- * NLL Part 1
- *
- * Calculate -sum(log(sum(Nj * Pj(xi)))) contribution to NLL.
- *
- * \param lut Pj(xi) lookup table
- * \param pars Event rates (normalizations) for each signal
- * \param ne Number of events in the data
- * \param ns Number of signals
- * \param sums Output sums for subsets of events
- */
-HEMI_KERNEL(nll_event_chunks)(const float* lut, const float* pars,
-                              const size_t ne, const size_t ns,
-                              double* sums);
-
-
-/**
- * NLL Part 2
- *
- * Total up the partial sums from Part 1
- *
- * \param
- */
-HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
-                              double* total_sum);
-
-
-/**
- * NLL Part 3
- *
- * Calculate overall normalization and constraints contributions to NLL, add
- * in the event term to get the total.
- *
- * \param ns Number of signals
- * \param pars Event rates (normalizations) for each signal
- * \param expectations Expected rates for each signal
- * \param constraints Fractional constraints for each signal
- * \param events_total Sum of event term contribution
- * \param nll The total NLL
- */
-HEMI_KERNEL(nll_total)(const size_t ns, const float* pars,
-                       const float* expectations,
-                       const float* constraints,
-                       const double* events_total,
-                       float* nll);
-
-
-/**
- * \class MCMC
- * \brief Markov Chain Monte Carlo simulator
- *
- * Given a set of signal PDFs and a dataset, random walk to map out the
- * likelihood space.
- */
 class MCMC {
   public:
     /**
@@ -116,7 +35,7 @@ class MCMC {
      * \param signals List of Signals defining the PDFs and expectations
      * \param data The dataset as a TNtuple with fields "e:r"
      */
-    MCMC(std::vector<Signal> signals, TNtuple* data);
+    MCMC(const std::vector<Signal>& signals, TNtuple* data);
 
     /**
      * Destructor
@@ -169,22 +88,23 @@ class MCMC {
      * \param event_partial_sums Pre-allocated buffer for event term calculation
      * \param event_total_sum Pre-allocated buffer for event term total
      */
-    void nll(hemi::Array<float>& v, hemi::Array<float>& nll,
-             hemi::Array<double>& event_partial_sums,
-             hemi::Array<double>& event_total_sum);
+    void nll(const float* v, double* nll,
+             double* event_partial_sums,
+             double* event_total_sum);
 
   private:
-    unsigned nsignals;
-    unsigned nevents;
-    unsigned nnllblocks;
-    unsigned nllblocksize;
-    unsigned nnllthreads;
-    unsigned blocksize;
-    unsigned nblocks;
-    hemi::Array<float>* expectations;
-    hemi::Array<float>* constraints;
-    hemi::Array<float>* lut;  // Event/PDF probability lookup table
-    hemi::Array<RNGState>* rngs;  // CURAND RNGs, ignored in CPU mode
+    unsigned nsignals;  //!< number of signals
+    unsigned nevents;  //!< number of events
+    unsigned nnllblocks;  //!< number of cuda blocks for nll partial sums
+    unsigned nllblocksize;  //!< size of cuda blocks for nll partial sums
+    unsigned nnllthreads;  //!< number of threads for nll partial sums
+    unsigned blocksize;  //!< size of blocks for per-signal kernels
+    unsigned nblocks;  //!< number of blocks for per-signal kernels
+    std::string varlist;  //!< string identifier list for ntuple indexing
+    hemi::Array<float>* expectations;  //!< signal rate expectation values
+    hemi::Array<float>* constraints;  //!< signal rate gaussian constraints
+    hemi::Array<float>* lut;  //!< Event/PDF probability lookup table
+    hemi::Array<RNGState>* rngs;  //!< CURAND RNGs, ignored in CPU mode
 };
 
 #endif  // __MCMC_H__

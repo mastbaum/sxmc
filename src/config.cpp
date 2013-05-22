@@ -59,7 +59,7 @@ FitConfig::FitConfig(std::string filename) {
 
   // signal parameters
   const Json::Value signal_names = root["signals"];
-  for (Json::Value::const_iterator it=signal_names.begin(); it!=signal_names.end(); it++) {
+  for (Json::Value::const_iterator it=signal_names.begin(); it!=signal_names.end(); ++it) {
     if (std::find(fit_signal_names.begin(), fit_signal_names.end(), it.key().asString()) == fit_signal_names.end()) {
       continue;
     }
@@ -81,7 +81,6 @@ FitConfig::FitConfig(std::string filename) {
       s.histogram = dynamic_cast<TH1*>(project1d(h2d, &this->r_range));
       int x1 = s.histogram->GetXaxis()->FindBin(e_range.min);
       int x2 = s.histogram->GetXaxis()->FindBin(e_range.max);
-      std::cout << s.name << ": " <<  s.histogram->Integral(x1, x2) << " // " <<  h2d->Integral() << std::endl; //////////
       s.nexpected *= (s.histogram->Integral(x1, x2) / h2d->Integral());
       s.histogram->Rebin(rebin_e);
     }
@@ -145,7 +144,7 @@ void FitConfig::print() const {
             << "  Confidence level: " << this->confidence << std::endl
             << "Signals:" << std::endl;
 
-  for (std::vector<Signal>::const_iterator it=this->signals.begin(); it!=this->signals.end(); it++) {
+  for (std::vector<Signal>::const_iterator it=this->signals.begin(); it!=this->signals.end(); ++it) {
     std::cout << "  " << it->name << std::endl;
     std::cout << "    Title: \"" << it->title << "\"" << std::endl;
     std::cout << "    Expectation:  "<< it->nexpected << std::endl;

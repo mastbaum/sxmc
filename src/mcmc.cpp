@@ -1,121 +1,33 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <assert.h>
 #include <hemi/hemi.h>
 #include <TH1D.h>
 #include <TH2F.h>
 #include <TNtuple.h>
 #include <TRandom.h>
+#include <TStopwatch.h>
 #include "mcmc.h"
 #include "signals.h"
-
-#ifdef __CUDACC__
-#include <curand_kernel.h>
-#endif
 
 #ifndef __HEMI_ARRAY_H__
 #define __HEMI_ARRAY_H__
 #include <hemi/array.h>
 #endif
 
-#ifdef __CUDACC__
-__global__ void init_device_rngs(int nthreads, unsigned long long seed,
-                                 curandState* state) {
-  int idx = hemiGetElementOffset();
-  if (idx > nthreads) {
-    return;
-  }
-  curand_init(seed, idx, 0, &state[idx]);
-}
-#endif
-
-HEMI_KERNEL(pick_new_vector)(int nthreads, curandState* rng, float sigma,
-                             const float* current_vector,
-                             float* proposed_vector) {
-  int idx = hemiGetElementOffset();
-  if (idx > nthreads) {
-    return;
-  }
-#ifdef HEMI_DEV_CODE
-  float u = curand_normal(&rng[idx]);
-  proposed_vector[idx] = current_vector[idx] + sigma * u;
-#else
-  proposed_vector[idx] = gRandom->Gaus(current_vector[idx], sigma);
-#endif
-}
-
-
-HEMI_KERNEL(nll_event_chunks)(const float* lut, const float* pars,
-                              const size_t ne, const size_t ns,
-                              double* sums) {
-  int offset = hemiGetElementOffset();
-  int stride = hemiGetElementStride();
-
-  double sum = 0;
-  for (int i=offset; i<(int)ne; i+=stride) {
-    double s = 0;
-    for (size_t j=0; j<ns; j++) {
-      s += pars[j] * lut[i * ns + j];
-    }
-    sum += log(s);
-  }
-
-  sums[offset] = sum;
-}
-
-
-HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
-                             double* total_sum) {
-  float sum = 0;
-  for (size_t i=0; i<nthreads; i++) {
-    sum += sums[i];
-  }
-  *total_sum = sum;
-}
-
-
-HEMI_KERNEL(nll_total)(const size_t ns, const float* pars,
-                       const float* expectations,
-                       const float* constraints,
-                       const double* events_total,
-                       float* nll) {
-  int idx = hemiGetElementOffset();
-
-  // total from sum over events, once
-  if (idx == 0) {
-#ifdef HEMI_DEV_CODE
-    atomicAdd(nll, *events_total);
-#else
-    *nll = *nll + *events_total;
-#endif
-  }
-
-  // normalization constraints
-#ifdef HEMI_DEV_CODE
-  atomicAdd(nll, pars[idx]);
-#else
-  *nll = *nll + pars[idx];
-#endif
-
-  // gaussian constraints
-  if (constraints[idx] != 0) {
-    float x = (pars[idx] / expectations[idx] - 1.0) / constraints[idx];
-#ifdef HEMI_DEV_CODE
-    atomicAdd(nll, x * x);
-#else
-    *nll = *nll + x * x;
-#endif
-  }
-}
-
-
-MCMC::MCMC(std::vector<Signal> signals, TNtuple* data) {
+MCMC::MCMC(const std::vector<Signal>& signals, TNtuple* data) {
   this->nsignals = signals.size();
   this->nevents = data->GetEntries();
 
-  this->nnllblocks = 256;
+#ifdef __CUDACC__
+  this->nnllblocks = 64;
   this->nllblocksize = 16;
-  this->nnllthreads = this->nblocks * this->blocksize;
+#else
+  this->nnllblocks = 1;
+  this->nllblocksize = 1;
+#endif
+  this->nnllthreads = this->nnllblocks * this->nllblocksize;
 
   this->expectations = new hemi::Array<float>(this->nsignals, true);
   for (size_t i=0; i<this->nsignals; i++) {
@@ -130,15 +42,23 @@ MCMC::MCMC(std::vector<Signal> signals, TNtuple* data) {
   // Pj(xi) lookup table
   this->lut = MCMC::build_lut(signals, data);
 
+  // list of variables for output ntuple
+  for (size_t i=0; i<signals.size(); i++) {
+    this->varlist += (signals[i].name + ":");
+  }
+  this->varlist += "likelihood";
+
+  this->rngs = new hemi::Array<RNGState>(this->nsignals, true);
+
   // if compiling device code, initialize the RNGs
 #ifdef __CUDACC__
-  this->rngs = new hemi::Array<RNGState>(this->nsignals, true);
   this->rngs->writeOnlyHostPtr();
-  int bs = 256;
+  int bs = 128;
   int nb = this->nsignals / bs + 1;
+  assert(nb < 8);
   init_device_rngs<<<nb, bs>>>(this->nsignals, 1234, this->rngs->ptr());
 #else
-  this->rngs = static_cast<hemi::Array<RNGState>*>(NULL);
+  this->rngs->writeOnlyHostPtr();
 #endif
 }
 
@@ -152,11 +72,18 @@ MCMC::~MCMC() {
 
 
 TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
-                    unsigned sync_interval) {
-  int bs = 256;
+                          unsigned sync_interval) {
+  int bs = 128;
   int nb = this->nsignals / bs + 1;
+  assert(nb < 8);
 
-  float sigma = 0.125;  // FIXME make adaptive
+  unsigned burnin_steps = nsteps * burnin_fraction;
+
+  float sigma = 0.05;  // FIXME make adaptive
+
+  // Ntuple to hold likelihood space
+  TNtuple* nt = new TNtuple("lspace", "Likelihood space",
+                            this->varlist.c_str());
 
   // buffers for current and proposed parameter vectors
   hemi::Array<float> current_vector(this->nsignals, true);
@@ -168,66 +95,117 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
   proposed_vector.writeOnlyHostPtr();  // touch to set valid
 
   // buffers for nll values at current and proposed parameter vectors
-  hemi::Array<float> current_nll(1, true);
+  hemi::Array<double> current_nll(1, true);
   current_nll.writeOnlyHostPtr();
 
-  hemi::Array<float> proposed_nll(1, true);
+  hemi::Array<double> proposed_nll(1, true);
   proposed_nll.writeOnlyHostPtr();
 
   // buffers for computing event term in nll
-  hemi::Array<double> event_partial_sums(nnllthreads, true);
+  hemi::Array<double> event_partial_sums(this->nnllthreads, true);
+  event_partial_sums.writeOnlyHostPtr();
+
   hemi::Array<double> event_total_sum(1, true);    
+  event_total_sum.writeOnlyHostPtr();
+
+  // buffer of accepted jumps, transferred from gpu periodically
+  hemi::Array<int> jump_counter(1, true);
+  jump_counter.writeOnlyHostPtr()[0] = 0;
+
+  hemi::Array<float> jump_buffer(sync_interval * (this->nsignals + 1), true);
+  float* jump_vector = new float[this->nsignals + 1];
 
   // calculate nll with initial parameters
-  nll(current_vector, current_nll, event_partial_sums, event_total_sum);
+  const float* cv = current_vector.readOnlyHostPtr();
+  nll(current_vector.readOnlyPtr(), current_nll.writeOnlyPtr(),
+      event_partial_sums.ptr(), event_total_sum.ptr());
 
+  // perform random walk
+  TStopwatch timer;
+  timer.Start();
   for (unsigned i=0; i<nsteps; i++) {
-    HEMI_KERNEL_LAUNCH(pick_new_vector, nb, bs, 0, 0,
+    HEMI_KERNEL_LAUNCH(pick_new_vector, 8, 8, 0, 0,
                        this->nsignals, this->rngs->ptr(), sigma,
                        current_vector.readOnlyPtr(),
                        proposed_vector.writeOnlyPtr());
 
-    nll(proposed_vector, proposed_nll, event_partial_sums, event_total_sum);
+    nll(proposed_vector.readOnlyPtr(), proposed_nll.writeOnlyPtr(),
+        event_partial_sums.ptr(), event_total_sum.ptr());
 
-    // compare, accept/reject, store
+    //std::cout << "current: " << current_nll.readOnlyHostPtr()[0] << ", "
+    //          << "proposed: " << proposed_nll.readOnlyHostPtr()[0]
+    //          << std::endl;
 
-    std::cout << "current: " << current_nll.readOnlyHostPtr()[0] << ", "
-              << "proposed: " << proposed_nll.readOnlyHostPtr()[0]
-              << std::endl;
+    HEMI_KERNEL_LAUNCH(jump_decider, 1, 1, 0, 0,
+                       this->rngs->ptr(),
+                       current_nll.ptr(),
+                       proposed_nll.readOnlyPtr(),
+                       current_vector.ptr(),
+                       proposed_vector.readOnlyPtr(),
+                       this->nsignals,
+                       jump_counter.ptr(),
+                       jump_buffer.writeOnlyPtr());
 
+    // flush the jump buffer periodically
     if (i % sync_interval == 0 || i == nsteps - 1) {
-      // dump gpu step buffer to TNtuple
+      int njumps = jump_counter.readOnlyHostPtr()[0];
+      std::cout << i << " " << sync_interval << " " << nsteps << ": JUMPS IN BUFFER: " << njumps << std::endl;
+      for (int j=0; j<njumps; j++) {
+         // first nsignals elements are normalizations
+         for (unsigned k=0; k<this->nsignals; k++) {
+           int idx = j * (this->nsignals + 1) + k;
+           jump_vector[k] = jump_buffer.readOnlyHostPtr()[idx];
+         }
+         // last element is the likelihood
+         jump_vector[this->nsignals] = jump_buffer.readOnlyHostPtr()[j*(this->nsignals+1)+this->nsignals];
+
+        //for (unsigned i=0; i<=this->nsignals; i++) {
+        //  std::cout << jump_vector[i] << " ";
+        //}
+        //std::cout << std::endl;
+        if (i > burnin_steps) {
+          nt->Fill(jump_vector);
+        }
+      }
+
+      // reset counter
+      jump_counter.writeOnlyHostPtr()[0] = 0;
     }
   }
 
-  return static_cast<TNtuple*>(NULL);
+  std::cout << "MCMC: Elapsed time: " << timer.RealTime() << std::endl;
+
+  delete[] jump_vector;
+
+  return nt;
 }
 
 
-void MCMC::nll(hemi::Array<float>& v, hemi::Array<float>& nll,
-               hemi::Array<double>& event_partial_sums,
-               hemi::Array<double>& event_total_sum) {
+void MCMC::nll(const float* v, double* nll,
+               double* event_partial_sums,
+               double* event_total_sum) {
   // partial sums of event term
-  HEMI_KERNEL_LAUNCH(nll_event_chunks, 16, 256, 0, 0,
+  HEMI_KERNEL_LAUNCH(nll_event_chunks, this->nnllblocks,
+                     this->nllblocksize, 0, 0,
                      this->lut->readOnlyPtr(),
-                     v.readOnlyPtr(),
+                     v,
                      this->nevents, this->nsignals,
-                     event_partial_sums.writeOnlyPtr());
+                     event_partial_sums);
 
   // total of event term
-  HEMI_KERNEL_LAUNCH(nll_event_reduce, 1, this->nnllthreads, 0, 0,
+  HEMI_KERNEL_LAUNCH(nll_event_reduce, 1, 1, 0 ,0,
                      this->nnllthreads,
-                     event_partial_sums.readOnlyPtr(),
-                     event_total_sum.writeOnlyPtr());
+                     event_partial_sums,
+                     event_total_sum);
 
   // constraints + event term
   HEMI_KERNEL_LAUNCH(nll_total, 1, 1, 0, 0,
                      this->nsignals,
-                     v.readOnlyPtr(),
+                     v,
                      this->expectations->readOnlyPtr(),
                      this->constraints->readOnlyPtr(),
-                     event_total_sum.readOnlyPtr(),
-                     nll.writeOnlyPtr());
+                     event_total_sum,
+                     nll);
 }
     
 
