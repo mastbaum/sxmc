@@ -28,6 +28,7 @@ MCMC::MCMC(const std::vector<Signal>& signals, TNtuple* data) {
   this->nllblocksize = 1;
 #endif
   this->nnllthreads = this->nnllblocks * this->nllblocksize;
+  this->nreducethreads = 128;
 
   this->expectations = new hemi::Array<float>(this->nsignals, true);
   for (size_t i=0; i<this->nsignals; i++) {
@@ -193,7 +194,8 @@ void MCMC::nll(const float* v, double* nll,
                      event_partial_sums);
 
   // total of event term
-  HEMI_KERNEL_LAUNCH(nll_event_reduce, 1, 1, 0 ,0,
+  HEMI_KERNEL_LAUNCH(nll_event_reduce, 1, this->nreducethreads,  
+		     this->nreducethreads * sizeof(double) /* shared memory */, 0,
                      this->nnllthreads,
                      event_partial_sums,
                      event_total_sum);

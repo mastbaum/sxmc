@@ -98,6 +98,7 @@ class MCMC {
     unsigned nnllblocks;  //!< number of cuda blocks for nll partial sums
     unsigned nllblocksize;  //!< size of cuda blocks for nll partial sums
     unsigned nnllthreads;  //!< number of threads for nll partial sums
+    unsigned nreducethreads; //!< number of threads to use in partial sum reduction kernel
     unsigned blocksize;  //!< size of blocks for per-signal kernels
     unsigned nblocks;  //!< number of blocks for per-signal kernels
     std::string varlist;  //!< string identifier list for ntuple indexing
