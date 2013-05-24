@@ -5,8 +5,8 @@
 #include <algorithm>
 #include <vector>
 #include <assert.h>
-#include <jsoncpp/json/value.h>
-#include <jsoncpp/json/reader.h>
+#include <json/value.h>
+#include <json/reader.h>
 #include <TFile.h>
 #include <TH1.h>
 #include <TH1D.h>
