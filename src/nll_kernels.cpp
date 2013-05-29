@@ -131,7 +131,8 @@ HEMI_KERNEL(nll_total)(const size_t ns, const float* pars,
   for (unsigned i=0; i<ns; i++) {
     // non-negative rates
     if (pars[i] < 0) {
-      sum += 1e6;
+      nll[0] = 1e6;
+      return;      
     }
 
     // normalization constraints

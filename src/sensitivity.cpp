@@ -11,6 +11,8 @@
 #include <string>
 #include <algorithm>
 #include <assert.h>
+#include <TStyle.h>
+#include <TLegend.h>
 #include <TFile.h>
 #include <TH1F.h>
 #include <TNtuple.h>
@@ -21,6 +23,18 @@
 #include "config.h"
 #include "generator.h"
 #include "mcmc.h"
+#include "utils.h"
+
+
+/** A ROOT color palette in which sequential colors look okay. */
+static const int color[28] = {kRed,      kGreen,    kBlue,      kMagenta,
+                              kCyan,     kYellow,   kOrange,    kViolet+2,
+                              kRed+2,    kGreen+2,  kBlue+2,    kMagenta+2,
+                              kCyan+2,   kYellow+2, kOrange+2,  kRed-7,
+                              kGreen-7,  kBlue-7,   kMagenta-7, kCyan-7,
+                              kYellow-7, kOrange-7, kRed-6,     kAzure+1,
+                              kTeal+1,   kSpring-9, kAzure-9};
+
 
 /**
  * Find an upper limit
@@ -65,7 +79,7 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
                float burnin_fraction, std::string signal_name,
                float confidence, unsigned nexperiments) {
   TH1F* limits = new TH1F("limits", "Background-fluctuation sensitivity",
-                          300, 0, 300);
+                          100, 0, 100);
 
   for (unsigned i=0; i<nexperiments; i++) {
     std::cout << "Experiment " << i << " / " << nexperiments << std::endl;
@@ -75,11 +89,7 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
     for (size_t i=0; i<signals.size(); i++) {
       norms[i] = signals[i].nexpected;
     }
-    TCanvas c2;
-    c2.SetLogz();
     TNtuple* data = gen(norms);
-    data->Draw("e:r","","col z");
-    c2.SaveAs("ee.pdf");
 
     // run mcmc
     MCMC mcmc(signals, data);
@@ -92,10 +102,97 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
     std::cout << confidence * 100 << "\% limit: " << limit << std::endl;
     limits->Fill(limit);
 
-    TCanvas c1;
+    // extract likelihood-maximizing parameters
+    float* norms_branch = new float[signals.size()];
+    for (size_t i=0; i<signals.size(); i++) {
+      lspace->SetBranchAddress(signals[i].name.c_str(), &norms_branch[i]);
+    }
+    float ml_branch;
+    lspace->SetBranchAddress("likelihood", &ml_branch);
+    float* norms_fit = new float[signals.size()];
+    float ml = 1e9;
+    for (int j=0; j<lspace->GetEntries(); j++) {
+      lspace->GetEntry(j);
+      if (ml_branch < ml) {
+        ml = ml_branch;
+        for (size_t k=0; k<signals.size(); k++) {
+          norms_fit[k] = norms_branch[k];
+        }
+      }
+    }
+
+
+    // plot and save this fit
+    SpectralPlot p_all;
+    SpectralPlot p_external;
+    SpectralPlot p_cosmo;
+
+    TH1* hdata = SpectralPlot::make_like(signals[0].histogram, "hdata");
+    hdata->SetAxisRange(1e-1, 1e3, "Y");
+    hdata->SetAxisRange(1.5, 5.0, "X");
+    hdata->SetMarkerStyle(20);
+    hdata->SetLineColor(kBlack);
+    data->Draw("e>>hdata");
+    p_all.add(hdata, "Data");
+
+    TH1* hsum = SpectralPlot::make_like(signals[0].histogram, "hdata");
+    hsum->SetLineColor(kRed);
+
+    TH1* hcosmo = SpectralPlot::make_like(signals[0].histogram, "hcosmo");
+    hcosmo->SetLineColor(kAzure+1);
+
+    TH1* hexternal = SpectralPlot::make_like(hcosmo, "hexternal");
+    hexternal->SetLineColor(kOrange+1);
+
+    std::cout << "-- Best fit: NLL = " << ml << " --" << std::endl;
+    for (size_t i=0; i<signals.size(); i++) {
+      std::cout << " " << signals[i].name << ": " << norms_fit[i]
+                << " (" << norms[i] <<  ")" << std::endl;
+      TH1* hs = (TH1*) signals[i].histogram->Clone("hs");
+      int bin1 = hs->FindBin(1.5);
+      int bin2 = hs->FindBin(5.0);
+      hs->Scale(norms_fit[i] * signals[i].histogram->Integral() /
+                signals[i].histogram->Integral(bin1, bin2));
+      hs->SetLineColor(color[i+1]);
+      hsum->Add(hs);
+
+      hs->SetAxisRange(1e-1, 1e3, "Y");
+      hs->SetAxisRange(1.5, 5.0, "X");
+
+      std::string n = signals[i].name;
+      if (n == "av_tl208" || n == "av_bi214" || n == "water_tl208" ||
+          n == "water_bi214" || n == "pmt_bg") {
+        p_external.add(hs, signals[i].title, "hist");
+        hexternal->Add(hs);
+      }
+      else if (n != "0vbb" && n != "2vbb" && n != "int_tl208" &&
+               n != "int_bi214" && n != "b8") {
+        p_cosmo.add(hs, signals[i].title, "hist");
+        hcosmo->Add(hs);
+      }
+      else {
+        p_all.add(hs, signals[i].title, "hist");
+      }
+      delete hs;
+    }
+
+    p_all.add(hexternal, "External", "hist");
+    p_all.add(hcosmo, "Cosmogenics", "hist");
+    p_all.add(hsum, "Fit", "hist");
+    p_all.save("spectrum_all.pdf");
+
+    hexternal->SetLineStyle(2);
+    p_external.add(hexternal, "Sum", "hist");
+    p_external.save("spectrum_external.pdf");
+
+    hcosmo->SetLineStyle(2);
+    p_cosmo.add(hcosmo, "Sum", "hist");
+    p_cosmo.save("spectrum_cosmogenic.pdf");
+
+    TCanvas c2;
     hproj.Rebin(10);
     hproj.Draw();
-    c1.SaveAs("lproj.pdf");
+    c2.SaveAs("lproj.pdf");
     TFile f("lspace.root", "recreate");
     lspace->Write();
     f.Close();
@@ -103,6 +200,7 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
     delete data;
     delete lspace;
     delete[] norms;
+    delete[] norms_branch;
   }
 
   return limits;
@@ -126,6 +224,9 @@ int main(int argc, char* argv[]) {
   delete gRandom;
   gRandom = new TRandom2(0);
   gRandom->SetSeed(0);
+
+  gStyle->SetErrorX(0);
+  gStyle->SetOptStat(0);
 
   // load configuration from json file
   std::string config_filename = std::string(argv[1]);

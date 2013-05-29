@@ -9,7 +9,6 @@ Building
 `sxmc` requires the following libraries:
 
 * [ROOT](http://root.cern.ch)
-* [JsonCpp](http://jsoncpp.sourceforge.net)
 * [Doxygen](http://doxygen.org) (if building documentation)
 
 It also uses [hemi](https://github.com/harrism/hemi), which is included as a

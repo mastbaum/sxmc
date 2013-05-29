@@ -93,7 +93,8 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
   // buffers for current and proposed parameter vectors
   hemi::Array<float> current_vector(this->nsignals, true);
   for (size_t i=0; i<this->nsignals; i++) {
-    current_vector.writeOnlyHostPtr()[i] = this->expectations->readOnlyHostPtr()[i];
+    current_vector.writeOnlyHostPtr()[i] =
+      this->expectations->readOnlyHostPtr()[i];
   }
 
   hemi::Array<float> proposed_vector(this->nsignals, true);
@@ -111,8 +112,9 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
   for (size_t i=0; i<this->nsignals; i++) {
     float expectation = this->expectations->readOnlyHostPtr()[i];
     float constraint = this->constraints->readOnlyHostPtr()[i];
-    float width = (constraint > 0 ? constraint : 1.0 / sqrt(expectation));
-    sigma.writeOnlyHostPtr()[i] = 5; //0.5 * width;
+    float width = (constraint > 0 ? constraint : sqrt(expectation));
+    width = (width > 0 ? width : 1);
+    sigma.writeOnlyHostPtr()[i] = 0.5 * width;
   }
 
   // buffers for computing event term in nll
@@ -163,11 +165,11 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
         }
 
         double fit_width = fsproj->GetParameter(2);
-        const float scale_factor = 2.6;  // e!?
+        const float scale_factor = 0.11;  // tuned to get around 23% acceptance
 
-        sigma.writeOnlyHostPtr()[j] = scale_factor * fit_width;
-        std::cout << "MCMC: Rescaling jump sigma: " << name << " "
+        std::cout << "MCMC: Rescaling jump sigma: " << name << ": "
                   << scale_factor * fit_width << std::endl;
+        sigma.writeOnlyHostPtr()[j] = scale_factor * fit_width;
 
         hsproj->Delete();
       }
@@ -175,6 +177,7 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
       nt->Reset();
     }
 
+    // pick a new parameter vector and find the nll
     HEMI_KERNEL_LAUNCH(pick_new_vector, 8, 8, 0, 0,
                        this->nsignals, this->rngs->ptr(),
                        sigma.readOnlyPtr(),
@@ -184,10 +187,7 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
     nll(proposed_vector.readOnlyPtr(), proposed_nll.writeOnlyPtr(),
         event_partial_sums.ptr(), event_total_sum.ptr());
 
-    //std::cout << "current: " << current_nll.readOnlyHostPtr()[0] << ", "
-    //          << "proposed: " << proposed_nll.readOnlyHostPtr()[0]
-    //          << std::endl;
-
+    // accept/reject the jump, adding accepted ones to the buffer
     HEMI_KERNEL_LAUNCH(jump_decider, 1, 1, 0, 0,
                        this->rngs->ptr(),
                        current_nll.ptr(),
@@ -201,7 +201,8 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
     // flush the jump buffer periodically
     if (i % sync_interval == 0 || i == nsteps - 1) {
       int njumps = jump_counter.readOnlyHostPtr()[0];
-      std::cout << i << " " << sync_interval << " " << nsteps << ": JUMPS IN BUFFER: " << njumps << std::endl;
+      std::cout << "MCMC: Step " << i << "/" << nsteps
+                << " (" << njumps << " in buffer)" << std::endl;
       for (int j=0; j<njumps; j++) {
          // first nsignals elements are normalizations
          for (unsigned k=0; k<this->nsignals; k++) {
@@ -209,7 +210,8 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
            jump_vector[k] = jump_buffer.readOnlyHostPtr()[idx];
          }
          // last element is the likelihood
-         jump_vector[this->nsignals] = jump_buffer.readOnlyHostPtr()[j*(this->nsignals+1)+this->nsignals];
+         jump_vector[this->nsignals] =
+           jump_buffer.readOnlyHostPtr()[j*(this->nsignals+1)+this->nsignals];
 
          nt->Fill(jump_vector);
       }
@@ -240,7 +242,8 @@ void MCMC::nll(const float* v, double* nll,
 
   // total of event term
   HEMI_KERNEL_LAUNCH(nll_event_reduce, 1, this->nreducethreads,  
-		     this->nreducethreads * sizeof(double) /* shared memory */, 0,
+                     this->nreducethreads * sizeof(double),  // shared memory
+                     0,
                      this->nnllthreads,
                      event_partial_sums,
                      event_total_sum);
