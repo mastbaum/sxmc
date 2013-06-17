@@ -3,7 +3,8 @@ JSONCPP_INC = contrib/jsoncpp-src-0.6.0-rc2/include
 
 INCLUDE = -Isrc -I$(RATROOT)/include -I$(ROOTSYS)/include -I$(RATROOT)/src/stlplus -Icontrib/hemi -I/usr/local/cuda/include -I/opt/cuda-5.0/include -I$(JSONCPP_INC)
 CFLAGS = -DVERBOSE=true -g $(INCLUDE) 
-GCCFLAGS = -Wall -Werror -Wno-unused-variable -ffast-math -fdiagnostics-show-option  # -Wunused-variable errors with HEMI macros
+# Fix reorder errors in HEMI with -Wno-reorder
+GCCFLAGS = -Wall -Werror -Wno-reorder -Wno-unused-variable -ffast-math -fdiagnostics-show-option  # -Wunused-variable errors with HEMI macros
 NVCCFLAGS = -arch=sm_30 -use_fast_math -DDEBUG
 ROOTLIBS =  -lCore -lCint -lRIO -lMathCore -lHist -lGpad -lTree -lTree -lGraf -lm
 LFLAGS = -L$(RATROOT)/lib -lRATEvent_$(RATSYSTEM) -L$(ROOTSYS)/lib $(ROOTLIBS)
@@ -14,7 +15,6 @@ ARCH = $(shell uname)
 ifndef CUDA_ROOT
 $(warning *** CUDA_ROOT is not set, defaulting to CPU-only build ***)
 GCC = g++ $(GCCFLAGS) -DHEMI_CUDA_DISABLE
-GCC += -Wno-reorder  # -Wreorder errors in HEMI 
 CUDACC = $(CC)
 CC = $(GCC)
 else
