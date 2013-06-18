@@ -88,7 +88,7 @@ $(EXE): $(OBJECTS) $(JSONCPP_OBJECTS) $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o
 
 
 ###### Test Infrastructure ############
-test: test_sxmc
+test: bin/test_sxmc bin/bench_sxmc
 
 GTEST_DIR = contrib/gtest-1.6.0
 GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
@@ -113,5 +113,12 @@ $(OBJ_DIR)/test/%.o: test/%.cpp
 	test -d build/test || mkdir -p build/test
 	$(CUDACC) -c -o $@ $< $(CFLAGS) -I$(GTEST_DIR)/include
 
-test_sxmc: $(TEST_OBJECTS) $(SXMC_NO_MAIN_FUNCTION_OBJECTS) build/gtest_main.a
+bin/test_sxmc: $(TEST_OBJECTS) $(SXMC_NO_MAIN_FUNCTION_OBJECTS) build/gtest_main.a
+	$(GCC) -o $@ $^ $(GCCFLAGS) $(LFLAGS) $(CUDA_LFLAGS)
+
+## Benchmark code
+$(OBJ_DIR)/bench_sxmc.o: bench/bench_sxmc.cpp
+	$(CUDACC) -c -o $@ $< $(CFLAGS) -I$(GTEST_DIR)/include
+
+bin/bench_sxmc: $(OBJ_DIR)/bench_sxmc.o $(SXMC_NO_MAIN_FUNCTION_OBJECTS)
 	$(GCC) -o $@ $^ $(GCCFLAGS) $(LFLAGS) $(CUDA_LFLAGS)
