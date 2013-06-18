@@ -3,8 +3,7 @@ JSONCPP_INC = contrib/jsoncpp-src-0.6.0-rc2/include
 
 INCLUDE = -Isrc -I$(RATROOT)/include -I$(ROOTSYS)/include -I$(RATROOT)/src/stlplus -Icontrib/hemi -I/usr/local/cuda/include -I/opt/cuda-5.0/include -I$(JSONCPP_INC)
 CFLAGS = -DVERBOSE=true -g $(INCLUDE) 
-# Fix reorder errors in HEMI with -Wno-reorder
-GCCFLAGS = -Wall -Werror -Wno-reorder -Wno-unused-variable -ffast-math -fdiagnostics-show-option  # -Wunused-variable errors with HEMI macros
+GCCFLAGS = -Wall -Werror -Wno-unused-variable -ffast-math -fdiagnostics-show-option  # -Wunused-variable errors with HEMI macros
 NVCCFLAGS = -arch=sm_30 -use_fast_math -DDEBUG
 ROOTLIBS =  -lCore -lCint -lRIO -lMathCore -lHist -lGpad -lTree -lTree -lGraf -lm
 LFLAGS = -L$(RATROOT)/lib -lRATEvent_$(RATSYSTEM) -L$(ROOTSYS)/lib $(ROOTLIBS)
@@ -14,7 +13,7 @@ ARCH = $(shell uname)
 
 ifndef CUDA_ROOT
 $(warning *** CUDA_ROOT is not set, defaulting to CPU-only build ***)
-GCC = g++ $(GCCFLAGS) -DHEMI_CUDA_DISABLE
+GCC = g++ $(GCCFLAGS) -Wno-reorder -DHEMI_CUDA_DISABLE
 CUDACC = $(CC)
 CC = $(GCC)
 else
@@ -32,13 +31,13 @@ CC += --compiler-options "$(GCCFLAGS) -Wno-unused-function"
 endif
 
 OBJ_DIR = build
-SOURCES = $(filter-out src/mcmc.cpp src/nll_kernels.cpp, $(wildcard src/*.cpp))
+SOURCES = $(filter-out src/mcmc.cpp src/nll_kernels.cpp src/pdfz.cpp, $(wildcard src/*.cpp))
 OBJECTS = $(SOURCES:src/%.cpp=$(OBJ_DIR)/%.o)
 JSONCPP_SOURCES = $(wildcard $(JSONCPP_SRC)/*.cpp)
 JSONCPP_OBJECTS = $(JSONCPP_SOURCES:$(JSONCPP_SRC)/%.cpp=$(OBJ_DIR)/jsoncpp/%.o)
 
 # For unit test suit
-SXMC_NO_MAIN_FUNCTION_OBJECTS = $(filter-out build/sensitivity.o, $(OBJECTS) $(JSONCPP_OBJECTS))
+SXMC_NO_MAIN_FUNCTION_OBJECTS = $(filter-out build/sensitivity.o, $(OBJECTS) $(JSONCPP_OBJECTS) build/mcmc.o build/nll_kernels.o build/pdfz.o)
 TEST_SOURCES = $(wildcard test/*.cpp)
 TEST_OBJECTS = $(TEST_SOURCES:test/%.cpp=$(OBJ_DIR)/test/%.o)
 
@@ -52,7 +51,7 @@ ifndef ROOTSYS
 $(error ROOTSYS is not set)
 endif
 
-all: $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJECTS) $(JSONCPP_OBJECTS) $(EXE)
+all: $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o $(OBJECTS) $(JSONCPP_OBJECTS) $(EXE)
 
 .PHONY: doc test
 
@@ -78,7 +77,11 @@ $(OBJ_DIR)/nll_kernels.o: src/nll_kernels.cpp
 	test -d build || mkdir build
 	$(CUDACC) -c -o $@ $< $(CFLAGS)
 
-$(EXE): $(OBJECTS) $(JSONCPP_OBJECTS) $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o
+$(OBJ_DIR)/pdfz.o: src/pdfz.cpp
+	test -d build || mkdir build
+	$(CUDACC) -c -o $@ $< $(CFLAGS)
+
+$(EXE): $(OBJECTS) $(JSONCPP_OBJECTS) $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o
 	test -d bin || mkdir bin
 	$(GCC) -o $@ $^ $(CFLAGS) $(LFLAGS) $(CUDA_LFLAGS)
 
