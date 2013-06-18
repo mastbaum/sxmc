@@ -31,6 +31,12 @@ namespace pdfz {
         if (_nobservables > nfields )
             throw Error("Number of observables cannot be greater than number of fields.");
 
+        if ( (int) _upper.size() != _nobservables)
+            throw Error("Number of upper bounds must be same as number of observables.");
+
+        if ( (int) _lower.size() != _nobservables)
+            throw Error("Number of lower bounds must be same as number of observables.");
+
         // Transfer lower and upper bounds to hemi arrays for use on device
         this->lower.copyFromHost(&_lower.front(), _lower.size());
         this->upper.copyFromHost(&_upper.front(), _upper.size());
@@ -86,21 +92,25 @@ namespace pdfz {
         samples(_samples.size(), false), eval_points(0), 
         nbins(_nbins.size(), true), bin_stride(_nbins.size(), true), bins(0)
     {
-        if (_nbins.size() == 0)
-            throw Error("Cannot create EvalHist object with 0 dimensions");
+        if ( (int) _nbins.size() != nobservables)
+            throw Error("Size of nbins array must be same as number of observables.");
 
         this->samples.copyFromHost(&_samples.front(), _samples.size());
         this->nbins.copyFromHost(&_nbins.front(), _nbins.size());
 
         // Compute stride for row-major order storage
         const int ndims = (int) this->bin_stride.size();
-        int *bin_stride_host = this->bin_stride.hostPtr();
+        int *bin_stride_host = this->bin_stride.writeOnlyHostPtr();
 
         bin_stride_host[ndims - 1] = 1;
         for (int i=ndims-2; i >= 0; i--)
             bin_stride_host[i] = _nbins[i+1] * bin_stride_host[i+1];
 
         this->total_nbins = bin_stride_host[0] * _nbins[0];
+
+        if (this->total_nbins == 0)
+            throw Error("Cannot make histogram with zero bins.");
+
         this->bins = new hemi::Array<unsigned int>(this->total_nbins, true);
 
 
@@ -199,7 +209,7 @@ namespace pdfz {
                 }
 
                 float span = upper[idim] - lower[idim];
-                bin_volume *= span;
+                bin_volume *= span / nbins[idim];
                 bin_id += (int)( ((element - lower[idim]) / span) * nbins[idim] ) * bin_stride[idim];
             }
 
