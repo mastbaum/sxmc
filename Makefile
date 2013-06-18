@@ -36,6 +36,12 @@ SOURCES = $(filter-out src/mcmc.cpp src/nll_kernels.cpp, $(wildcard src/*.cpp))
 OBJECTS = $(SOURCES:src/%.cpp=$(OBJ_DIR)/%.o)
 JSONCPP_SOURCES = $(wildcard $(JSONCPP_SRC)/*.cpp)
 JSONCPP_OBJECTS = $(JSONCPP_SOURCES:$(JSONCPP_SRC)/%.cpp=$(OBJ_DIR)/jsoncpp/%.o)
+
+# For unit test suit
+SXMC_NO_MAIN_FUNCTION_OBJECTS = $(filter-out build/sensitivity.o, $(OBJECTS) $(JSONCPP_OBJECTS))
+TEST_SOURCES = $(wildcard test/*.cpp)
+TEST_OBJECTS = $(TEST_SOURCES:test/%.cpp=$(OBJ_DIR)/test/%.o)
+
 EXE = bin/sensitivity
 
 ifndef RATROOT
@@ -48,7 +54,7 @@ endif
 
 all: $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJECTS) $(JSONCPP_OBJECTS) $(EXE)
 
-.PHONY: doc
+.PHONY: doc test
 
 clean:
 	-$(RM) build/*.o build/jsoncpp/*.o bin/*
@@ -76,3 +82,32 @@ $(EXE): $(OBJECTS) $(JSONCPP_OBJECTS) $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o
 	test -d bin || mkdir bin
 	$(GCC) -o $@ $^ $(CFLAGS) $(LFLAGS) $(CUDA_LFLAGS)
 
+
+###### Test Infrastructure ############
+test: test_sxmc
+
+GTEST_DIR = contrib/gtest-1.6.0
+GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
+                $(GTEST_DIR)/include/gtest/internal/*.h
+GTEST_SRCS_ = $(GTEST_DIR)/src/*.cc $(GTEST_DIR)/src/*.h $(GTEST_HEADERS)
+
+# Generic Google Test code
+build/gtest-all.o : $(GTEST_SRCS_)
+	$(CXX) -I$(GTEST_DIR)/include -I$(GTEST_DIR) $(CXXFLAGS) -o $@ -c $(GTEST_DIR)/src/gtest-all.cc
+
+build/gtest_main.o : $(GTEST_SRCS_)
+	$(CXX) -I$(GTEST_DIR)/include -I$(GTEST_DIR) $(CXXFLAGS) -o $@ -c $(GTEST_DIR)/src/gtest_main.cc
+
+build/gtest.a : build/gtest-all.o
+	$(AR) $(ARFLAGS) $@ $^
+
+build/gtest_main.a : build/gtest-all.o build/gtest_main.o
+	$(AR) $(ARFLAGS) $@ $^
+
+# Our test code
+$(OBJ_DIR)/test/%.o: test/%.cpp
+	test -d build/test || mkdir -p build/test
+	$(CC) -c -o $@ $< $(CFLAGS) -I$(GTEST_DIR)/include
+
+test_sxmc: $(TEST_OBJECTS) $(SXMC_NO_MAIN_FUNCTION_OBJECTS) build/gtest_main.a
+	$(GCC) -o $@ $^ $(CFLAGS) $(LFLAGS) $(CUDA_LFLAGS)
