@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 #include "pdfz.h"
-#include <math.h>
+#include <cmath>
+
+#ifndef __CUDACC__
+#define isnan std::isnan
+#endif
 
 TEST(PdfzError, Constructor)
 {
@@ -123,6 +127,10 @@ class EvalHistMethods : public EvalHistConstructor {
 
     virtual void TearDown() {
         delete evaluator;
+        delete pdf_values;
+        delete norm;
+        delete params;
+        EvalHistConstructor::TearDown();
     }
 
 
@@ -146,7 +154,7 @@ TEST_F(EvalHistMethods, Evaluation)
     EXPECT_EQ((unsigned int) 5, *norm->readOnlyHostPtr());
 
     float *results = pdf_values->hostPtr();
-    ASSERT_TRUE(isnan((float)results[0]));
+    ASSERT_TRUE(isnan(results[0]));
     ASSERT_FLOAT_EQ(1.6, results[1]);
     ASSERT_FLOAT_EQ(1.6, results[2]);
     ASSERT_FLOAT_EQ(0.4, results[3]);
