@@ -1,5 +1,31 @@
 /** GPU/CPU-based PDF evaluation
  *
+ * The subclasses of pdfz::Eval (EvalHist and EvalKernel) take an array of 
+ * samples from an unknown multidimensional distribution and estimate the
+ * probability density function over a finite volume.
+ *
+ * These classes are designed to be incorporated into a larger GPU-based
+ * program using Hemi to manage GPU buffers.  As a result, the API is
+ * designed to minimizes unnecessary copying of data between the CPU and GPU
+ * by instead registering pointers to Hemi arrays before evaluation.
+ * Additionally, to make better use of CUDA devices with compute 
+ * capability 2.0 and greater, each evaluator object has its own CUDA
+ * stream.  Kernels on different streams can run in parallel, so when
+ * there are many PDFs to evaluate, the best approach is to call the 
+ * EvalAsync() method on each evaluator object first, then call EvalFinished()
+ * to block until the calculation is complete.
+ *
+ * The evaluator object computes the value of the PDF only at specific
+ * "evaluation points".  As part of the evaluation step, the samples can be 
+ * transformed on the fly to mimic various systematic uncertainties,
+ * like scale, offset or resolution.  A parameter buffer is used to control
+ * these systematic transformations.  In addition, a normalization buffer
+ * is updated during evaluation to record the total number of samples
+ * that were within the PDF domain after the systematic transformations 
+ * were applied.  This can be used to calculate an efficiency correction
+ * in certain kinds of applications.
+ * 
+ *
  * Example usage
  * -------------
  *
@@ -20,7 +46,7 @@
  *     // CPU/GPU storage of evaluation inputs and outputs
  *     hemi::Array<float> parameters(nparams);
  *     hemi::Array<float> pdf_values(neval_points);
- *     hemi::Array<float> normalizations(1); // Only 1 PDF!
+ *     hemi::Array<unsigned int> normalizations(1); // Only 1 PDF!
  *   
  *     // Settings for PDF evaluator
  *     std::vector<int> nbins(2, 10); // 10 bins in each dimension
@@ -28,7 +54,7 @@
  *     // Setup evaluator
  *     pdfz::EvalHist pdf(samples, nfields, nobs, lower, upper, nbins);
  *     pdf.SetEvalPoints(eval_points);
- *     pdf.SetPDFBuffer(&pdf_values, 0, 1);  // no offset, unit stride
+ *     pdf.SetPDFValueBuffer(&pdf_values, 0, 1);  // no offset, unit stride
  *     pdf.SetNormalizationBuffer(&normalizations, 0);
  *     pdf.SetParameterBuffer(parameters);
  *   
@@ -40,7 +66,8 @@
  *     pdf.AddSystematic(pdfz::ResolutionSystmatic(0, 2, 1));
  *  
  *     // Do it!
- *     pdf.Evaluate();
+ *     pdf.EvalAsync();
+ *     pdf.EvalFinished();
  */
 
 #include <hemi/array.h>
@@ -172,7 +199,7 @@ namespace pdfz {
             At evaulation time, the PDF evaluated at t_i will be written to:
                 output[offset + i * stride]
         */
-        virtual void SetPDFBuffer(hemi::Array<float> *output, int offset, int stride);
+        virtual void SetPDFValueBuffer(hemi::Array<float> *output, int offset=0, int stride=1);
 
 
         /** Set the output array where the PDF normalization will be written for each point.
@@ -187,7 +214,7 @@ namespace pdfz {
             At evaulation time, the normalization will be written to:
                 norm[offset]
         */
-        virtual void SetNormalizationBuffer(hemi::Array<unsigned int> *norm, int offset);
+        virtual void SetNormalizationBuffer(hemi::Array<unsigned int> *norm, int offset=0);
 
 
         /** Set the storage buffer that will be read for systematic parameters.
@@ -195,7 +222,7 @@ namespace pdfz {
             At evaluation time, the systematic parameter j will be read from:
                 params[offset + j * stride]
         */
-        virtual void SetParameterBuffer(hemi::Array<float> *params, int offset, int stride);
+        virtual void SetParameterBuffer(hemi::Array<float> *params, int offset=0, int stride=1);
 
 
         /** Add a systematic transformation to this PDF */

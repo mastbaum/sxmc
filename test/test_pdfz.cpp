@@ -116,7 +116,7 @@ class EvalHistMethods : public EvalHistConstructor {
         eval_points[4] = 0.75;
         eval_points[5] = 1.0;
 
-        pdf_values = new hemi::Array<float>(6, true);
+        pdf_values = new hemi::Array<float>(20, true);
         norm = new hemi::Array<unsigned int>(3, true);
         params = new hemi::Array<float>(5, true);
     }
@@ -137,19 +137,49 @@ class EvalHistMethods : public EvalHistConstructor {
 TEST_F(EvalHistMethods, Evaluation)
 {
     evaluator->SetEvalPoints(eval_points);
-    evaluator->SetPDFBuffer(pdf_values, 0, 1);
-    evaluator->SetNormalizationBuffer(norm, 0);
-    evaluator->SetParameterBuffer(params, 0, 1);
+    evaluator->SetPDFValueBuffer(pdf_values);
+    evaluator->SetNormalizationBuffer(norm);
+    evaluator->SetParameterBuffer(params);
     evaluator->EvalAsync();
     evaluator->EvalFinished();
 
     EXPECT_EQ((unsigned int) 5, *norm->readOnlyHostPtr());
 
     float *results = pdf_values->hostPtr();
-    ASSERT_TRUE(isnan(results[0]));
+    ASSERT_TRUE(isnan((float)results[0]));
     ASSERT_FLOAT_EQ(1.6, results[1]);
     ASSERT_FLOAT_EQ(1.6, results[2]);
     ASSERT_FLOAT_EQ(0.4, results[3]);
     ASSERT_FLOAT_EQ(0.4, results[4]);
     ASSERT_TRUE(isnan(results[5]));
+}
+
+TEST_F(EvalHistMethods, EvaluationOffsetStride)
+{
+    evaluator->SetEvalPoints(eval_points);
+    evaluator->SetPDFValueBuffer(pdf_values, 3, 2);
+    evaluator->SetNormalizationBuffer(norm, 1);
+    evaluator->SetParameterBuffer(params);
+
+    // Detect incorrect writes
+    norm->writeOnlyHostPtr()[0] = 77;
+    norm->writeOnlyHostPtr()[1] = 88;
+    norm->writeOnlyHostPtr()[2] = 99;
+    // Force flush to device
+    norm->readOnlyDevicePtr();
+
+    evaluator->EvalAsync();
+    evaluator->EvalFinished();
+
+    EXPECT_EQ((unsigned int) 77, norm->readOnlyHostPtr()[0]);
+    EXPECT_EQ((unsigned int) 5, norm->readOnlyHostPtr()[1]);
+    EXPECT_EQ((unsigned int) 99, norm->readOnlyHostPtr()[2]);
+
+    float *results = pdf_values->hostPtr();
+    ASSERT_TRUE(isnan(results[3]));
+    ASSERT_FLOAT_EQ(1.6, results[5]);
+    ASSERT_FLOAT_EQ(1.6, results[7]);
+    ASSERT_FLOAT_EQ(0.4, results[9]);
+    ASSERT_FLOAT_EQ(0.4, results[11]);
+    ASSERT_TRUE(isnan(results[13]));
 }

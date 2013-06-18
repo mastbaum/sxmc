@@ -57,7 +57,7 @@ namespace pdfz {
         delete this->cuda_state;
     }
 
-    void Eval::SetPDFBuffer(hemi::Array<float> *output, int offset, int stride)
+    void Eval::SetPDFValueBuffer(hemi::Array<float> *output, int offset, int stride)
     {
         this->pdf_buffer = output;
         this->pdf_offset = offset;
