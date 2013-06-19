@@ -235,6 +235,8 @@ namespace pdfz {
         int stride = hemiGetElementStride();
         float field_buffer[MAX_NFIELDS];
 
+	unsigned int thread_norm = 0;
+
         for (int isample=offset; isample < nsamples; isample += stride) {
             bool in_pdf_domain = true;
             int bin_id = 0;
@@ -263,13 +265,19 @@ namespace pdfz {
             if (in_pdf_domain) {
                 #ifdef HEMI_DEV_CODE
                 atomicAdd(bins + bin_id, 1);
-                atomicAdd(norm, 1);
                 #else
                 bins[bin_id] += 1;
-                *norm += 1;
                 #endif
+		
+		thread_norm += 1;
             }
         }
+
+	#ifdef HEMI_DEV_CODE
+	atomicAdd(norm, thread_norm);
+	#else
+	*norm += thread_norm;
+	#endif
     }
 
     HEMI_KERNEL(eval_pdf)(int npoints, const float *points, int point_stride,
