@@ -80,6 +80,7 @@ MCMC::~MCMC() {
 
 TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
                           unsigned sync_interval) {
+  // cuda/hemi block sizes
   int bs = 128;
   int nb = this->nsignals / bs + 1;
   assert(nb < 8);
@@ -124,9 +125,12 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
   hemi::Array<double> event_total_sum(1, true);    
   event_total_sum.writeOnlyHostPtr();
 
-  // buffer of accepted jumps, transferred from gpu periodically
+  // buffer of jumps, transferred from gpu periodically
   hemi::Array<int> jump_counter(1, true);
   jump_counter.writeOnlyHostPtr()[0] = 0;
+
+  hemi::Array<int> accept_counter(1, true);
+  accept_counter.writeOnlyHostPtr()[0] = 0;
 
   hemi::Array<float> jump_buffer(sync_interval * (this->nsignals + 1), true);
   float* jump_vector = new float[this->nsignals + 1];
@@ -195,14 +199,17 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
                        current_vector.ptr(),
                        proposed_vector.readOnlyPtr(),
                        this->nsignals,
+                       accept_counter.ptr(),
                        jump_counter.ptr(),
                        jump_buffer.writeOnlyPtr());
 
     // flush the jump buffer periodically
-    if (i % sync_interval == 0 || i == nsteps - 1) {
+    if (i % sync_interval == 0 || i == nsteps - 1 || i == burnin_steps - 1) {
       int njumps = jump_counter.readOnlyHostPtr()[0];
+      int naccepted = accept_counter.readOnlyHostPtr()[0];
       std::cout << "MCMC: Step " << i << "/" << nsteps
-                << " (" << njumps << " in buffer)" << std::endl;
+                << " (" << njumps << " in buffer, "
+                << naccepted << " accepted)" << std::endl;
       for (int j=0; j<njumps; j++) {
          // first nsignals elements are normalizations
          for (unsigned k=0; k<this->nsignals; k++) {
@@ -216,8 +223,9 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
          nt->Fill(jump_vector);
       }
 
-      // reset counter
+      // reset counters
       jump_counter.writeOnlyHostPtr()[0] = 0;
+      accept_counter.writeOnlyHostPtr()[0] = 0;
     }
   }
 

@@ -46,8 +46,8 @@ HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
 
 HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
                           const double* nll_proposed, float* v_current,
-                          const float* v_proposed, unsigned ns, int* counter,
-                          float* jump_buffer) {
+                          const float* v_proposed, unsigned ns, int* accepted,
+                          int* counter, float* jump_buffer) {
 #ifdef HEMI_DEV_CODE
   float u = curand_uniform(&rng[0]);
 #else
@@ -57,17 +57,22 @@ HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
   // metropolis algorithm
   double np = nll_proposed[0];
   double nc = nll_current[0];
-  int count = counter[0];
   if (np < nc || u <= exp(nc - np)) {
     nll_current[0] = np;
     for (unsigned i=0; i<ns; i++) {
       float vpi = v_proposed[i];
       v_current[i] = vpi;
-      jump_buffer[count * (ns + 1) + i] = vpi;
     }
-    jump_buffer[count * (ns + 1) + ns] = nll_proposed[0];
-    counter[0] = count + 1;    
+    accepted[0] += 1;
   }
+
+  // append all steps to jump buffer
+  int count = counter[0];
+  for (unsigned i=0; i<ns; i++) {
+    jump_buffer[count * (ns + 1) + i] = v_current[i];
+  }
+  jump_buffer[count * (ns + 1) + ns] = nll_proposed[0];
+  counter[0] = count + 1;    
 }
 
 

@@ -62,11 +62,11 @@ HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
                              float* proposed_vector);
 
 /**
- * Decide whether to accept a random MCMC step
+ * Decide whether to accept a random MCMC step.
  *
- * Compare likelihoods of current and proposed parameter vectors. If the step
- * is accepted, store it in a buffer which can be flushed periodically,
- * minimizing transfer overhead.
+ * Compare likelihoods of current and proposed parameter vectors. Store each
+ * step in a buffer which can be flushed periodically, minimizing transfer
+ * overhead.
  *
  * The step buffer is an (Nsignals + 1 x Nsteps) matrix, where the last column
  * contains the likelihood value.
@@ -77,13 +77,14 @@ HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
  * \param v_current The current parameters
  * \param v_proposed The proposed parameters
  * \param ns The number of signals
+ * \param accepted Number of accepted steps
  * \param counter The number of steps in the buffer
  * \param jump_buffer The step buffer
  */
 HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
                           const double* nll_proposed, float* v_current,
-                          const float* v_proposed, unsigned ns, int* counter,
-                          float* jump_buffer);
+                          const float* v_proposed, unsigned ns, int* accepted,
+                          int* counter, float* jump_buffer);
 
 /**
  * NLL Part 1
