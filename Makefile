@@ -5,7 +5,7 @@ INCLUDE = -Isrc -I$(RATROOT)/include -I$(ROOTSYS)/include -I$(RATROOT)/src/stlpl
 CFLAGS = -DVERBOSE=true -g $(INCLUDE)
 GCCFLAGS = -Wall -Werror -Wno-unused-variable -ffast-math -fdiagnostics-show-option  # -Wunused-variable errors with HEMI macros
 NOT_NVCC_CFLAGS = -Wno-reorder
-NVCCFLAGS = -arch=sm_30 -use_fast_math -DDEBUG
+NVCCFLAGS = -gencode arch=compute_20,code=sm_20 -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=\"sm_35,compute_35\" -use_fast_math -DDEBUG
 ROOTLIBS =  -lCore -lCint -lRIO -lMathCore -lHist -lGpad -lTree -lTree -lGraf -lm
 LFLAGS = -L$(RATROOT)/lib -lRATEvent_$(RATSYSTEM) -L$(ROOTSYS)/lib $(ROOTLIBS)
 
