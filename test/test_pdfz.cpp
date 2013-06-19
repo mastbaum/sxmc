@@ -28,10 +28,10 @@ TEST(SystematicObjects, ScaleSystematicConstructor)
     EXPECT_EQ(3, syst.par);
 }
 
-TEST(SystematicObjects, ResolutionSystematicConstructor)
+TEST(SystematicObjects, ResolutionScaleSystematicConstructor)
 {
-    pdfz::ResolutionSystematic syst(0, 2, 1);
-    EXPECT_EQ(pdfz::Systematic::RESOLUTION, syst.type);
+    pdfz::ResolutionScaleSystematic syst(0, 2, 1);
+    EXPECT_EQ(pdfz::Systematic::RESOLUTION_SCALE, syst.type);
     EXPECT_EQ(0, syst.obs);
     EXPECT_EQ(2, syst.true_obs);
     EXPECT_EQ(1, syst.par);

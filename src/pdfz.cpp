@@ -5,6 +5,21 @@
 
 namespace pdfz {
 
+    // Changes the size of an array while preserving its contents.
+    // Shrinking the array only preserves the initial entries, while truncating
+    // those past the new length.
+    template <typename T>
+    void resize_array(hemi::Array<T> &array, const size_t n)
+    {
+        std::vector<T> tmp(n);
+        T *orig_contents = array.hostPtr();
+
+        for (unsigned int i=0; i < array.size() && i < n; i++)
+            tmp[i] = orig_contents[i];
+
+        array.copyFromHost(&tmp.front(), n); // Resizes array automatically
+    }
+
     // If not compiling with CUDA, alias the CUDA stream type to something harmless.
     #ifndef __CUDACC__
     typedef int cudaStream_t;
@@ -17,10 +32,18 @@ namespace pdfz {
         cudaStream_t stream;
     };
 
+
+    struct SystematicDescriptor
+    {
+        short type;
+        short obs, extra_field;
+        short par;
+    };
+
     Eval::Eval(const std::vector<float> &_samples, int _nfields, int _nobservables,
                const std::vector<float> &_lower, const std::vector<float> &_upper) :
-        nfields(_nfields), nobservables(_nobservables), 
-        lower(_lower.size(), true), upper(_upper.size(), true)
+        nfields(_nfields), nobservables(_nobservables),
+        lower(_lower.size(), true), upper(_upper.size(), true), syst(0)
     {
         if (_samples.size() % _nfields != 0)
             throw Error("Length of samples array is not divisible by number of fields.");
@@ -49,12 +72,15 @@ namespace pdfz {
         this->cuda_state->stream = 0;
         #endif
 
+        this->syst = new hemi::Array<SystematicDescriptor>(0, true);
+
         // The handling of samples is up to the Eval subclass!
     }
 
     Eval::~Eval()
     {
         delete this->cuda_state;
+        delete this->syst;
     }
 
     void Eval::SetPDFValueBuffer(hemi::Array<float> *output, int offset, int stride)
@@ -79,7 +105,27 @@ namespace pdfz {
 
     void Eval::AddSystematic(const Systematic &syst)
     {
+        resize_array(*(this->syst), this->syst->size() + 1);
+        SystematicDescriptor desc;
+        desc.type = syst.type;
+        if (syst.type == Systematic::SHIFT) {
+            const ShiftSystematic &shift = dynamic_cast<const ShiftSystematic &>(syst);
+            desc.obs = shift.obs;
+            desc.par = shift.par;
+        } else if (syst.type == Systematic::SCALE) {
+            const ScaleSystematic &scale = dynamic_cast<const ScaleSystematic &>(syst);
+            desc.obs = scale.obs;
+            desc.par = scale.par;
+        } else if (syst.type == Systematic::RESOLUTION_SCALE) {
+            const ResolutionScaleSystematic &res = dynamic_cast<const ResolutionScaleSystematic &>(syst);
+            desc.obs = res.obs;
+            desc.extra_field = res.true_obs;
+            desc.par = res.par;
+        } else {
+            throw Error("Unknown systematic type");
+        }
 
+        this->syst->hostPtr()[this->syst->size() - 1] = desc;
     }
 
 
@@ -115,7 +161,12 @@ namespace pdfz {
 
 
         this->nthreads_per_block = 256;
-        this->nblocks = 64;
+        if (_samples.size() > 100000)
+            this->nblocks = 64;
+        else if (_samples.size() > 10000)
+            this->nblocks = 16;
+        else
+            this->nblocks = 4;
     }
 
     EvalHist::~EvalHist()

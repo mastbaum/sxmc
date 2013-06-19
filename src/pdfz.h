@@ -98,12 +98,14 @@ namespace pdfz {
         enum Type {
           SHIFT,
           SCALE,
-          RESOLUTION,
+          RESOLUTION_SCALE,
         };
 
         Type type;
 
         Systematic(Type _type) : type(_type) { }
+        // Needed to make this a polymorphic type for dynamic_cast in Eval::AddSystmatic
+        virtual ~Systematic() { }
     };
 
 
@@ -140,23 +142,24 @@ namespace pdfz {
 
 
     /**
-     * \struct ResolutionSystematic
+     * \struct ResolutionScaleSystematic
      * \brief  Fractionally alter the resolution of an observable by rescaling its distance
      *         from a "true" value.
      *
      * Transform x' = (1 + p) * (x - x_true) + x_true
      */
-    struct ResolutionSystematic : public Systematic
+    struct ResolutionScaleSystematic : public Systematic
     {
     // index of observable, "true" observable, and systematic parameter
-    ResolutionSystematic(int _obs, int _true_obs, int _par) :
-        Systematic(RESOLUTION), obs(_obs), true_obs(_true_obs), par(_par) { }
+    ResolutionScaleSystematic(int _obs, int _true_obs, int _par) :
+        Systematic(RESOLUTION_SCALE), obs(_obs), true_obs(_true_obs), par(_par) { }
 
         int obs, true_obs, par;
     };
 
 
     struct CudaState; // Hide CUDA-related state from callers
+    struct SystematicDescriptor; // Also hide representation of systematics
 
     class Eval
     {
@@ -266,6 +269,8 @@ namespace pdfz {
         hemi::Array<float> *param_buffer;
         int param_offset;
         int param_stride;
+
+        hemi::Array<SystematicDescriptor> *syst;
 
         CudaState *cuda_state;
     };
