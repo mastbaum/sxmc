@@ -123,6 +123,7 @@ class EvalHistMethods : public EvalHistConstructor {
         pdf_values = new hemi::Array<float>(20, true);
         norm = new hemi::Array<unsigned int>(3, true);
         params = new hemi::Array<float>(5, true);
+        params->writeOnlyHostPtr(); // Force memory allocation
     }
 
     virtual void TearDown() {

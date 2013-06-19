@@ -69,6 +69,8 @@
  *     pdf.EvalAsync();
  *     pdf.EvalFinished();
  */
+#ifndef __PDFZ_H__
+#define __PDFZ_H__
 
 #include <hemi/array.h>
 #include <string>
@@ -332,3 +334,5 @@ namespace pdfz {
     };
 
 } // end namespace pdfz
+
+#endif // __PDFZ_H__
