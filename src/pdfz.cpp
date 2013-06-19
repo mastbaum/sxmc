@@ -128,7 +128,7 @@ namespace pdfz {
             throw Error("Unknown systematic type");
         }
 
-        this->syst->hostPtr()[this->syst->size() - 1] = desc;
+        this->syst->writeOnlyHostPtr()[this->syst->size() - 1] = desc;
     }
 
 
