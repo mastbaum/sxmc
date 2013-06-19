@@ -355,7 +355,6 @@ namespace pdfz {
 
     void EvalHist::Optimize()
     {
-        return;
         // Only do this if running on GPU
         #ifdef __CUDACC__
 
