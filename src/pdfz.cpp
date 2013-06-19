@@ -1,7 +1,9 @@
+#include <iostream>
 #include "pdfz.h"
 #include <math.h>
 #include <cuda.h>
 #include <math_constants.h> // CUDA header
+#include <TStopwatch.h>
 
 namespace pdfz {
     const int MAX_NFIELDS = 10;
@@ -137,10 +139,10 @@ namespace pdfz {
 
     EvalHist::EvalHist(const std::vector<float> &_samples, int nfields, int nobservables,
                        const std::vector<float> &lower, const std::vector<float> &upper,
-                       const std::vector<int> &_nbins) :
+                       const std::vector<int> &_nbins, bool optimize) :
         Eval(_samples, nfields, nobservables, lower, upper),
         samples(_samples.size(), false), eval_points(0), 
-        nbins(_nbins.size(), true), bin_stride(_nbins.size(), true), bins(0)
+        nbins(_nbins.size(), true), bin_stride(_nbins.size(), true), bins(0), needs_optimization(optimize)
     {
         if ( (int) _nbins.size() != nobservables)
             throw Error("Size of nbins array must be same as number of observables.");
@@ -312,6 +314,11 @@ namespace pdfz {
 
     void EvalHist::EvalAsync()
     {
+        if (this->needs_optimization) {
+            this->Optimize();
+            needs_optimization = false;
+        }
+
         // Handle no systematics case
         int nsyst = 0;
         const SystematicDescriptor *syst_ptr = 0;
@@ -348,7 +355,69 @@ namespace pdfz {
 
     void EvalHist::Optimize()
     {
+        return;
+        // Only do this if running on GPU
+        #ifdef __CUDACC__
 
+        const int ngrid_sizes = 6;
+        const int grid_sizes[ngrid_sizes] = { 2, 4, 8, 16, 32, 64 };
+        const int nblock_sizes = 5;
+        const int block_sizes[nblock_sizes] = { 32, 64, 128, 256, 512};
+        const int nreps = 5;
+
+        // Handle missing systematics case
+        int nsyst = 0;
+        const SystematicDescriptor *syst_ptr = 0;
+        if (this->syst) {
+            nsyst = this->syst->size();
+            syst_ptr = this->syst->readOnlyPtr();
+        }
+
+        // Force allocation of these buffers (since we are not calling the zero bin kernel first)
+        this->bins->writeOnlyPtr(); 
+        this->norm_buffer->writeOnlyPtr();
+
+        // Benchmark all possible grid sizes
+        float best_time = 1e9;
+        TStopwatch timer;
+
+        for (int igrid=0; igrid < ngrid_sizes; igrid++) {
+            int grid_size = grid_sizes[igrid];
+
+            for (int iblock=0; iblock < nblock_sizes; iblock++) {
+                int block_size = block_sizes[iblock];
+
+                timer.Start();
+                for (int irep=0; irep < nreps; irep++) {
+                    HEMI_KERNEL_LAUNCH(bin_samples, grid_size, block_size, 0, this->cuda_state->stream,
+                      (int) this->samples.size(), this->samples.readOnlyPtr(), 
+                      this->nobservables, this->nfields,
+                      this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
+                      this->lower.readOnlyPtr(), this->upper.readOnlyPtr(),
+                      nsyst, syst_ptr,
+                      this->param_buffer->readOnlyPtr(),
+                      this->bins->ptr(), this->norm_buffer->writeOnlyPtr() + this->norm_offset);
+                }
+                checkCuda( cudaStreamSynchronize(this->cuda_state->stream) );
+                timer.Stop();
+                float this_time = timer.RealTime();
+
+                //std::cerr << "Grid/Block tested:" << grid_size << "/" << block_size << "(" << this_time << " sec)\n";
+
+                if (this_time < best_time) {
+                    best_time = this_time;
+                    this->nblocks = grid_size;
+                    this->nthreads_per_block = block_size;
+                }
+            }
+        }
+
+        #ifdef DEBUG
+        std::cerr << "pdfz::EvalHist::Optimize(): # of samples = " << this->samples.size() / this->nfields
+                  << " Grid/Block selected = " << this->nblocks << "/" << this->nthreads_per_block << "\n";
+        #endif
+   
+        #endif
     }
 
     ///////////////////// EvalKernel ///////////////////////
