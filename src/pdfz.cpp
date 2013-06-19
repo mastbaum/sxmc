@@ -33,6 +33,7 @@ namespace pdfz {
     };
 
 
+    //HEMI_ALIGN(8)
     struct SystematicDescriptor
     {
         short type;
@@ -72,8 +73,6 @@ namespace pdfz {
         this->cuda_state->stream = 0;
         #endif
 
-        this->syst = new hemi::Array<SystematicDescriptor>(0, true);
-
         // The handling of samples is up to the Eval subclass!
     }
 
@@ -105,7 +104,11 @@ namespace pdfz {
 
     void Eval::AddSystematic(const Systematic &syst)
     {
-        resize_array(*(this->syst), this->syst->size() + 1);
+        if (this->syst)
+            resize_array(*(this->syst), this->syst->size() + 1);
+        else
+            this->syst = new hemi::Array<SystematicDescriptor>(1, true);
+
         SystematicDescriptor desc;
         desc.type = syst.type;
         if (syst.type == Systematic::SHIFT) {
@@ -186,6 +189,22 @@ namespace pdfz {
     }
 
     ///// EvalHist kernels
+    HEMI_DEV_CALLABLE_INLINE
+    void apply_systematic(const SystematicDescriptor *syst, float *fields, const float *parameters)
+    {
+        switch (syst->type) {
+            case Systematic::SHIFT:
+            fields[syst->obs] += parameters[syst->par];
+            break;
+            case Systematic::SCALE:
+            fields[syst->obs] *= (1 + parameters[syst->par]);
+            break;
+            case Systematic::RESOLUTION_SCALE:
+            fields[syst->obs] *= (1 + parameters[syst->par]);            
+            break;
+        }
+    }
+
     HEMI_KERNEL(zero_hist)(int total_nbins, unsigned int *bins, unsigned int *norm)
     {
         int offset = hemiGetElementOffset();
@@ -198,31 +217,43 @@ namespace pdfz {
             bins[i] = 0;
     }
 
-    HEMI_KERNEL(bin_samples)(int nsamples, const float *samples, int sample_stride,
-                             int ndims, const int *bin_stride, const int *nbins,
+    HEMI_KERNEL(bin_samples)(int nsamples, const float *samples,
+                             const int nobs, const int nfields, 
+                             const int *bin_stride, const int *nbins,
                              const float *lower, const float *upper,
+                             const int nsyst, const SystematicDescriptor *syst,
+                             const float *parameters,
                              unsigned int *bins, unsigned int *norm)
     {
         int offset = hemiGetElementOffset();
         int stride = hemiGetElementStride();
+        float *field_buffer = new float[nfields];
 
         for (int isample=offset; isample < nsamples; isample += stride) {
             bool in_pdf_domain = true;
             int bin_id = 0;
 
-            for (int idim=0; idim < ndims; idim++) {
-                int ielement = sample_stride * isample + idim;
-                float element = samples[ielement];
+            // Copy fields
+            for (int ifield=0; ifield < nfields; ifield++)
+                field_buffer[ifield] = samples[isample * nfields + ifield];
 
+            // Apply systematics
+            for (int isyst=0; isyst < nsyst; isyst++)
+                apply_systematic(syst + isyst, field_buffer, parameters);
+
+            // Compute histogram bin
+            for (int iobs=0; iobs < nobs; iobs++) {
+                float element = field_buffer[iobs];
                 // Throw out this event if outside of PDF domain
-                if (element < lower[idim] || element >= upper[idim]) {
+                if (element < lower[iobs] || element >= upper[iobs]) {
                     in_pdf_domain = false;
                     break;
                 }
 
-                bin_id += (int)( ((element - lower[idim]) / (upper[idim] - lower[idim])) * nbins[idim] ) * bin_stride[idim];
+                bin_id += (int)( ((element - lower[iobs]) / (upper[iobs] - lower[iobs])) * nbins[iobs] ) * bin_stride[iobs];
             }
 
+            // Add to histogram if sample in PDF domain
             if (in_pdf_domain) {
                 #ifdef HEMI_DEV_CODE
                 atomicAdd(bins + bin_id, 1);
@@ -233,6 +264,8 @@ namespace pdfz {
                 #endif
             }
         }
+
+        delete[] field_buffer;
     }
 
     HEMI_KERNEL(eval_pdf)(int npoints, const float *points, int point_stride,
@@ -277,12 +310,23 @@ namespace pdfz {
 
     void EvalHist::EvalAsync()
     {
+        // Handle no systematics case
+        int nsyst = 0;
+        const SystematicDescriptor *syst_ptr = 0;
+        if (this->syst) {
+            nsyst = this->syst->size();
+            syst_ptr = this->syst->readOnlyPtr();
+        }
+
         HEMI_KERNEL_LAUNCH(zero_hist, this->nblocks, this->nthreads_per_block, 0, this->cuda_state->stream,
                            this->total_nbins, this->bins->writeOnlyPtr(), this->norm_buffer->writeOnlyPtr() + this->norm_offset);
         HEMI_KERNEL_LAUNCH(bin_samples, this->nblocks, this->nthreads_per_block, 0, this->cuda_state->stream,
-                           (int) this->samples.size(), this->samples.readOnlyPtr(), this->nfields,
-                           this->nobservables, this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
-                           this->lower.readOnlyPtr(), this->upper.readOnlyPtr(), 
+                           (int) this->samples.size(), this->samples.readOnlyPtr(), 
+                           this->nobservables, this->nfields,
+                           this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
+                           this->lower.readOnlyPtr(), this->upper.readOnlyPtr(),
+                           nsyst, syst_ptr,
+                           this->param_buffer->readOnlyPtr(),
                            this->bins->ptr(), this->norm_buffer->writeOnlyPtr() + this->norm_offset);
         HEMI_KERNEL_LAUNCH(eval_pdf, this->nblocks, this->nthreads_per_block, 0, this->cuda_state->stream,
                            (int) this->eval_points->size(), this->eval_points->readOnlyPtr(), this->nobservables,
