@@ -10,6 +10,7 @@
 #include <string>
 #include <TCanvas.h>
 
+class TNtuple;
 class TLegend;
 class TH1;
 
