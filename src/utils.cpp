@@ -23,7 +23,7 @@ std::vector<float> get_correlation_matrix(TNtuple* nt) {
 
   // get list of branch names
   std::vector<std::string> names;
-  for (size_t i=0; i<nt->GetListOfBranches()->GetEntries(); i++) {
+  for (int i=0; i<nt->GetListOfBranches()->GetEntries(); i++) {
     names.push_back(nt->GetListOfBranches()->At(i)->GetName());
   }
 
@@ -32,7 +32,7 @@ std::vector<float> get_correlation_matrix(TNtuple* nt) {
   // convert the ntuple to a vector, calculating means as we go
   std::vector<float> table(names.size() * nentries);
   std::vector<float> means(names.size(), 0);
-  for (size_t i=0; i<nentries; i++) {
+  for (int i=0; i<nentries; i++) {
     for (size_t j=0; j<names.size(); j++) {
       float v = get_ntuple_entry(nt, i, names[j]);
       table[j + i * names.size()] = v;
