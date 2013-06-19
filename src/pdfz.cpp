@@ -305,7 +305,7 @@ namespace pdfz {
             if (in_pdf_domain) {
                 pdf_value = bins[bin_id] / bin_volume / *norm;
             } else {
-                pdf_value = nanf(0);
+                pdf_value = nanf("");
             }
             output[output_stride * ipoint] = pdf_value;
         }
