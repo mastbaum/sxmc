@@ -59,6 +59,7 @@ void bench_pdfz()
     hemi::Array<float> pdf_values(neval_points, true);
     hemi::Array<unsigned int> norm (1, true);
     hemi::Array<float> params(1, true);
+    params.writeOnlyHostPtr(); // force alloc
 
     evaluator.SetEvalPoints(eval_points);
     evaluator.SetPDFValueBuffer(&pdf_values);
@@ -140,7 +141,8 @@ void bench_pdfz_group()
         nsamples_total += nsamples[i];
     }
 
-    cout << "\n        # of evaluation points = " << neval_points << "\n"
+    cout << "\n        # of samples (total) = " << nsamples_total << "\n"
+         <<   "        # of evaluation points = " << neval_points << "\n"
          <<   "        # of bins = " << nbins << "\n";
 
     // Setup arrays for evaluators
@@ -150,6 +152,7 @@ void bench_pdfz_group()
     hemi::Array<float> pdf_values(neval_points * nsignals, true);
     hemi::Array<unsigned int> norm (nsignals, true);
     hemi::Array<float> params(1, true);
+    params.writeOnlyHostPtr(); // force alloc
 
     // Initialize evaluators
     pdfz::EvalHist *evaluators[nsignals];
