@@ -4,6 +4,7 @@
 #include <math_constants.h> // CUDA header
 
 namespace pdfz {
+    const int MAX_NFIELDS = 10;
 
     // Changes the size of an array while preserving its contents.
     // Shrinking the array only preserves the initial entries, while truncating
@@ -144,6 +145,9 @@ namespace pdfz {
         if ( (int) _nbins.size() != nobservables)
             throw Error("Size of nbins array must be same as number of observables.");
 
+        if (nfields > MAX_NFIELDS)
+            throw Error("Exceeded maximum number of fields per sample.  Edit MAX_NFIELDS in pdfz.cpp to fix this!");
+
         this->samples.copyFromHost(&_samples.front(), _samples.size());
         this->nbins.copyFromHost(&_nbins.front(), _nbins.size());
 
@@ -227,7 +231,7 @@ namespace pdfz {
     {
         int offset = hemiGetElementOffset();
         int stride = hemiGetElementStride();
-        float *field_buffer = new float[nfields];
+        float field_buffer[MAX_NFIELDS];
 
         for (int isample=offset; isample < nsamples; isample += stride) {
             bool in_pdf_domain = true;
@@ -264,8 +268,6 @@ namespace pdfz {
                 #endif
             }
         }
-
-        delete[] field_buffer;
     }
 
     HEMI_KERNEL(eval_pdf)(int npoints, const float *points, int point_stride,
@@ -344,6 +346,11 @@ namespace pdfz {
     }
 
 
+    void EvalHist::Optimize()
+    {
+
+    }
+
     ///////////////////// EvalKernel ///////////////////////
 
-} // namespace pdfs
+} // namespace pdfz
