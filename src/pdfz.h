@@ -148,7 +148,7 @@ namespace pdfz {
      * \brief  Fractionally alter the resolution of an observable by rescaling its distance
      *         from a "true" value.
      *
-     * Transform x' = (1 + p) * (x - x_true) + x_true
+     * Transform x' = x + p * (x - x_true)
      */
     struct ResolutionScaleSystematic : public Systematic
     {

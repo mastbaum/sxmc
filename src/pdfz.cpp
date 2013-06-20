@@ -201,7 +201,7 @@ namespace pdfz {
             fields[syst->obs] *= (1 + parameters[syst->par]);
             break;
             case Systematic::RESOLUTION_SCALE:
-            fields[syst->obs] *= (1 + parameters[syst->par]);            
+            fields[syst->obs] += parameters[syst->par] * (fields[syst->obs] - fields[syst->extra_field]);
             break;
         }
     }
@@ -218,7 +218,7 @@ namespace pdfz {
             bins[i] = 0;
     }
 
-    HEMI_KERNEL(bin_samples)(int nsamples, const float *samples,
+    HEMI_KERNEL(bin_samples)(int ndata, const float *data,
                              const int nobs, const int nfields, 
                              const int * __restrict__ bin_stride, const int * __restrict__ nbins,
                              const float * __restrict__ lower, const float * __restrict__ upper,
@@ -229,6 +229,7 @@ namespace pdfz {
         int offset = hemiGetElementOffset();
         int stride = hemiGetElementStride();
         float field_buffer[MAX_NFIELDS];
+        const int nsamples = ndata / nfields;
 
         unsigned int thread_norm = 0;
 
@@ -238,7 +239,7 @@ namespace pdfz {
 
             // Copy fields
             for (int ifield=0; ifield < nfields; ifield++)
-                field_buffer[ifield] = samples[isample * nfields + ifield];
+                field_buffer[ifield] = data[isample * nfields + ifield];
 
             // Apply systematics
             for (int isyst=0; isyst < nsyst; isyst++)
