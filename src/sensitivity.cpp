@@ -8,6 +8,7 @@
  */
 
 #include <iostream>
+#include <iomanip>
 #include <string>
 #include <algorithm>
 #include <assert.h>
@@ -121,7 +122,6 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
       }
     }
 
-
     // plot and save this fit
     SpectralPlot p_all;
     SpectralPlot p_external;
@@ -174,6 +174,18 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
         p_all.add(hs, signals[i].title, "hist");
       }
       delete hs;
+    }
+
+    std::cout << "Correlation matrix:" << std::endl;
+    std::vector<float> correlations = get_correlation_matrix(lspace);
+    for (size_t i=0; i<signals.size(); i++) {
+      std::cout << std::setw(10) << signals[i].name << " ";
+      for (size_t j=0; j<signals.size(); j++) {
+        std::cout << std::setiosflags(std::ios::fixed)
+                  << std::setprecision(3) << std::setw(8)
+                  << correlations[j + i * (signals.size() + 1)];
+      }
+      std::cout << std::resetiosflags(std::ios::fixed) << std::endl;
     }
 
     p_all.add(hexternal, "External", "hist");

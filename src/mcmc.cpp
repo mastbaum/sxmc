@@ -113,7 +113,7 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
   for (size_t i=0; i<this->nsignals; i++) {
     float expectation = this->expectations->readOnlyHostPtr()[i];
     float constraint = this->constraints->readOnlyHostPtr()[i];
-    float width = (constraint > 0 ? constraint : sqrt(expectation));
+    float width = (constraint > 0 ? constraint : sqrt(expectation) / 10);
     width = (width > 0 ? width : 1);
     sigma.writeOnlyHostPtr()[i] = 0.5 * width;
   }
@@ -191,7 +191,7 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
     nll(proposed_vector.readOnlyPtr(), proposed_nll.writeOnlyPtr(),
         event_partial_sums.ptr(), event_total_sum.ptr());
 
-    // accept/reject the jump, adding accepted ones to the buffer
+    // accept/reject the jump, add current position to the buffer
     HEMI_KERNEL_LAUNCH(jump_decider, 1, 1, 0, 0,
                        this->rngs->ptr(),
                        current_nll.ptr(),
@@ -274,10 +274,7 @@ hemi::Array<float>* MCMC::build_lut(const std::vector<Signal>& signals,
   hemi::Array<float>* lut = new hemi::Array<float>(signals.size() * nevents,
                                                    true);
 
-  std::vector<float> minima;
-  for (size_t i=0; i<signals.size(); i++) {
-    minima.push_back(signals[i].histogram->GetMinimum(0) * 0.0001);
-  }
+  float minimum_probability = 1.0;
 
   float e;
   float r;
@@ -300,10 +297,17 @@ hemi::Array<float>* MCMC::build_lut(const std::vector<Signal>& signals,
         assert(false);
       }
 
-      if (v <= 0) {
-        v = minima[j];
+      if (v < minimum_probability && v > 0) {
+        minimum_probability = v;
       }
       lut->writeOnlyHostPtr()[i * signals.size() + j] = v;
+    }
+  }
+
+  // ensure Pj(xi) > 0
+  for (size_t i=0; i<signals.size()*nevents; i++) {
+    if (lut->readOnlyHostPtr()[i] <= 0) {
+      lut->writeOnlyHostPtr()[i] = minimum_probability / 1000;
     }
   }
 

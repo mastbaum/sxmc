@@ -60,8 +60,7 @@ HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
   if (np < nc || u <= exp(nc - np)) {
     nll_current[0] = np;
     for (unsigned i=0; i<ns; i++) {
-      float vpi = v_proposed[i];
-      v_current[i] = vpi;
+      v_current[i] = v_proposed[i];
     }
     accepted[0] += 1;
   }
@@ -71,7 +70,7 @@ HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
   for (unsigned i=0; i<ns; i++) {
     jump_buffer[count * (ns + 1) + i] = v_current[i];
   }
-  jump_buffer[count * (ns + 1) + ns] = nll_proposed[0];
+  jump_buffer[count * (ns + 1) + ns] = nll_current[0];
   counter[0] = count + 1;    
 }
 
