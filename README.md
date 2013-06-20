@@ -10,6 +10,7 @@ Building
 
 * [ROOT](http://root.cern.ch)
 * [Doxygen](http://doxygen.org) (if building documentation)
+* [HDF5](http://www.hdfgroup.org/HDF5/doc/index.html)
 
 It also uses [hemi](https://github.com/harrism/hemi), which is included as a
 git submodule. After cloning `sxmc`, run:
