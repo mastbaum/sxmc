@@ -356,7 +356,23 @@ namespace pdfz {
         const int grid_sizes[ngrid_sizes] = { 2, 4, 8, 16, 32, 64 };
         const int nblock_sizes = 5;
         const int block_sizes[nblock_sizes] = { 32, 64, 128, 256, 512};
-        const int nreps = 5;
+        const int nsamples = this->samples.size() / this->nfields;
+        int nreps = 1;
+
+        // Do more repetitions on small kernels to avoid being fooled by timing fluctuations
+        if (nsamples < 1000)
+            nreps = 1000;
+        if (nsamples < 10000)
+            nreps = 100;
+        if (nsamples < 100000)
+            nreps = 10;
+
+        // Avoid picking large numbers of blocks due to timing fluctuations
+        // by requiring the timing to be at least 10% better than the
+        // current winner.  Since we try grid sizes in increasing order,
+        // this favors smaller configurations, which will be better
+        // for overlapping kernels.
+        const double improvement_threshold = 0.9;
 
         // Handle missing systematics case
         int nsyst = 0;
@@ -380,6 +396,10 @@ namespace pdfz {
             for (int iblock=0; iblock < nblock_sizes; iblock++) {
                 int block_size = block_sizes[iblock];
 
+                // Skip obviously too-large launch configurations
+                if (grid_size * block_size >= 2 * nsamples)
+                    continue;
+
                 timer.Start();
                 for (int irep=0; irep < nreps; irep++) {
                     HEMI_KERNEL_LAUNCH(bin_samples, grid_size, block_size, 0, this->cuda_state->stream,
@@ -397,7 +417,7 @@ namespace pdfz {
 
                 //std::cerr << "Grid/Block tested:" << grid_size << "/" << block_size << "(" << this_time << " sec)\n";
 
-                if (this_time < best_time) {
+                if (this_time < best_time * improvement_threshold) {
                     best_time = this_time;
                     this->nblocks = grid_size;
                     this->nthreads_per_block = block_size;
@@ -405,10 +425,10 @@ namespace pdfz {
             }
         }
 
-        #ifdef DEBUG
-        std::cerr << "pdfz::EvalHist::Optimize(): # of samples = " << this->samples.size() / this->nfields
+        //#ifdef DEBUG
+        std::cerr << "pdfz::EvalHist::Optimize(): # of samples = " << nsamples
                   << " Grid/Block selected = " << this->nblocks << "/" << this->nthreads_per_block << "\n";
-        #endif
+        //#endif
    
         #endif
     }
