@@ -30,6 +30,11 @@ parallel. To build without GPU support:
 You still need to have the CUDA headers installed, but no libraries or hardware
 are required.
 
+By default, `sxmc` is built in debug mode.  For much higher performance when
+using GPU support, pass the `OPTIMIZE=1` flag to make:
+
+    $ make OPTIMIZE=1
+
 Documentation
 -------------
 The code is fully documented for Doxygen. To view HTML documentation online,
