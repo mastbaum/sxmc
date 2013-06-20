@@ -220,10 +220,10 @@ namespace pdfz {
 
     HEMI_KERNEL(bin_samples)(int nsamples, const float *samples,
                              const int nobs, const int nfields, 
-                             const int *bin_stride, const int *nbins,
-                             const float *lower, const float *upper,
-                             const int nsyst, const SystematicDescriptor *syst,
-                             const float *parameters,
+                             const int * __restrict__ bin_stride, const int * __restrict__ nbins,
+                             const float * __restrict__ lower, const float * __restrict__ upper,
+                             const int nsyst, const SystematicDescriptor * __restrict__ syst,
+                             const float * __restrict__ parameters,
                              unsigned int *bins, unsigned int *norm)
     {
         int offset = hemiGetElementOffset();
@@ -269,7 +269,7 @@ namespace pdfz {
     HEMI_KERNEL(eval_pdf)(int npoints, const float *points, int point_stride,
                           int ndims, const int *bin_stride, const int *nbins,
                           const float *lower, const float *upper,
-                          const unsigned int *bins, const unsigned int *norm,
+                          const unsigned int * __restrict__ bins, const unsigned int * __restrict__ norm,
                           float *output, int output_stride)
     {
         int offset = hemiGetElementOffset();
