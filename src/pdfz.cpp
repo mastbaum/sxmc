@@ -1,9 +1,14 @@
+#include <iostream>
 #include "pdfz.h"
 #include <math.h>
 #include <cuda.h>
 #include <math_constants.h> // CUDA header
+#include <TStopwatch.h>
+
+#include "cuda_compat.h"
 
 namespace pdfz {
+    const int MAX_NFIELDS = 10;
 
     // Changes the size of an array while preserving its contents.
     // Shrinking the array only preserves the initial entries, while truncating
@@ -20,12 +25,6 @@ namespace pdfz {
         array.copyFromHost(&tmp.front(), n); // Resizes array automatically
     }
 
-    // If not compiling with CUDA, alias the CUDA stream type to something harmless.
-    #ifndef __CUDACC__
-    typedef int cudaStream_t;
-    #endif
-
-
     // Hidden CUDA state for evaluator.  Not visible to Eval class users.
     struct CudaState
     {
@@ -33,7 +32,6 @@ namespace pdfz {
     };
 
 
-    //HEMI_ALIGN(8)
     struct SystematicDescriptor
     {
         short type;
@@ -128,7 +126,7 @@ namespace pdfz {
             throw Error("Unknown systematic type");
         }
 
-        this->syst->hostPtr()[this->syst->size() - 1] = desc;
+        this->syst->writeOnlyHostPtr()[this->syst->size() - 1] = desc;
     }
 
 
@@ -136,13 +134,16 @@ namespace pdfz {
 
     EvalHist::EvalHist(const std::vector<float> &_samples, int nfields, int nobservables,
                        const std::vector<float> &lower, const std::vector<float> &upper,
-                       const std::vector<int> &_nbins) :
+                       const std::vector<int> &_nbins, bool optimize) :
         Eval(_samples, nfields, nobservables, lower, upper),
         samples(_samples.size(), false), eval_points(0), 
-        nbins(_nbins.size(), true), bin_stride(_nbins.size(), true), bins(0)
+        nbins(_nbins.size(), true), bin_stride(_nbins.size(), true), bins(0), needs_optimization(optimize)
     {
         if ( (int) _nbins.size() != nobservables)
             throw Error("Size of nbins array must be same as number of observables.");
+
+        if (nfields > MAX_NFIELDS)
+            throw Error("Exceeded maximum number of fields per sample.  Edit MAX_NFIELDS in pdfz.cpp to fix this!");
 
         this->samples.copyFromHost(&_samples.front(), _samples.size());
         this->nbins.copyFromHost(&_nbins.front(), _nbins.size());
@@ -219,15 +220,17 @@ namespace pdfz {
 
     HEMI_KERNEL(bin_samples)(int nsamples, const float *samples,
                              const int nobs, const int nfields, 
-                             const int *bin_stride, const int *nbins,
-                             const float *lower, const float *upper,
-                             const int nsyst, const SystematicDescriptor *syst,
-                             const float *parameters,
+                             const int * __restrict__ bin_stride, const int * __restrict__ nbins,
+                             const float * __restrict__ lower, const float * __restrict__ upper,
+                             const int nsyst, const SystematicDescriptor * __restrict__ syst,
+                             const float * __restrict__ parameters,
                              unsigned int *bins, unsigned int *norm)
     {
         int offset = hemiGetElementOffset();
         int stride = hemiGetElementStride();
-        float *field_buffer = new float[nfields];
+        float field_buffer[MAX_NFIELDS];
+
+        unsigned int thread_norm = 0;
 
         for (int isample=offset; isample < nsamples; isample += stride) {
             bool in_pdf_domain = true;
@@ -255,23 +258,18 @@ namespace pdfz {
 
             // Add to histogram if sample in PDF domain
             if (in_pdf_domain) {
-                #ifdef HEMI_DEV_CODE
                 atomicAdd(bins + bin_id, 1);
-                atomicAdd(norm, 1);
-                #else
-                bins[bin_id] += 1;
-                *norm += 1;
-                #endif
+                thread_norm += 1;
             }
         }
 
-        delete[] field_buffer;
+        atomicAdd(norm, thread_norm);
     }
 
     HEMI_KERNEL(eval_pdf)(int npoints, const float *points, int point_stride,
                           int ndims, const int *bin_stride, const int *nbins,
                           const float *lower, const float *upper,
-                          const unsigned int *bins, const unsigned int *norm,
+                          const unsigned int * __restrict__ bins, const unsigned int * __restrict__ norm,
                           float *output, int output_stride)
     {
         int offset = hemiGetElementOffset();
@@ -301,7 +299,7 @@ namespace pdfz {
             if (in_pdf_domain) {
                 pdf_value = bins[bin_id] / bin_volume / *norm;
             } else {
-                pdf_value = nanf(0);
+                pdf_value = nanf("");
             }
             output[output_stride * ipoint] = pdf_value;
         }
@@ -310,6 +308,11 @@ namespace pdfz {
 
     void EvalHist::EvalAsync()
     {
+        if (this->needs_optimization) {
+            this->Optimize();
+            needs_optimization = false;
+        }
+
         // Handle no systematics case
         int nsyst = 0;
         const SystematicDescriptor *syst_ptr = 0;
@@ -344,6 +347,92 @@ namespace pdfz {
     }
 
 
+    void EvalHist::Optimize()
+    {
+        // Only do this if running on GPU
+        #ifdef __CUDACC__
+
+        const int ngrid_sizes = 6;
+        const int grid_sizes[ngrid_sizes] = { 2, 4, 8, 16, 32, 64 };
+        const int nblock_sizes = 5;
+        const int block_sizes[nblock_sizes] = { 32, 64, 128, 256, 512};
+        const int nsamples = this->samples.size() / this->nfields;
+        int nreps = 1;
+
+        // Do more repetitions on small kernels to avoid being fooled by timing fluctuations
+        if (nsamples < 1000)
+            nreps = 1000;
+        if (nsamples < 10000)
+            nreps = 100;
+        if (nsamples < 100000)
+            nreps = 10;
+
+        // Avoid picking large numbers of blocks due to timing fluctuations
+        // by requiring the timing to be at least 10% better than the
+        // current winner.  Since we try grid sizes in increasing order,
+        // this favors smaller configurations, which will be better
+        // for overlapping kernels.
+        const double improvement_threshold = 0.9;
+
+        // Handle missing systematics case
+        int nsyst = 0;
+        const SystematicDescriptor *syst_ptr = 0;
+        if (this->syst) {
+            nsyst = this->syst->size();
+            syst_ptr = this->syst->readOnlyPtr();
+        }
+
+        // Force allocation of these buffers (since we are not calling the zero bin kernel first)
+        this->bins->writeOnlyPtr(); 
+        this->norm_buffer->writeOnlyPtr();
+
+        // Benchmark all possible grid sizes
+        float best_time = 1e9;
+        TStopwatch timer;
+
+        for (int igrid=0; igrid < ngrid_sizes; igrid++) {
+            int grid_size = grid_sizes[igrid];
+
+            for (int iblock=0; iblock < nblock_sizes; iblock++) {
+                int block_size = block_sizes[iblock];
+
+                // Skip obviously too-large launch configurations
+                if (grid_size * block_size >= 2 * nsamples)
+                    continue;
+
+                timer.Start();
+                for (int irep=0; irep < nreps; irep++) {
+                    HEMI_KERNEL_LAUNCH(bin_samples, grid_size, block_size, 0, this->cuda_state->stream,
+                      (int) this->samples.size(), this->samples.readOnlyPtr(), 
+                      this->nobservables, this->nfields,
+                      this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
+                      this->lower.readOnlyPtr(), this->upper.readOnlyPtr(),
+                      nsyst, syst_ptr,
+                      this->param_buffer->readOnlyPtr(),
+                      this->bins->ptr(), this->norm_buffer->writeOnlyPtr() + this->norm_offset);
+                }
+                checkCuda( cudaStreamSynchronize(this->cuda_state->stream) );
+                timer.Stop();
+                float this_time = timer.RealTime();
+
+                //std::cerr << "Grid/Block tested:" << grid_size << "/" << block_size << "(" << this_time << " sec)\n";
+
+                if (this_time < best_time * improvement_threshold) {
+                    best_time = this_time;
+                    this->nblocks = grid_size;
+                    this->nthreads_per_block = block_size;
+                }
+            }
+        }
+
+        //#ifdef DEBUG
+        std::cerr << "pdfz::EvalHist::Optimize(): # of samples = " << nsamples
+                  << " Grid/Block selected = " << this->nblocks << "/" << this->nthreads_per_block << "\n";
+        //#endif
+   
+        #endif
+    }
+
     ///////////////////// EvalKernel ///////////////////////
 
-} // namespace pdfs
+} // namespace pdfz

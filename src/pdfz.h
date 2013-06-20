@@ -289,13 +289,20 @@ namespace pdfz {
 
             Raises all exceptions of Eval(), as well as pdfz::Error if 
             nbins.size() != nobs.
+
+            If optimize is set to true (default), then the CUDA block
+            configuration will be optimized the first time EvalAsync() is called.
         */
         EvalHist(const std::vector<float> &samples, int nfields, int nobservables,
                  const std::vector<float> &lower, const std::vector<float> &upper,
-                 const std::vector<int> &nbins);
+                 const std::vector<int> &nbins, bool optimize=true);
 
         virtual ~EvalHist();
         virtual void SetEvalPoints(const std::vector<float> &points);
+
+        /** Brute force tests a bunch of CUDA configurations to find the best one */
+        virtual void Optimize();
+
         virtual void EvalAsync();
         virtual void EvalFinished();
 
@@ -309,6 +316,8 @@ namespace pdfz {
 
         int nthreads_per_block;
         int nblocks;
+
+        bool needs_optimization;
     };
 
 
