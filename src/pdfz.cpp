@@ -5,6 +5,8 @@
 #include <math_constants.h> // CUDA header
 #include <TStopwatch.h>
 
+#include "cuda_compat.h"
+
 namespace pdfz {
     const int MAX_NFIELDS = 10;
 
@@ -23,12 +25,6 @@ namespace pdfz {
         array.copyFromHost(&tmp.front(), n); // Resizes array automatically
     }
 
-    // If not compiling with CUDA, alias the CUDA stream type to something harmless.
-    #ifndef __CUDACC__
-    typedef int cudaStream_t;
-    #endif
-
-
     // Hidden CUDA state for evaluator.  Not visible to Eval class users.
     struct CudaState
     {
@@ -36,7 +32,6 @@ namespace pdfz {
     };
 
 
-    //HEMI_ALIGN(8)
     struct SystematicDescriptor
     {
         short type;
@@ -235,7 +230,7 @@ namespace pdfz {
         int stride = hemiGetElementStride();
         float field_buffer[MAX_NFIELDS];
 
-	unsigned int thread_norm = 0;
+        unsigned int thread_norm = 0;
 
         for (int isample=offset; isample < nsamples; isample += stride) {
             bool in_pdf_domain = true;
@@ -263,21 +258,12 @@ namespace pdfz {
 
             // Add to histogram if sample in PDF domain
             if (in_pdf_domain) {
-                #ifdef HEMI_DEV_CODE
                 atomicAdd(bins + bin_id, 1);
-                #else
-                bins[bin_id] += 1;
-                #endif
-		
-		thread_norm += 1;
+                thread_norm += 1;
             }
         }
 
-	#ifdef HEMI_DEV_CODE
-	atomicAdd(norm, thread_norm);
-	#else
-	*norm += thread_norm;
-	#endif
+        atomicAdd(norm, thread_norm);
     }
 
     HEMI_KERNEL(eval_pdf)(int npoints, const float *points, int point_stride,
