@@ -136,7 +136,7 @@ namespace pdfz {
                        const std::vector<float> &lower, const std::vector<float> &upper,
                        const std::vector<int> &_nbins, bool optimize) :
         Eval(_samples, nfields, nobservables, lower, upper),
-        samples(_samples.size(), false), eval_points(0), 
+        samples(_samples.size(), false), read_bins(0), 
         nbins(_nbins.size(), true), bin_stride(_nbins.size(), true), bins(0), needs_optimization(optimize)
     {
         if ( (int) _nbins.size() != nobservables)
@@ -147,6 +147,12 @@ namespace pdfz {
 
         this->samples.copyFromHost(&_samples.front(), _samples.size());
         this->nbins.copyFromHost(&_nbins.front(), _nbins.size());
+
+        // Compute bin volume
+        this->bin_volume = 1.0f;
+        for (int i=0; i < nobservables; i++)
+            this->bin_volume *= (upper[i] - lower[i]) / _nbins[i];
+
 
         // Compute stride for row-major order storage
         const int ndims = (int) this->bin_stride.size();
@@ -178,7 +184,7 @@ namespace pdfz {
 
     EvalHist::~EvalHist()
     {
-        delete this->eval_points;
+        delete this->read_bins;
         delete this->bins;
     }
 
@@ -187,9 +193,49 @@ namespace pdfz {
         if (points.size() % this->nobservables != 0)
             throw Error("Number of entries in evaluation points array not divisible by number of observables.");
 
-        delete this->eval_points;
-        this->eval_points = new hemi::Array<float>(points.size(), false);
-        this->eval_points->copyFromHost(&points.front(), points.size());
+        delete this->read_bins;
+        this->read_bins = new hemi::Array<int>(points.size(), false);
+        int *read_bins = this->read_bins->writeOnlyHostPtr();
+
+        // Precompute the bin number corresponding to each evaluation point
+        // *** This never changes between PDF evaluations! ***
+
+
+        // Pointer aliases to Hemi array contents (for convenience)
+        const float *lower = this->lower.readOnlyHostPtr();
+        const float *upper = this->upper.readOnlyHostPtr();
+        const int *nbins = this->nbins.readOnlyHostPtr();
+        const int *bin_stride = this->bin_stride.readOnlyHostPtr();
+
+        std::vector<float> bin_scale(this->nobservables);
+
+        for (int iobs=0; iobs < this->nobservables; iobs++) {
+            float span = upper[iobs] - lower[iobs];
+            bin_scale[iobs] = nbins[iobs] / span;
+        }
+
+        for (unsigned int ipoint=0; ipoint < points.size(); ipoint++) {
+            bool in_pdf_domain = true;
+            int bin_id = 0;
+
+            for (int iobs=0; iobs < this->nobservables; iobs++) {
+                int ielement = this->nobservables * ipoint + iobs;
+                float element = points[ielement];
+
+                // Throw out this event if outside of PDF domain
+                if (element < lower[iobs] || element >= upper[iobs]) {
+                    in_pdf_domain = false;
+                    break;
+                }
+
+                bin_id += (int)( (element - lower[iobs]) * bin_scale[iobs] ) * bin_stride[iobs];
+            }
+
+            if (in_pdf_domain)
+                read_bins[ipoint] = (int) bin_id;
+            else
+                read_bins[ipoint] = -1; // Filled in with NaN during evaluation
+        }
     }
 
     ///// EvalHist kernels
@@ -274,47 +320,25 @@ namespace pdfz {
         atomicAdd(norm, thread_norm);
     }
 
-    HEMI_KERNEL(eval_pdf)(int npoints, const float *points, int point_stride,
-                          int ndims, const int *bin_stride, const int *nbins,
-                          const float *lower, const float *upper,
-                          const unsigned int * __restrict__ bins, const unsigned int * __restrict__ norm,
+    HEMI_KERNEL(eval_pdf)(int npoints, const int *read_bins,
+                          const unsigned int * __restrict__ bins,
+                          const unsigned int * __restrict__ norm,
+                          float bin_volume,
                           float *output, int output_stride)
     {
         int offset = hemiGetElementOffset();
         int stride = hemiGetElementStride();
-        float bin_norm = *norm;
-        float bin_scale[MAX_NFIELDS];
-
-        for (int idim=0; idim < ndims; idim++) {
-            float span = upper[idim] - lower[idim];
-            bin_scale[idim] = nbins[idim] / span;
-            bin_norm /= bin_scale[idim];
-        }
+        const float bin_norm = *norm * bin_volume;
 
         for (int ipoint=offset; ipoint < npoints; ipoint += stride) {
-            bool in_pdf_domain = true;
-            int bin_id = 0;
-
-
-            for (int idim=0; idim < ndims; idim++) {
-                int ielement = point_stride * ipoint + idim;
-                float element = points[ielement];
-
-                // Throw out this event if outside of PDF domain
-                if (element < lower[idim] || element >= upper[idim]) {
-                    in_pdf_domain = false;
-                    break;
-                }
-
-                bin_id += (int)( (element - lower[idim]) * bin_scale[idim] ) * bin_stride[idim];
-            }
+            int bin_id = read_bins[ipoint];
 
             float pdf_value = 0.0f;
-            if (in_pdf_domain) {
-                pdf_value = bins[bin_id] / bin_norm;
-            } else {
+            if (bin_id < 0)
                 pdf_value = nanf("");
-            }
+            else
+                pdf_value = bins[bin_id] / bin_norm;
+
             output[output_stride * ipoint] = pdf_value;
         }
     }
@@ -344,10 +368,9 @@ namespace pdfz {
                            this->param_buffer->readOnlyPtr(),
                            this->bins->ptr(), this->norm_buffer->writeOnlyPtr() + this->norm_offset);
         HEMI_KERNEL_LAUNCH(eval_pdf, this->eval_nblocks, this->eval_nthreads_per_block, 0, this->cuda_state->stream,
-                           (int) this->eval_points->size(), this->eval_points->readOnlyPtr(), this->nobservables,
-                           this->nobservables, this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
-                           this->lower.readOnlyPtr(), this->upper.readOnlyPtr(), 
+                           (int) this->read_bins->size(), this->read_bins->readOnlyPtr(),
                            this->bins->readOnlyPtr(), this->norm_buffer->readOnlyPtr() + this->norm_offset,
+                           this->bin_volume,
                            this->pdf_buffer->writeOnlyPtr() + this->pdf_offset, this->pdf_stride);
     }
 
@@ -461,7 +484,7 @@ namespace pdfz {
         const int grid_sizes[ngrid_sizes] = { 2, 4, 8, 16, 32, 64 };
         const int nblock_sizes = 5;
         const int block_sizes[nblock_sizes] = { 32, 64, 128, 256, 512};
-        const int npoints = this->eval_points->size() / this->nobservables;
+        const int npoints = this->read_bins->size();
         int nreps = 1;
 
         // Do more repetitions on small kernels to avoid being fooled by timing fluctuations
@@ -500,10 +523,9 @@ namespace pdfz {
                 timer.Start();
                 for (int irep=0; irep < nreps; irep++) {
                     HEMI_KERNEL_LAUNCH(eval_pdf, grid_size, block_size, 0, this->cuda_state->stream,
-                           (int) this->eval_points->size(), this->eval_points->readOnlyPtr(), this->nobservables,
-                           this->nobservables, this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
-                           this->lower.readOnlyPtr(), this->upper.readOnlyPtr(), 
+                           (int) this->read_bins->size(), this->read_bins->readOnlyPtr(),
                            this->bins->readOnlyPtr(), this->norm_buffer->readOnlyPtr() + this->norm_offset,
+                           this->bin_volume,
                            this->pdf_buffer->writeOnlyPtr() + this->pdf_offset, this->pdf_stride);
                 }
                 checkCuda( cudaStreamSynchronize(this->cuda_state->stream) );

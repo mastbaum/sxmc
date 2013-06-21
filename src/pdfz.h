@@ -310,10 +310,11 @@ namespace pdfz {
 
     protected:
         hemi::Array<float> samples;
-        hemi::Array<float> *eval_points;
+        hemi::Array<int> *read_bins;
         hemi::Array<int> nbins;
         hemi::Array<int> bin_stride;
         int total_nbins;
+        float bin_volume;
         hemi::Array<unsigned int> *bins;
 
         int bin_nthreads_per_block;
