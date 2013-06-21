@@ -76,6 +76,8 @@
 #include <string>
 #include <vector>
 
+#include <TH1.h>
+
 namespace pdfz {
 
     /**
@@ -299,6 +301,12 @@ namespace pdfz {
 
         virtual ~EvalHist();
         virtual void SetEvalPoints(const std::vector<float> &points);
+
+        /** Dump the current PDF contents (as of the last EvalAsync/Finished call)
+         *  into a new TH1 object and return it.  Obviously only works for 
+         *  1, 2 or 3 histograms.
+         */
+        virtual TH1* CreateHistogram();
 
         /** Brute force tests a bunch of CUDA configurations to find the best one */
         virtual void Optimize();

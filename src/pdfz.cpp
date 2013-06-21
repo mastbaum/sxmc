@@ -4,6 +4,9 @@
 #include <cuda.h>
 #include <math_constants.h> // CUDA header
 #include <TStopwatch.h>
+#include <TH1D.h>
+#include <TH2D.h>
+#include <TH3D.h>
 
 #include "cuda_compat.h"
 
@@ -379,6 +382,71 @@ namespace pdfz {
         #ifdef __CUDACC__
         checkCuda( cudaStreamSynchronize(this->cuda_state->stream) );
         #endif
+    }
+
+    TH1* EvalHist::CreateHistogram()
+    {
+        if (this->nobservables > 3)
+            throw Error("Cannot EvalHist::CreateHistogram for dimensions greater than 3!");
+
+        const float *lower = this->lower.readOnlyHostPtr();
+        const float *upper = this->upper.readOnlyHostPtr();
+        const int *nbins = this->nbins.readOnlyHostPtr();
+        const unsigned int *bins = this->bins->readOnlyHostPtr();
+        const int *bin_stride = this->bin_stride.readOnlyHostPtr();
+        const unsigned int norm = this->norm_buffer->readOnlyHostPtr()[this->norm_offset];
+
+        TH1 *hist = 0;
+        switch (this->nobservables) {
+            case 1:
+            hist = new TH1D("", "", nbins[0], lower[0], upper[0]);
+            hist->Sumw2();
+            for (int x=0; x < nbins[0]; x++) {
+                int source_bin = x * bin_stride[0];
+                int target_bin = hist->GetBin(x+1);
+                hist->SetBinContent(target_bin, bins[source_bin] / this->bin_volume / norm);
+                hist->SetBinError(target_bin, sqrt(bins[source_bin]) / this->bin_volume / norm);
+            }
+            break;
+
+            case 2:
+            hist = new TH2D("", "",
+                            nbins[0], lower[0], upper[0],
+                            nbins[1], lower[1], upper[1]);
+            hist->Sumw2();
+            for (int x=0; x < nbins[0]; x++) {
+                for (int y=0; y < nbins[1]; y++) {
+                    int source_bin = x * bin_stride[0] + y * bin_stride[1];
+                    int target_bin = hist->GetBin(x+1, y+1);
+                    hist->SetBinContent(target_bin, bins[source_bin] / this->bin_volume / norm);
+                    hist->SetBinError(target_bin, sqrt(bins[source_bin]) / this->bin_volume / norm);
+                }
+            }
+            break;
+
+            case 3:
+            hist = new TH3D("", "",
+                            nbins[0], lower[0], upper[0],
+                            nbins[1], lower[1], upper[1],
+                            nbins[2], lower[2], upper[2]);
+            hist->Sumw2();
+            for (int x=0; x < nbins[0]; x++) {
+                for (int y=0; y < nbins[1]; y++) {
+                    for (int z=0; z < nbins[2]; z++) {
+                        int source_bin = x * bin_stride[0] + y * bin_stride[1] + z * bin_stride[2];
+                        int target_bin = hist->GetBin(x+1, y+1, z+1);
+                        hist->SetBinContent(target_bin, bins[source_bin] / this->bin_volume / norm);
+                        hist->SetBinError(target_bin, sqrt(bins[source_bin]) / this->bin_volume / norm);
+                    }
+                }
+            }
+            break;
+
+            default:
+                throw Error("Impossible EvalHist::CreateHistogram switch case!");
+        }
+
+        return hist;
     }
 
     void EvalHist::Optimize()
