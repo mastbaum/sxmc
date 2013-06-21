@@ -302,6 +302,8 @@ namespace pdfz {
 
         /** Brute force tests a bunch of CUDA configurations to find the best one */
         virtual void Optimize();
+        virtual void OptimizeBin();
+        virtual void OptimizeEval();
 
         virtual void EvalAsync();
         virtual void EvalFinished();
@@ -314,8 +316,10 @@ namespace pdfz {
         int total_nbins;
         hemi::Array<unsigned int> *bins;
 
-        int nthreads_per_block;
-        int nblocks;
+        int bin_nthreads_per_block;
+        int bin_nblocks;
+        int eval_nthreads_per_block;
+        int eval_nblocks;
 
         bool needs_optimization;
     };

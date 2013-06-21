@@ -164,13 +164,16 @@ namespace pdfz {
         this->bins = new hemi::Array<unsigned int>(this->total_nbins, true);
 
 
-        this->nthreads_per_block = 256;
+        this->bin_nthreads_per_block = 256;
         if (_samples.size() > 100000)
-            this->nblocks = 64;
+            this->bin_nblocks = 64;
         else if (_samples.size() > 10000)
-            this->nblocks = 16;
+            this->bin_nblocks = 16;
         else
-            this->nblocks = 4;
+            this->bin_nblocks = 4;
+
+        this->eval_nthreads_per_block = 256;
+        this->eval_nblocks = 64;
     }
 
     EvalHist::~EvalHist()
@@ -309,10 +312,8 @@ namespace pdfz {
 
     void EvalHist::EvalAsync()
     {
-        if (this->needs_optimization) {
+        if (this->needs_optimization)
             this->Optimize();
-            needs_optimization = false;
-        }
 
         // Handle no systematics case
         int nsyst = 0;
@@ -322,9 +323,9 @@ namespace pdfz {
             syst_ptr = this->syst->readOnlyPtr();
         }
 
-        HEMI_KERNEL_LAUNCH(zero_hist, this->nblocks, this->nthreads_per_block, 0, this->cuda_state->stream,
+        HEMI_KERNEL_LAUNCH(zero_hist, this->eval_nblocks, this->eval_nthreads_per_block, 0, this->cuda_state->stream,
                            this->total_nbins, this->bins->writeOnlyPtr(), this->norm_buffer->writeOnlyPtr() + this->norm_offset);
-        HEMI_KERNEL_LAUNCH(bin_samples, this->nblocks, this->nthreads_per_block, 0, this->cuda_state->stream,
+        HEMI_KERNEL_LAUNCH(bin_samples, this->bin_nblocks, this->bin_nthreads_per_block, 0, this->cuda_state->stream,
                            (int) this->samples.size(), this->samples.readOnlyPtr(), 
                            this->nobservables, this->nfields,
                            this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
@@ -332,7 +333,7 @@ namespace pdfz {
                            nsyst, syst_ptr,
                            this->param_buffer->readOnlyPtr(),
                            this->bins->ptr(), this->norm_buffer->writeOnlyPtr() + this->norm_offset);
-        HEMI_KERNEL_LAUNCH(eval_pdf, this->nblocks, this->nthreads_per_block, 0, this->cuda_state->stream,
+        HEMI_KERNEL_LAUNCH(eval_pdf, this->eval_nblocks, this->eval_nthreads_per_block, 0, this->cuda_state->stream,
                            (int) this->eval_points->size(), this->eval_points->readOnlyPtr(), this->nobservables,
                            this->nobservables, this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
                            this->lower.readOnlyPtr(), this->upper.readOnlyPtr(), 
@@ -347,8 +348,14 @@ namespace pdfz {
         #endif
     }
 
-
     void EvalHist::Optimize()
+    {
+        OptimizeBin();
+        OptimizeEval();
+        needs_optimization = false;
+    }
+
+    void EvalHist::OptimizeBin()
     {
         // Only do this if running on GPU
         #ifdef __CUDACC__
@@ -420,15 +427,92 @@ namespace pdfz {
 
                 if (this_time < best_time * improvement_threshold) {
                     best_time = this_time;
-                    this->nblocks = grid_size;
-                    this->nthreads_per_block = block_size;
+                    this->bin_nblocks = grid_size;
+                    this->bin_nthreads_per_block = block_size;
                 }
             }
         }
 
         //#ifdef DEBUG
-        std::cerr << "pdfz::EvalHist::Optimize(): # of samples = " << nsamples
-                  << " Grid/Block selected = " << this->nblocks << "/" << this->nthreads_per_block << "\n";
+        std::cerr << "pdfz::EvalHist::OptimizeBin(): # of samples = " << nsamples
+                  << " Grid/Block selected = " << this->bin_nblocks << "/" << this->bin_nthreads_per_block << "\n";
+        //#endif
+   
+        #endif
+    }
+
+
+    void EvalHist::OptimizeEval()
+    {
+        // Only do this if running on GPU
+        #ifdef __CUDACC__
+
+        const int ngrid_sizes = 6;
+        const int grid_sizes[ngrid_sizes] = { 2, 4, 8, 16, 32, 64 };
+        const int nblock_sizes = 5;
+        const int block_sizes[nblock_sizes] = { 32, 64, 128, 256, 512};
+        const int npoints = this->eval_points->size() / this->nobservables;
+        int nreps = 1;
+
+        // Do more repetitions on small kernels to avoid being fooled by timing fluctuations
+        if (npoints < 1000)
+            nreps = 1000;
+        if (npoints < 10000)
+            nreps = 100;
+        if (npoints < 100000)
+            nreps = 10;
+
+        // Avoid picking large numbers of blocks due to timing fluctuations
+        // by requiring the timing to be at least 10% better than the
+        // current winner.  Since we try grid sizes in increasing order,
+        // this favors smaller configurations, which will be better
+        // for overlapping kernels.
+        const double improvement_threshold = 0.9;
+
+        // Force allocation of these buffers (since we are not calling the zero bin kernel first)
+        this->bins->writeOnlyPtr(); 
+        this->norm_buffer->writeOnlyPtr();
+
+        // Benchmark all possible grid sizes
+        float best_time = 1e9;
+        TStopwatch timer;
+
+        for (int igrid=0; igrid < ngrid_sizes; igrid++) {
+            int grid_size = grid_sizes[igrid];
+
+            for (int iblock=0; iblock < nblock_sizes; iblock++) {
+                int block_size = block_sizes[iblock];
+
+                // Skip obviously too-large launch configurations
+                if (grid_size * block_size >= 2 * npoints)
+                    continue;
+
+                timer.Start();
+                for (int irep=0; irep < nreps; irep++) {
+                    HEMI_KERNEL_LAUNCH(eval_pdf, grid_size, block_size, 0, this->cuda_state->stream,
+                           (int) this->eval_points->size(), this->eval_points->readOnlyPtr(), this->nobservables,
+                           this->nobservables, this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
+                           this->lower.readOnlyPtr(), this->upper.readOnlyPtr(), 
+                           this->bins->readOnlyPtr(), this->norm_buffer->readOnlyPtr() + this->norm_offset,
+                           this->pdf_buffer->writeOnlyPtr() + this->pdf_offset, this->pdf_stride);
+                }
+                checkCuda( cudaStreamSynchronize(this->cuda_state->stream) );
+                timer.Stop();
+                float this_time = timer.RealTime();
+
+                //std::cerr << "Grid/Block tested:" << grid_size << "/" << block_size << "(" << this_time << " sec)\n";
+
+                if (this_time < best_time * improvement_threshold) {
+                    best_time = this_time;
+                    this->eval_nblocks = grid_size;
+                    this->eval_nthreads_per_block = block_size;
+                }
+            }
+        }
+
+        //#ifdef DEBUG
+        std::cerr << "pdfz::EvalHist::OptimizeEval(): # of points = " << npoints
+                  << " Grid/Block selected = " << this->eval_nblocks << "/" << this->eval_nthreads_per_block << "\n";
         //#endif
    
         #endif
