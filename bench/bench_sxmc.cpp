@@ -6,6 +6,10 @@
 
 #include "pdfz.h"
 
+#ifdef __CUDACC__
+#include <cuda_profiler_api.h>
+#endif
+
 using namespace std;
 
 void fill_gaussian(std::vector<float> &samples)
@@ -69,9 +73,18 @@ void bench_pdfz()
     evaluator.SetParameterBuffer(&params);
     evaluator.AddSystematic(shift);
 
+    // Don't profile warmup stage (w/ optimization of block size)
+#ifdef __CUDACC__
+    cudaProfilerStop();
+#endif
+
     // Warmup
     evaluator.EvalAsync();
     evaluator.EvalFinished();
+
+#ifdef __CUDACC__
+    cudaProfilerStart();
+#endif
 
     const int nreps = 100;
     TStopwatch timer;
@@ -160,6 +173,11 @@ void bench_pdfz_group()
     hemi::Array<float> params(1, true);
     params.writeOnlyHostPtr()[0] = 0.0f;
 
+    // Don't profile warmup stage (w/ optimization of block size)
+#ifdef __CUDACC__
+    cudaProfilerStop();
+#endif
+
     // Initialize evaluators
     pdfz::EvalHist *evaluators[nsignals];
     std::vector<float> samples;
@@ -180,6 +198,10 @@ void bench_pdfz_group()
         evaluators[i] = evaluator;
     }
 
+    // Don't profile warmup stage (w/ optimization of block size)
+#ifdef __CUDACC__
+    cudaProfilerStart();
+#endif
 
     // Evaluate all the PDFs
     const int nreps = 100;
