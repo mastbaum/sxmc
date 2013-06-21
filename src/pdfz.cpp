@@ -234,6 +234,10 @@ namespace pdfz {
         float field_buffer[MAX_NFIELDS];
         const int nsamples = ndata / nfields;
 
+        float bin_scale[MAX_NFIELDS];
+        for (int iobs=0; iobs < nobs; iobs++)
+          bin_scale[iobs] = nbins[iobs] / (upper[iobs] - lower[iobs]);
+
         unsigned int thread_norm = 0;
 
         for (int isample=offset; isample < nsamples; isample += stride) {
@@ -257,7 +261,7 @@ namespace pdfz {
                     break;
                 }
 
-                bin_id += (int)( ((element - lower[iobs]) / (upper[iobs] - lower[iobs])) * nbins[iobs] ) * bin_stride[iobs];
+                bin_id += (int)( (element - lower[iobs]) * bin_scale[iobs] ) * bin_stride[iobs];
             }
 
             // Add to histogram if sample in PDF domain
@@ -278,11 +282,19 @@ namespace pdfz {
     {
         int offset = hemiGetElementOffset();
         int stride = hemiGetElementStride();
+        float bin_norm = *norm;
+        float bin_scale[MAX_NFIELDS];
+
+        for (int idim=0; idim < ndims; idim++) {
+            float span = upper[idim] - lower[idim];
+            bin_scale[idim] = nbins[idim] / span;
+            bin_norm /= bin_scale[idim];
+        }
 
         for (int ipoint=offset; ipoint < npoints; ipoint += stride) {
             bool in_pdf_domain = true;
             int bin_id = 0;
-            float bin_volume = 1.0f;
+
 
             for (int idim=0; idim < ndims; idim++) {
                 int ielement = point_stride * ipoint + idim;
@@ -294,14 +306,12 @@ namespace pdfz {
                     break;
                 }
 
-                float span = upper[idim] - lower[idim];
-                bin_volume *= span / nbins[idim];
-                bin_id += (int)( ((element - lower[idim]) / span) * nbins[idim] ) * bin_stride[idim];
+                bin_id += (int)( (element - lower[idim]) * bin_scale[idim] ) * bin_stride[idim];
             }
 
             float pdf_value = 0.0f;
             if (in_pdf_domain) {
-                pdf_value = bins[bin_id] / bin_volume / *norm;
+                pdf_value = bins[bin_id] / bin_norm;
             } else {
                 pdf_value = nanf("");
             }
