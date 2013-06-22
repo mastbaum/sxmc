@@ -134,5 +134,13 @@ HEMI_KERNEL(nll_total)(const size_t ns, const float* pars,
                        const double* events_total,
                        double* nll);
 
+HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums, const double* sums,
+                                        const size_t ns,
+                                        const float* expectations, const float* constraints,
+                                        RNGState* rng, double *nll_current, double *nll_proposed,
+                                        float *v_current, float *v_proposed, int* accepted,
+                                        int* counter, float* jump_buffer,
+                                        int nparameters, const float* sigma);
+
 #endif  // __NLL_H__
 
