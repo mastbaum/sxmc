@@ -26,7 +26,7 @@ MCMC::MCMC(const std::vector<Signal>& signals, TNtuple* data) {
 
 #ifdef __CUDACC__
   this->nnllblocks = 16;
-  this->nllblocksize = 32;
+  this->nllblocksize = 256;
 #else
   this->nnllblocks = 1;
   this->nllblocksize = 1;
@@ -196,7 +196,7 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
                      event_partial_sums.ptr());
 
     // accept/reject the jump, add current position to the buffer
-    HEMI_KERNEL_LAUNCH(finish_nll_jump_pick_combo, 1, this->nreducethreads = 128, this->nreducethreads * sizeof(double), 0,
+    HEMI_KERNEL_LAUNCH(finish_nll_jump_pick_combo, 1, this->nreducethreads, this->nreducethreads * sizeof(double), 0,
                        this->nnllthreads,
                        event_partial_sums.ptr(),
                        this->nsignals, 
