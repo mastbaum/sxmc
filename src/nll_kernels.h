@@ -134,6 +134,29 @@ HEMI_KERNEL(nll_total)(const size_t ns, const float* pars,
                        const double* events_total,
                        double* nll);
 
+
+/**
+ * All-in-one MCMC step kernel.
+ *
+ * Combines the operations of computing the final NLL, picking a new parameter
+ * vector, and possibly jumping, all in one kernel to reduce launch overhead.
+ *
+ * \param npartial_sums The number of partial sums of event terms to add up
+ * \param sums Partial sums from event terms
+ * \param ns The number of signals
+ * \param expectations Expectation values for each signal normalization
+ * \param constraints Constraints for each signal normalization
+ * \param rng Random-number generators
+ * \param nll_current The NLL at the current step
+ * \param nll_proposed The NLL at the proposed step
+ * \param v_current The current parameter vector
+ * \param v_proposed The proposed parameter vector
+ * \param accepted The number of accepted steps
+ * \param counter The number of steps in the jump buffer
+ * \param jump_buffer The buffer of steps (vectors and likelihoods)
+ * \param nparameters The number of parameters (dimensions in the L space)
+ * \param sigma The jump distribution widths in each dimension
+ */
 HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums, const double* sums,
                                         const size_t ns,
                                         const float* expectations, const float* constraints,

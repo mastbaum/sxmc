@@ -4,27 +4,38 @@
 #include <vector>
 #include <string>
 
-/** Opens an HDF5 file and write the given data to a float
+/**
+ * Opens an HDF5 file and write the given data to a float
  * dataset.  The rank array is the number of elements in data
  * along each dimension of the array.  This is also recorded
  * in the output file.  The output file is replaced if it already exists.
  *
- * Returns a negative value if an operation fails.
+ * \param filename Name of file to write to
+ * \param dataset Name of the HDF5 dataset to write
+ * \param data The data to write
+ * \param rank The rank of the output data
+ * \return Status code, negative in case of failure
  */
-int write_float_vector_hdf5(const std::string &filename,
-                            const std::string &dataset,
-                            const std::vector<float> &data, 
-                            const std::vector<unsigned int> &rank);
+int write_float_vector_hdf5(const std::string& filename,
+                            const std::string& dataset,
+                            const std::vector<float>& data, 
+                            const std::vector<unsigned int>& rank);
 
-/** Opens an HDF5 file and reads the given dataset to a float
+/**
+ * Opens an HDF5 file and reads the given dataset to a float
  * vector.  The rank array is also read from the file.
  * Both data and rank will be resized.
  *
- * Returns a negative value if an operation fails.
+ * \param filename Name of file to write to
+ * \param dataset Name of the HDF5 dataset to write
+ * \param data The data to write
+ * \param rank The rank of the output data
+ * \return Status code, negative in case of failure
  */
-int read_float_vector_hdf5(const std::string &filename,
-                           const std::string &dataset,
-                           std::vector<float> &data, 
-                           std::vector<unsigned int> &rank);
+int read_float_vector_hdf5(const std::string& filename,
+                           const std::string& dataset,
+                           std::vector<float>& data, 
+                           std::vector<unsigned int>& rank);
 
 #endif // __HDF5_IO_H__
+
