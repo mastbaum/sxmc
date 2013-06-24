@@ -124,3 +124,22 @@ TEST_F(EvalHistMethods, EvaluationOffsetStride)
     ASSERT_FLOAT_EQ(0.4, results[11]);
     ASSERT_TRUE(isnan(results[13]));
 }
+
+TEST_F(EvalHistMethods, CreateHistogram1D)
+{
+    evaluator->SetEvalPoints(eval_points);
+    evaluator->SetPDFValueBuffer(pdf_values);
+    evaluator->SetNormalizationBuffer(norm);
+    evaluator->SetParameterBuffer(params);
+    evaluator->EvalAsync();
+    evaluator->EvalFinished();
+
+    TH1 *hist = evaluator->CreateHistogram();
+
+    EXPECT_EQ(2, hist->GetNbinsX());
+    ASSERT_FLOAT_EQ(1.0, hist->Integral("width"));
+    ASSERT_FLOAT_EQ(1.6, hist->GetBinContent(hist->FindBin(0.25)));
+    ASSERT_FLOAT_EQ(0.4, hist->GetBinContent(hist->FindBin(0.75)));
+
+    delete hist;
+}

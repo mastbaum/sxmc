@@ -100,10 +100,11 @@ FitConfig::FitConfig(std::string filename) {
       assert(false);
     }
 
-    // normalize the histogram within the fit range
-    int x1 = s.histogram->FindBin(this->e_range.min);
-    int x2 = s.histogram->FindBin(this->e_range.max);
-    s.histogram->Scale(1.0 / s.histogram->Integral(x1, x2, "width"));
+    // subtract small amount from the end to ensure we don't get the next bin
+    int min_bin = s.histogram->GetXaxis()->FindBin(e_range.min);
+    int max_bin = s.histogram->GetXaxis()->FindBin(e_range.max-1e-6);
+    s.histogram->Scale(1.0 / s.histogram->Integral(min_bin, max_bin, "width"));
+
     this->signals.push_back(s);
   }
 }

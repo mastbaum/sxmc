@@ -25,8 +25,8 @@ MCMC::MCMC(const std::vector<Signal>& signals, TNtuple* data) {
   this->nevents = data->GetEntries();
 
 #ifdef __CUDACC__
-  this->nnllblocks = 64;
-  this->nllblocksize = 16;
+  this->nnllblocks = 16;
+  this->nllblocksize = 256;
 #else
   this->nnllblocks = 1;
   this->nllblocksize = 1;
@@ -140,6 +140,12 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
   nll(current_vector.readOnlyPtr(), current_nll.writeOnlyPtr(),
       event_partial_sums.ptr(), event_total_sum.ptr());
 
+  HEMI_KERNEL_LAUNCH(pick_new_vector, 1, 64, 0, 0,
+                     this->nsignals, this->rngs->ptr(),
+                     sigma.readOnlyPtr(),
+                     current_vector.readOnlyPtr(),
+                     proposed_vector.writeOnlyPtr());
+
   // perform random walk
   TStopwatch timer;
   timer.Start();
@@ -181,27 +187,31 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
       nt->Reset();
     }
 
-    // pick a new parameter vector and find the nll
-    HEMI_KERNEL_LAUNCH(pick_new_vector, 8, 8, 0, 0,
-                       this->nsignals, this->rngs->ptr(),
-                       sigma.readOnlyPtr(),
-                       current_vector.readOnlyPtr(),
-                       proposed_vector.writeOnlyPtr());
-
-    nll(proposed_vector.readOnlyPtr(), proposed_nll.writeOnlyPtr(),
-        event_partial_sums.ptr(), event_total_sum.ptr());
+    // partial sums of event term
+    HEMI_KERNEL_LAUNCH(nll_event_chunks, this->nnllblocks,
+                     this->nllblocksize, 0, 0,
+                     this->lut->readOnlyPtr(),
+                     proposed_vector.readOnlyPtr(),
+                     this->nevents, this->nsignals,
+                     event_partial_sums.ptr());
 
     // accept/reject the jump, add current position to the buffer
-    HEMI_KERNEL_LAUNCH(jump_decider, 1, 1, 0, 0,
+    HEMI_KERNEL_LAUNCH(finish_nll_jump_pick_combo, 1, this->nreducethreads, this->nreducethreads * sizeof(double), 0,
+                       this->nnllthreads,
+                       event_partial_sums.ptr(),
+                       this->nsignals, 
+                       this->expectations->readOnlyPtr(),
+                       this->constraints->readOnlyPtr(),
                        this->rngs->ptr(),
                        current_nll.ptr(),
-                       proposed_nll.readOnlyPtr(),
+                       proposed_nll.ptr(),
                        current_vector.ptr(),
-                       proposed_vector.readOnlyPtr(),
-                       this->nsignals,
+                       proposed_vector.ptr(),
                        accept_counter.ptr(),
                        jump_counter.ptr(),
-                       jump_buffer.writeOnlyPtr());
+                       jump_buffer.writeOnlyPtr(),
+                       this->nsignals /* number of parameters */,
+                       sigma.readOnlyPtr());
 
     // flush the jump buffer periodically
     if (i % sync_interval == 0 || i == nsteps - 1 || i == burnin_steps - 1) {
@@ -301,13 +311,6 @@ hemi::Array<float>* MCMC::build_lut(const std::vector<Signal>& signals,
         minimum_probability = v;
       }
       lut->writeOnlyHostPtr()[i * signals.size() + j] = v;
-    }
-  }
-
-  // ensure Pj(xi) > 0
-  for (size_t i=0; i<signals.size()*nevents; i++) {
-    if (lut->readOnlyHostPtr()[i] <= 0) {
-      lut->writeOnlyHostPtr()[i] = minimum_probability / 1000;
     }
   }
 

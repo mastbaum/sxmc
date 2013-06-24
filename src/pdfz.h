@@ -76,6 +76,8 @@
 #include <string>
 #include <vector>
 
+#include <TH1.h>
+
 namespace pdfz {
 
     /**
@@ -148,7 +150,7 @@ namespace pdfz {
      * \brief  Fractionally alter the resolution of an observable by rescaling its distance
      *         from a "true" value.
      *
-     * Transform x' = (1 + p) * (x - x_true) + x_true
+     * Transform x' = x + p * (x - x_true)
      */
     struct ResolutionScaleSystematic : public Systematic
     {
@@ -300,22 +302,33 @@ namespace pdfz {
         virtual ~EvalHist();
         virtual void SetEvalPoints(const std::vector<float> &points);
 
+        /** Dump the current PDF contents (as of the last EvalAsync/Finished call)
+         *  into a new TH1 object and return it.  Obviously only works for 
+         *  1, 2 or 3 histograms.
+         */
+        virtual TH1* CreateHistogram();
+
         /** Brute force tests a bunch of CUDA configurations to find the best one */
         virtual void Optimize();
+        virtual void OptimizeBin();
+        virtual void OptimizeEval();
 
         virtual void EvalAsync();
         virtual void EvalFinished();
 
     protected:
         hemi::Array<float> samples;
-        hemi::Array<float> *eval_points;
+        hemi::Array<int> *read_bins;
         hemi::Array<int> nbins;
         hemi::Array<int> bin_stride;
         int total_nbins;
+        float bin_volume;
         hemi::Array<unsigned int> *bins;
 
-        int nthreads_per_block;
-        int nblocks;
+        int bin_nthreads_per_block;
+        int bin_nblocks;
+        int eval_nthreads_per_block;
+        int eval_nblocks;
 
         bool needs_optimization;
     };

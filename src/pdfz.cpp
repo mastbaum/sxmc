@@ -4,6 +4,9 @@
 #include <cuda.h>
 #include <math_constants.h> // CUDA header
 #include <TStopwatch.h>
+#include <TH1D.h>
+#include <TH2D.h>
+#include <TH3D.h>
 
 #include "cuda_compat.h"
 
@@ -136,7 +139,7 @@ namespace pdfz {
                        const std::vector<float> &lower, const std::vector<float> &upper,
                        const std::vector<int> &_nbins, bool optimize) :
         Eval(_samples, nfields, nobservables, lower, upper),
-        samples(_samples.size(), false), eval_points(0), 
+        samples(_samples.size(), false), read_bins(0), 
         nbins(_nbins.size(), true), bin_stride(_nbins.size(), true), bins(0), needs_optimization(optimize)
     {
         if ( (int) _nbins.size() != nobservables)
@@ -147,6 +150,12 @@ namespace pdfz {
 
         this->samples.copyFromHost(&_samples.front(), _samples.size());
         this->nbins.copyFromHost(&_nbins.front(), _nbins.size());
+
+        // Compute bin volume
+        this->bin_volume = 1.0f;
+        for (int i=0; i < nobservables; i++)
+            this->bin_volume *= (upper[i] - lower[i]) / _nbins[i];
+
 
         // Compute stride for row-major order storage
         const int ndims = (int) this->bin_stride.size();
@@ -164,18 +173,21 @@ namespace pdfz {
         this->bins = new hemi::Array<unsigned int>(this->total_nbins, true);
 
 
-        this->nthreads_per_block = 256;
+        this->bin_nthreads_per_block = 256;
         if (_samples.size() > 100000)
-            this->nblocks = 64;
+            this->bin_nblocks = 64;
         else if (_samples.size() > 10000)
-            this->nblocks = 16;
+            this->bin_nblocks = 16;
         else
-            this->nblocks = 4;
+            this->bin_nblocks = 4;
+
+        this->eval_nthreads_per_block = 256;
+        this->eval_nblocks = 64;
     }
 
     EvalHist::~EvalHist()
     {
-        delete this->eval_points;
+        delete this->read_bins;
         delete this->bins;
     }
 
@@ -184,9 +196,49 @@ namespace pdfz {
         if (points.size() % this->nobservables != 0)
             throw Error("Number of entries in evaluation points array not divisible by number of observables.");
 
-        delete this->eval_points;
-        this->eval_points = new hemi::Array<float>(points.size(), false);
-        this->eval_points->copyFromHost(&points.front(), points.size());
+        delete this->read_bins;
+        this->read_bins = new hemi::Array<int>(points.size(), false);
+        int *read_bins = this->read_bins->writeOnlyHostPtr();
+
+        // Precompute the bin number corresponding to each evaluation point
+        // *** This never changes between PDF evaluations! ***
+
+
+        // Pointer aliases to Hemi array contents (for convenience)
+        const float *lower = this->lower.readOnlyHostPtr();
+        const float *upper = this->upper.readOnlyHostPtr();
+        const int *nbins = this->nbins.readOnlyHostPtr();
+        const int *bin_stride = this->bin_stride.readOnlyHostPtr();
+
+        std::vector<float> bin_scale(this->nobservables);
+
+        for (int iobs=0; iobs < this->nobservables; iobs++) {
+            float span = upper[iobs] - lower[iobs];
+            bin_scale[iobs] = nbins[iobs] / span;
+        }
+
+        for (unsigned int ipoint=0; ipoint < points.size(); ipoint++) {
+            bool in_pdf_domain = true;
+            int bin_id = 0;
+
+            for (int iobs=0; iobs < this->nobservables; iobs++) {
+                int ielement = this->nobservables * ipoint + iobs;
+                float element = points[ielement];
+
+                // Throw out this event if outside of PDF domain
+                if (element < lower[iobs] || element >= upper[iobs]) {
+                    in_pdf_domain = false;
+                    break;
+                }
+
+                bin_id += (int)( (element - lower[iobs]) * bin_scale[iobs] ) * bin_stride[iobs];
+            }
+
+            if (in_pdf_domain)
+                read_bins[ipoint] = (int) bin_id;
+            else
+                read_bins[ipoint] = -1; // Filled in with NaN during evaluation
+        }
     }
 
     ///// EvalHist kernels
@@ -201,7 +253,7 @@ namespace pdfz {
             fields[syst->obs] *= (1 + parameters[syst->par]);
             break;
             case Systematic::RESOLUTION_SCALE:
-            fields[syst->obs] *= (1 + parameters[syst->par]);            
+            fields[syst->obs] += parameters[syst->par] * (fields[syst->obs] - fields[syst->extra_field]);
             break;
         }
     }
@@ -218,7 +270,7 @@ namespace pdfz {
             bins[i] = 0;
     }
 
-    HEMI_KERNEL(bin_samples)(int nsamples, const float *samples,
+    HEMI_KERNEL(bin_samples)(int ndata, const float *data,
                              const int nobs, const int nfields, 
                              const int * __restrict__ bin_stride, const int * __restrict__ nbins,
                              const float * __restrict__ lower, const float * __restrict__ upper,
@@ -229,6 +281,11 @@ namespace pdfz {
         int offset = hemiGetElementOffset();
         int stride = hemiGetElementStride();
         float field_buffer[MAX_NFIELDS];
+        const int nsamples = ndata / nfields;
+
+        float bin_scale[MAX_NFIELDS];
+        for (int iobs=0; iobs < nobs; iobs++)
+          bin_scale[iobs] = nbins[iobs] / (upper[iobs] - lower[iobs]);
 
         unsigned int thread_norm = 0;
 
@@ -238,7 +295,7 @@ namespace pdfz {
 
             // Copy fields
             for (int ifield=0; ifield < nfields; ifield++)
-                field_buffer[ifield] = samples[isample * nfields + ifield];
+                field_buffer[ifield] = data[isample * nfields + ifield];
 
             // Apply systematics
             for (int isyst=0; isyst < nsyst; isyst++)
@@ -253,7 +310,7 @@ namespace pdfz {
                     break;
                 }
 
-                bin_id += (int)( ((element - lower[iobs]) / (upper[iobs] - lower[iobs])) * nbins[iobs] ) * bin_stride[iobs];
+                bin_id += (int)( (element - lower[iobs]) * bin_scale[iobs] ) * bin_stride[iobs];
             }
 
             // Add to histogram if sample in PDF domain
@@ -266,41 +323,25 @@ namespace pdfz {
         atomicAdd(norm, thread_norm);
     }
 
-    HEMI_KERNEL(eval_pdf)(int npoints, const float *points, int point_stride,
-                          int ndims, const int *bin_stride, const int *nbins,
-                          const float *lower, const float *upper,
-                          const unsigned int * __restrict__ bins, const unsigned int * __restrict__ norm,
+    HEMI_KERNEL(eval_pdf)(int npoints, const int *read_bins,
+                          const unsigned int * __restrict__ bins,
+                          const unsigned int * __restrict__ norm,
+                          float bin_volume,
                           float *output, int output_stride)
     {
         int offset = hemiGetElementOffset();
         int stride = hemiGetElementStride();
+        const float bin_norm = *norm * bin_volume;
 
         for (int ipoint=offset; ipoint < npoints; ipoint += stride) {
-            bool in_pdf_domain = true;
-            int bin_id = 0;
-            float bin_volume = 1.0f;
-
-            for (int idim=0; idim < ndims; idim++) {
-                int ielement = point_stride * ipoint + idim;
-                float element = points[ielement];
-
-                // Throw out this event if outside of PDF domain
-                if (element < lower[idim] || element >= upper[idim]) {
-                    in_pdf_domain = false;
-                    break;
-                }
-
-                float span = upper[idim] - lower[idim];
-                bin_volume *= span / nbins[idim];
-                bin_id += (int)( ((element - lower[idim]) / span) * nbins[idim] ) * bin_stride[idim];
-            }
+            int bin_id = read_bins[ipoint];
 
             float pdf_value = 0.0f;
-            if (in_pdf_domain) {
-                pdf_value = bins[bin_id] / bin_volume / *norm;
-            } else {
+            if (bin_id < 0)
                 pdf_value = nanf("");
-            }
+            else
+                pdf_value = bins[bin_id] / bin_norm;
+
             output[output_stride * ipoint] = pdf_value;
         }
     }
@@ -308,10 +349,8 @@ namespace pdfz {
 
     void EvalHist::EvalAsync()
     {
-        if (this->needs_optimization) {
+        if (this->needs_optimization)
             this->Optimize();
-            needs_optimization = false;
-        }
 
         // Handle no systematics case
         int nsyst = 0;
@@ -321,9 +360,9 @@ namespace pdfz {
             syst_ptr = this->syst->readOnlyPtr();
         }
 
-        HEMI_KERNEL_LAUNCH(zero_hist, this->nblocks, this->nthreads_per_block, 0, this->cuda_state->stream,
+        HEMI_KERNEL_LAUNCH(zero_hist, this->eval_nblocks, this->eval_nthreads_per_block, 0, this->cuda_state->stream,
                            this->total_nbins, this->bins->writeOnlyPtr(), this->norm_buffer->writeOnlyPtr() + this->norm_offset);
-        HEMI_KERNEL_LAUNCH(bin_samples, this->nblocks, this->nthreads_per_block, 0, this->cuda_state->stream,
+        HEMI_KERNEL_LAUNCH(bin_samples, this->bin_nblocks, this->bin_nthreads_per_block, 0, this->cuda_state->stream,
                            (int) this->samples.size(), this->samples.readOnlyPtr(), 
                            this->nobservables, this->nfields,
                            this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
@@ -331,11 +370,10 @@ namespace pdfz {
                            nsyst, syst_ptr,
                            this->param_buffer->readOnlyPtr(),
                            this->bins->ptr(), this->norm_buffer->writeOnlyPtr() + this->norm_offset);
-        HEMI_KERNEL_LAUNCH(eval_pdf, this->nblocks, this->nthreads_per_block, 0, this->cuda_state->stream,
-                           (int) this->eval_points->size(), this->eval_points->readOnlyPtr(), this->nobservables,
-                           this->nobservables, this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
-                           this->lower.readOnlyPtr(), this->upper.readOnlyPtr(), 
+        HEMI_KERNEL_LAUNCH(eval_pdf, this->eval_nblocks, this->eval_nthreads_per_block, 0, this->cuda_state->stream,
+                           (int) this->read_bins->size(), this->read_bins->readOnlyPtr(),
                            this->bins->readOnlyPtr(), this->norm_buffer->readOnlyPtr() + this->norm_offset,
+                           this->bin_volume,
                            this->pdf_buffer->writeOnlyPtr() + this->pdf_offset, this->pdf_stride);
     }
 
@@ -346,8 +384,79 @@ namespace pdfz {
         #endif
     }
 
+    TH1* EvalHist::CreateHistogram()
+    {
+        if (this->nobservables > 3)
+            throw Error("Cannot EvalHist::CreateHistogram for dimensions greater than 3!");
+
+        const float *lower = this->lower.readOnlyHostPtr();
+        const float *upper = this->upper.readOnlyHostPtr();
+        const int *nbins = this->nbins.readOnlyHostPtr();
+        const unsigned int *bins = this->bins->readOnlyHostPtr();
+        const int *bin_stride = this->bin_stride.readOnlyHostPtr();
+        const unsigned int norm = this->norm_buffer->readOnlyHostPtr()[this->norm_offset];
+
+        TH1 *hist = 0;
+        switch (this->nobservables) {
+            case 1:
+            hist = new TH1D("", "", nbins[0], lower[0], upper[0]);
+            hist->Sumw2();
+            for (int x=0; x < nbins[0]; x++) {
+                int source_bin = x * bin_stride[0];
+                int target_bin = hist->GetBin(x+1);
+                hist->SetBinContent(target_bin, bins[source_bin] / this->bin_volume / norm);
+                hist->SetBinError(target_bin, sqrt(bins[source_bin]) / this->bin_volume / norm);
+            }
+            break;
+
+            case 2:
+            hist = new TH2D("", "",
+                            nbins[0], lower[0], upper[0],
+                            nbins[1], lower[1], upper[1]);
+            hist->Sumw2();
+            for (int x=0; x < nbins[0]; x++) {
+                for (int y=0; y < nbins[1]; y++) {
+                    int source_bin = x * bin_stride[0] + y * bin_stride[1];
+                    int target_bin = hist->GetBin(x+1, y+1);
+                    hist->SetBinContent(target_bin, bins[source_bin] / this->bin_volume / norm);
+                    hist->SetBinError(target_bin, sqrt(bins[source_bin]) / this->bin_volume / norm);
+                }
+            }
+            break;
+
+            case 3:
+            hist = new TH3D("", "",
+                            nbins[0], lower[0], upper[0],
+                            nbins[1], lower[1], upper[1],
+                            nbins[2], lower[2], upper[2]);
+            hist->Sumw2();
+            for (int x=0; x < nbins[0]; x++) {
+                for (int y=0; y < nbins[1]; y++) {
+                    for (int z=0; z < nbins[2]; z++) {
+                        int source_bin = x * bin_stride[0] + y * bin_stride[1] + z * bin_stride[2];
+                        int target_bin = hist->GetBin(x+1, y+1, z+1);
+                        hist->SetBinContent(target_bin, bins[source_bin] / this->bin_volume / norm);
+                        hist->SetBinError(target_bin, sqrt(bins[source_bin]) / this->bin_volume / norm);
+                    }
+                }
+            }
+            break;
+
+            default:
+                throw Error("Impossible EvalHist::CreateHistogram switch case!");
+        }
+
+        return hist;
+    }
 
     void EvalHist::Optimize()
+    {
+        OptimizeBin();
+        OptimizeEval();
+        needs_optimization = false;
+    }
+
+    void EvalHist::OptimizeBin()
     {
         // Only do this if running on GPU
         #ifdef __CUDACC__
@@ -419,15 +528,91 @@ namespace pdfz {
 
                 if (this_time < best_time * improvement_threshold) {
                     best_time = this_time;
-                    this->nblocks = grid_size;
-                    this->nthreads_per_block = block_size;
+                    this->bin_nblocks = grid_size;
+                    this->bin_nthreads_per_block = block_size;
                 }
             }
         }
 
         //#ifdef DEBUG
-        std::cerr << "pdfz::EvalHist::Optimize(): # of samples = " << nsamples
-                  << " Grid/Block selected = " << this->nblocks << "/" << this->nthreads_per_block << "\n";
+        std::cerr << "pdfz::EvalHist::OptimizeBin(): # of samples = " << nsamples
+                  << " Grid/Block selected = " << this->bin_nblocks << "/" << this->bin_nthreads_per_block << "\n";
+        //#endif
+   
+        #endif
+    }
+
+
+    void EvalHist::OptimizeEval()
+    {
+        // Only do this if running on GPU
+        #ifdef __CUDACC__
+
+        const int ngrid_sizes = 6;
+        const int grid_sizes[ngrid_sizes] = { 2, 4, 8, 16, 32, 64 };
+        const int nblock_sizes = 5;
+        const int block_sizes[nblock_sizes] = { 32, 64, 128, 256, 512};
+        const int npoints = this->read_bins->size();
+        int nreps = 1;
+
+        // Do more repetitions on small kernels to avoid being fooled by timing fluctuations
+        if (npoints < 1000)
+            nreps = 1000;
+        if (npoints < 10000)
+            nreps = 100;
+        if (npoints < 100000)
+            nreps = 10;
+
+        // Avoid picking large numbers of blocks due to timing fluctuations
+        // by requiring the timing to be at least 10% better than the
+        // current winner.  Since we try grid sizes in increasing order,
+        // this favors smaller configurations, which will be better
+        // for overlapping kernels.
+        const double improvement_threshold = 0.9;
+
+        // Force allocation of these buffers (since we are not calling the zero bin kernel first)
+        this->bins->writeOnlyPtr(); 
+        this->norm_buffer->writeOnlyPtr();
+
+        // Benchmark all possible grid sizes
+        float best_time = 1e9;
+        TStopwatch timer;
+
+        for (int igrid=0; igrid < ngrid_sizes; igrid++) {
+            int grid_size = grid_sizes[igrid];
+
+            for (int iblock=0; iblock < nblock_sizes; iblock++) {
+                int block_size = block_sizes[iblock];
+
+                // Skip obviously too-large launch configurations
+                if (grid_size * block_size >= 2 * npoints)
+                    continue;
+
+                timer.Start();
+                for (int irep=0; irep < nreps; irep++) {
+                    HEMI_KERNEL_LAUNCH(eval_pdf, grid_size, block_size, 0, this->cuda_state->stream,
+                           (int) this->read_bins->size(), this->read_bins->readOnlyPtr(),
+                           this->bins->readOnlyPtr(), this->norm_buffer->readOnlyPtr() + this->norm_offset,
+                           this->bin_volume,
+                           this->pdf_buffer->writeOnlyPtr() + this->pdf_offset, this->pdf_stride);
+                }
+                checkCuda( cudaStreamSynchronize(this->cuda_state->stream) );
+                timer.Stop();
+                float this_time = timer.RealTime();
+
+                //std::cerr << "Grid/Block tested:" << grid_size << "/" << block_size << "(" << this_time << " sec)\n";
+
+                if (this_time < best_time * improvement_threshold) {
+                    best_time = this_time;
+                    this->eval_nblocks = grid_size;
+                    this->eval_nthreads_per_block = block_size;
+                }
+            }
+        }
+
+        //#ifdef DEBUG
+        std::cerr << "pdfz::EvalHist::OptimizeEval(): # of points = " << npoints
+                  << " Grid/Block selected = " << this->eval_nblocks << "/" << this->eval_nthreads_per_block << "\n";
         //#endif
    
         #endif
