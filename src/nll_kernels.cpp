@@ -78,7 +78,7 @@ void jump_decider_device(RNGState* rng, double* nll_current,
 }
 
 
-HEMI_KERNEL(nll_event_chunks)(const float* lut, const float* pars,
+HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut, const float* __restrict__ pars,
                               const size_t ne, const size_t ns,
                               double* sums) {
   int offset = hemiGetElementOffset();
