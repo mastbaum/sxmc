@@ -25,6 +25,7 @@ __global__ void init_device_rngs(int nthreads, unsigned long long seed,
 }
 #endif
 
+
 HEMI_DEV_CALLABLE_INLINE
 void pick_new_vector_device(int nthreads, RNGState* rng,
                              const float* sigma,
@@ -98,7 +99,7 @@ HEMI_KERNEL(nll_event_chunks)(const float* lut, const float* pars,
 
 HEMI_DEV_CALLABLE_INLINE
 void nll_event_reduce_device(const size_t nthreads, const double* sums,
-                              double* total_sum) {
+                             double* total_sum) {
   int offset = hemiGetElementOffset();
   int stride = hemiGetElementStride();
 
@@ -123,8 +124,8 @@ void nll_event_reduce_device(const size_t nthreads, const double* sums,
   __syncthreads();
 #endif
   total_sum[0] = block_sums[0];
-
 }
+
 
 HEMI_DEV_CALLABLE_INLINE
 void nll_total_device(const size_t ns, const float* pars,
@@ -155,13 +156,13 @@ void nll_total_device(const size_t ns, const float* pars,
   nll[0] = sum;
 }
 
-/////////////////////////////////
 
 HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
                              const float* sigma,
                              const float* current_vector,
                              float* proposed_vector) {
-  pick_new_vector_device(nthreads, rng, sigma, current_vector, proposed_vector);
+  pick_new_vector_device(nthreads, rng, sigma, current_vector,
+                         proposed_vector);
 }
 
 
@@ -169,13 +170,16 @@ HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
                           const double* nll_proposed, float* v_current,
                           const float* v_proposed, unsigned ns, int* accepted,
                           int* counter, float* jump_buffer) {
-  jump_decider_device(rng, nll_current, nll_proposed, v_current, v_proposed, ns, accepted, counter, jump_buffer);
+  jump_decider_device(rng, nll_current, nll_proposed, v_current, v_proposed,
+                      ns, accepted, counter, jump_buffer);
 }
+
 
 HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
                               double* total_sum) {
   nll_event_reduce_device(nthreads, sums, total_sum);
 }
+
 
 HEMI_KERNEL(nll_total)(const size_t ns, const float* pars,
                        const float* expectations,
@@ -185,14 +189,18 @@ HEMI_KERNEL(nll_total)(const size_t ns, const float* pars,
   nll_total_device(ns, pars, expectations, constraints, events_total, nll);
 }
 
-HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums, const double* sums,
-                                        const size_t ns,
-                                        const float* expectations, const float* constraints,
-                                        RNGState* rng, double *nll_current, double *nll_proposed,
-                                        float *v_current, float *v_proposed, int* accepted,
-                                        int* counter, float* jump_buffer,
-                                        int nparameters, const float* sigma)
-{
+
+HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
+                                        const double* sums, const size_t ns,
+                                        const float* expectations,
+                                        const float* constraints,
+                                        RNGState* rng,
+                                        double *nll_current,
+                                        double *nll_proposed,
+                                        float *v_current, float *v_proposed,
+                                        int* accepted, int* counter,
+                                        float* jump_buffer, int nparameters,
+                                        const float* sigma) {
   double total_sum;
 
   nll_event_reduce_device(npartial_sums, sums, &total_sum);
@@ -202,8 +210,11 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums, const double
 #endif
 
   if (hemiGetElementOffset() == 0) {
-    nll_total_device(ns, v_proposed, expectations, constraints, &total_sum, nll_proposed);
-    jump_decider_device(rng, nll_current, nll_proposed, v_current, v_proposed, ns, accepted, counter, jump_buffer);
+    nll_total_device(ns, v_proposed, expectations, constraints, &total_sum,
+                     nll_proposed);
+
+    jump_decider_device(rng, nll_current, nll_proposed, v_current, v_proposed,
+                        ns, accepted, counter, jump_buffer);
   }
 
 #ifdef HEMI_DEV_CODE
@@ -212,3 +223,4 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums, const double
 
   pick_new_vector_device(nparameters, rng, sigma, v_current, v_proposed);
 }
+

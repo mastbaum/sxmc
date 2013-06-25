@@ -4,13 +4,13 @@
 #include <hemi/hemi.h>
 
 #ifndef HEMI_DEV_CODE
-// Replacement for atomicAdd on CPU.  NOT THREAD-SAFE.
-inline unsigned int atomicAdd(unsigned int *address, int val)
-{
+// Replacement for atomicAdd on CPU. NOT THREAD-SAFE.
+inline unsigned int atomicAdd(unsigned int* address, int val) {
   unsigned int old = *address;
   *address = old + val;
   return old;
 }
 #endif
 
-#endif
+#endif  // __CUDA_COMPAT_H__
+

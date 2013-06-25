@@ -100,8 +100,9 @@ FitConfig::FitConfig(std::string filename) {
       assert(false);
     }
 
+    // subtract small amount from the end to ensure we don't get the next bin
     int min_bin = s.histogram->GetXaxis()->FindBin(e_range.min);
-    int max_bin = s.histogram->GetXaxis()->FindBin(e_range.max-1e-6 /* subtract small amount to ensure we don't get the next bin */);
+    int max_bin = s.histogram->GetXaxis()->FindBin(e_range.max-1e-6);
     s.histogram->Scale(1.0 / s.histogram->Integral(min_bin, max_bin, "width"));
 
     this->signals.push_back(s);

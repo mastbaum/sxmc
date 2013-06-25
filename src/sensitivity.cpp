@@ -151,8 +151,7 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
       TH1* hs = (TH1*) signals[i].histogram->Clone("hs");
       int bin1 = hs->FindBin(1.5);
       int bin2 = hs->FindBin(5.0);
-      float bin_width = hs->GetBinWidth(bin1);
-      hs->Scale(norms_fit[i] * bin_width);
+      hs->Scale(norms_fit[i] / signals[i].histogram->Integral(bin1, bin2));
       hs->SetLineColor(color[i+1]);
       hsum->Add(hs);
 
