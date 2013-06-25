@@ -25,7 +25,7 @@ MCMC::MCMC(const std::vector<Signal>& signals, TNtuple* data) {
   this->nevents = data->GetEntries();
 
 #ifdef __CUDACC__
-  this->nnllblocks = 16;
+  this->nnllblocks = 64;
   this->nllblocksize = 256;
 #else
   this->nnllblocks = 1;
