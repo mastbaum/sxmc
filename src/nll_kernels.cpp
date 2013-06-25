@@ -87,7 +87,7 @@ HEMI_KERNEL(nll_event_chunks)(const float* lut, const float* pars,
   for (int i=offset; i<(int)ne; i+=stride) {
     double s = 0;
     for (size_t j=0; j<ns; j++) {
-      s += pars[j] * lut[i * ns + j];
+      s += pars[j] * lut[i + ne * j];
     }
     sum += log(s);
   }

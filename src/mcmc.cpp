@@ -310,7 +310,7 @@ hemi::Array<float>* MCMC::build_lut(const std::vector<Signal>& signals,
       if (v < minimum_probability && v > 0) {
         minimum_probability = v;
       }
-      lut->writeOnlyHostPtr()[i * signals.size() + j] = v;
+      lut->writeOnlyHostPtr()[i + nevents * j] = v;
     }
   }
 
