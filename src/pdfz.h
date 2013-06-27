@@ -72,11 +72,14 @@
 #ifndef __PDFZ_H__
 #define __PDFZ_H__
 
-#include <hemi/array.h>
 #include <string>
 #include <vector>
-
 #include <TH1.h>
+
+#ifndef __HEMI_ARRAY_H__                                                        
+#define __HEMI_ARRAY_H__                                                        
+#include <hemi/array.h>                                                         
+#endif
 
 namespace pdfz {
 

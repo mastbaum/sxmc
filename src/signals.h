@@ -23,6 +23,7 @@ struct Signal {
  * \brief A container for observable metadata
  */
 struct Observable {
+  std::string name;
   std::string title;
   std::string field;
   size_t field_index;
@@ -37,6 +38,7 @@ struct Observable {
  * \brief A container for systematic parameter metadata
  */
 struct Systematic {
+  std::string name;
   std::string title;
   std::string observable_field;
   std::string truth_field;

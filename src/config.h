@@ -56,8 +56,6 @@ class FitConfig {
     std::string signal_name;  //!< name of the signal that is the signal
     std::vector<Observable> observables;  //!< Observables used in PDFs
     std::vector<Systematic> systematics;  //!< Systematics used in PDFs
-    hemi::Array<unsigned>* normalizations;  //!< Norms determined by PDF
-    hemi::Array<float>* parameters;  //!< All of the parameters of the fit
 };
 
 #endif  // __CONFIG_H__

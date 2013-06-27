@@ -61,6 +61,7 @@ HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
                              const float* current_vector,
                              float* proposed_vector);
 
+
 /**
  * Decide whether to accept a random MCMC step.
  *
@@ -76,15 +77,16 @@ HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
  * \param nll_proposed the NLL of the proposed parameters
  * \param v_current The current parameters
  * \param v_proposed The proposed parameters
- * \param ns The number of signals
+ * \param nparameters The number of parameters
  * \param accepted Number of accepted steps
  * \param counter The number of steps in the buffer
  * \param jump_buffer The step buffer
  */
 HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
                           const double* nll_proposed, float* v_current,
-                          const float* v_proposed, unsigned ns, int* accepted,
-                          int* counter, float* jump_buffer);
+                          const float* v_proposed, unsigned nparameters,
+                          int* accepted, int* counter, float* jump_buffer);
+
 
 /**
  * NLL Part 1
@@ -121,16 +123,17 @@ HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
  * Calculate overall normalization and constraints contributions to NLL, add
  * in the event term to get the total.
  *
- * \param ns Number of signals
- * \param pars Event rates (normalizations) for each signal
- * \param expectations Expected rates for each signal
- * \param constraints Fractional constraints for each signal
+ * \param nparameters The number of parameters
+ * \param pars Parameters, normalizations then systematics
+ * \param means Expected rates and means of systematics
+ * \param sigmas Gaussian constraint sigma, same units as means
  * \param events_total Sum of event term contribution
  * \param nll The total NLL
  */
-HEMI_KERNEL(nll_total)(const size_t ns, const float* pars,
-                       const float* expectations,
-                       const float* constraints,
+HEMI_KERNEL(nll_total)(const size_t nparameters, const float* pars,
+                       const size_t nsignals,
+                       const float* means,
+                       const float* sigmas,
                        const double* events_total,
                        double* nll);
 
@@ -144,8 +147,8 @@ HEMI_KERNEL(nll_total)(const size_t ns, const float* pars,
  * \param npartial_sums The number of partial sums of event terms to add up
  * \param sums Partial sums from event terms
  * \param ns The number of signals
- * \param expectations Expectation values for each signal normalization
- * \param constraints Constraints for each signal normalization
+ * \param means Expected rates and means of systematics
+ * \param sigmas Gaussian constraint sigma, same units as means
  * \param rng Random-number generators
  * \param nll_current The NLL at the current step
  * \param nll_proposed The NLL at the proposed step
@@ -157,13 +160,17 @@ HEMI_KERNEL(nll_total)(const size_t ns, const float* pars,
  * \param nparameters The number of parameters (dimensions in the L space)
  * \param sigma The jump distribution widths in each dimension
  */
-HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums, const double* sums,
-                                        const size_t ns,
-                                        const float* expectations, const float* constraints,
-                                        RNGState* rng, double *nll_current, double *nll_proposed,
-                                        float *v_current, float *v_proposed, int* accepted,
-                                        int* counter, float* jump_buffer,
-                                        int nparameters, const float* sigma);
+HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
+                                        const double* sums, const size_t ns,
+                                        const float* means,
+                                        const float* sigmas,
+                                        RNGState* rng,
+                                        double *nll_current,
+                                        double *nll_proposed,
+                                        float *v_current, float *v_proposed,
+                                        int* accepted, int* counter,
+                                        float* jump_buffer, int nparameters,
+                                        const float* sigma);
 
 #endif  // __NLL_H__
 

@@ -63,6 +63,7 @@ FitConfig::FitConfig(std::string filename) {
        it!=pdf_params["observables"].end(); ++it) {
     Json::Value o_json = pdf_params["observables"][it.key().asString()];
     Observable o;
+    o.name = it.key().asString();
     o.title = o_json["title"].asString();
     o.field = o_json["field"].asString();
     o.bins = o_json["bins"].asInt();
@@ -76,6 +77,7 @@ FitConfig::FitConfig(std::string filename) {
        it!=pdf_params["systematics"].end(); ++it) {
     Json::Value s_json = pdf_params["systematics"][it.key().asString()];
     Systematic s;
+    s.name = it.key().asString();
     s.title = s_json["title"].asString();
     s.observable_field = s_json["observable_field"].asString();
 
@@ -111,13 +113,8 @@ FitConfig::FitConfig(std::string filename) {
   this->signal_name = fit_params["signal_name"].asString();
   this->output_file = fit_params.get("output_file", "fit_spectrum").asString();
 
-  this->normalizations = \
-    new hemi::Array<unsigned>(fit_params["signals"].size(), true);
-
   size_t nparams = \
     fit_params["signals"].size() + fit_params["systematics"].size();
-
-  this->parameters = new hemi::Array<float>(nparams, true);
 
   for (Json::Value::const_iterator it=fit_params["observables"].begin();
        it!=fit_params["observables"].end(); ++it) {
@@ -127,9 +124,6 @@ FitConfig::FitConfig(std::string filename) {
   for (Json::Value::const_iterator it=fit_params["systematics"].begin();
        it!=fit_params["systematics"].end(); ++it) {
     this->systematics.push_back(all_systematics[(*it).asString()]);
-    size_t param_index = it - fit_params["systematics"].begin();
-    this->parameters->writeOnlyHostPtr()[param_index] = \
-      (*this->systematics.end()).mean;
   }
 
   // signal parameters
@@ -199,7 +193,7 @@ FitConfig::FitConfig(std::string filename) {
       assert(field < hdf5_fields.size());
 
       // systematic observable must be an observable
-      int index = (std::find(sample_fields.begin(), sample_fields.end(),
+      size_t index = (std::find(sample_fields.begin(), sample_fields.end(),
                                 field) -
                       sample_fields.begin());
       assert(index < sample_fields.size());
@@ -256,26 +250,22 @@ FitConfig::FitConfig(std::string filename) {
                                      this->observables.size(),
                                      lower, upper, nbins);
 
-    s.histogram->SetNormalizationBuffer(this->normalizations);
-    s.histogram->SetParameterBuffer(this->parameters);
-
     for (size_t i=0; i<this->systematics.size(); i++) {
       Systematic* syst = &this->systematics[i];
 
       size_t o_field = syst->observable_field_index;
       size_t t_field = syst->truth_field_index;
-      size_t param_id = this->observables.size() + i;
 
       if (syst->type == pdfz::Systematic::SHIFT) {
-        s.histogram->AddSystematic(pdfz::ShiftSystematic(o_field, param_id));
+        s.histogram->AddSystematic(pdfz::ShiftSystematic(o_field, i));
       }
       else if (syst->type == pdfz::Systematic::SCALE) {
-        s.histogram->AddSystematic(pdfz::ScaleSystematic(o_field, param_id));
+        s.histogram->AddSystematic(pdfz::ScaleSystematic(o_field, i));
       }
       else if (syst->type == pdfz::Systematic::RESOLUTION_SCALE) {
         s.histogram->AddSystematic(pdfz::ResolutionScaleSystematic(o_field,
                                                                    t_field,
-                                                                   param_id));
+                                                                   i));
       }
       else {
         std::cerr << "Unknown systematic ID " << (int)syst->type << std::endl;

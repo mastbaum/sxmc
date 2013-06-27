@@ -28,9 +28,9 @@ __global__ void init_device_rngs(int nthreads, unsigned long long seed,
 
 HEMI_DEV_CALLABLE_INLINE
 void pick_new_vector_device(int nthreads, RNGState* rng,
-                             const float* sigma,
-                             const float* current_vector,
-                             float* proposed_vector) {
+                            const float* sigma,
+                            const float* current_vector,
+                            float* proposed_vector) {
   int offset = hemiGetElementOffset();
   int stride = hemiGetElementStride();
 
@@ -48,9 +48,9 @@ void pick_new_vector_device(int nthreads, RNGState* rng,
 
 HEMI_DEV_CALLABLE_INLINE
 void jump_decider_device(RNGState* rng, double* nll_current,
-                          const double* nll_proposed, float* v_current,
-                          const float* v_proposed, unsigned ns, int* accepted,
-                          int* counter, float* jump_buffer) {
+                         const double* nll_proposed, float* v_current,
+                         const float* v_proposed, unsigned nparameters,
+                         int* accepted, int* counter, float* jump_buffer) {
 #ifdef HEMI_DEV_CODE
   float u = curand_uniform(&rng[0]);
 #else
@@ -62,7 +62,7 @@ void jump_decider_device(RNGState* rng, double* nll_current,
   double nc = nll_current[0];
   if (np < nc || u <= exp(nc - np)) {
     nll_current[0] = np;
-    for (unsigned i=0; i<ns; i++) {
+    for (unsigned i=0; i<nparameters; i++) {
       v_current[i] = v_proposed[i];
     }
     accepted[0] += 1;
@@ -70,15 +70,16 @@ void jump_decider_device(RNGState* rng, double* nll_current,
 
   // append all steps to jump buffer
   int count = counter[0];
-  for (unsigned i=0; i<ns; i++) {
-    jump_buffer[count * (ns + 1) + i] = v_current[i];
+  for (unsigned i=0; i<nparameters; i++) {
+    jump_buffer[count * (nparameters + 1) + i] = v_current[i];
   }
-  jump_buffer[count * (ns + 1) + ns] = nll_current[0];
+  jump_buffer[count * (nparameters + 1) + nparameters] = nll_current[0];
   counter[0] = count + 1;    
 }
 
 
-HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut, const float* __restrict__ pars,
+HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
+                              const float* __restrict__ pars,
                               const size_t ne, const size_t ns,
                               double* sums) {
   int offset = hemiGetElementOffset();
@@ -128,17 +129,18 @@ void nll_event_reduce_device(const size_t nthreads, const double* sums,
 
 
 HEMI_DEV_CALLABLE_INLINE
-void nll_total_device(const size_t ns, const float* pars,
-                       const float* expectations,
-                       const float* constraints,
-                       const double* events_total,
-                       double* nll) {
+void nll_total_device(const size_t nparameters, const size_t nsignals,
+                      const float* pars,
+                      const float* means,
+                      const float* sigmas,
+                      const double* events_total,
+                      double* nll) {
   // total from sum over events, once
   double sum = -events_total[0];
 
-  for (unsigned i=0; i<ns; i++) {
+  for (unsigned i=0; i<nparameters; i++) {
     // non-negative rates
-    if (pars[i] < 0) {
+    if (i < nsignals && pars[i] < 0) {
       nll[0] = 1e6;
       return;      
     }
@@ -147,8 +149,8 @@ void nll_total_device(const size_t ns, const float* pars,
     sum += pars[i];
 
     // gaussian constraints
-    if (constraints[i] > 0 && expectations[i] > 0) {
-      float x = (pars[i] / expectations[i] - 1.0) / constraints[i];
+    if (sigmas[i] > 0) {
+      float x = (pars[i] - means[i]) / sigmas[i];
       sum += x * x;
     }
   }
@@ -168,10 +170,10 @@ HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
 
 HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
                           const double* nll_proposed, float* v_current,
-                          const float* v_proposed, unsigned ns, int* accepted,
-                          int* counter, float* jump_buffer) {
+                          const float* v_proposed, unsigned nparameters,
+                          int* accepted, int* counter, float* jump_buffer) {
   jump_decider_device(rng, nll_current, nll_proposed, v_current, v_proposed,
-                      ns, accepted, counter, jump_buffer);
+                      nparameters, accepted, counter, jump_buffer);
 }
 
 
@@ -181,19 +183,19 @@ HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
 }
 
 
-HEMI_KERNEL(nll_total)(const size_t ns, const float* pars,
-                       const float* expectations,
-                       const float* constraints,
+HEMI_KERNEL(nll_total)(const size_t npars, const float* pars,
+                       const size_t nsignals,
+                       const float* means, const float* sigmas,
                        const double* events_total,
                        double* nll) {
-  nll_total_device(ns, pars, expectations, constraints, events_total, nll);
+  nll_total_device(npars, nsignals, pars, means, sigmas, events_total, nll);
 }
 
 
 HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
                                         const double* sums, const size_t ns,
-                                        const float* expectations,
-                                        const float* constraints,
+                                        const float* means,
+                                        const float* sigmas,
                                         RNGState* rng,
                                         double *nll_current,
                                         double *nll_proposed,
@@ -210,11 +212,11 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
 #endif
 
   if (hemiGetElementOffset() == 0) {
-    nll_total_device(ns, v_proposed, expectations, constraints, &total_sum,
-                     nll_proposed);
+    nll_total_device(nparameters, ns, v_proposed, expectations, constraints,
+                     &total_sum, nll_proposed);
 
     jump_decider_device(rng, nll_current, nll_proposed, v_current, v_proposed,
-                        ns, accepted, counter, jump_buffer);
+                        nparameters, accepted, counter, jump_buffer);
   }
 
 #ifdef HEMI_DEV_CODE

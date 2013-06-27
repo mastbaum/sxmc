@@ -20,9 +20,10 @@
 #include <hemi/array.h>
 #endif
 
-MCMC::MCMC(const std::vector<Signal>& signals, TNtuple* data) {
+MCMC::MCMC(const std::vector<Signal>& signals,
+           const std::vector<Systematic>& systematics) {
   this->nsignals = signals.size();
-  this->nevents = data->GetEntries();
+  this->nsystematics = systematics.size();
 
 #ifdef __CUDACC__
   this->nnllblocks = 64;
@@ -34,36 +35,46 @@ MCMC::MCMC(const std::vector<Signal>& signals, TNtuple* data) {
   this->nnllthreads = this->nnllblocks * this->nllblocksize;
   this->nreducethreads = 128;
 
-  this->expectations = new hemi::Array<float>(this->nsignals, true);
+  // set mean/expectation and sigma for all parameters
+  this->nparameters = this->nsignals + this->nsystematics;
+  this->parameter_means = new hemi::Array<float>(this->nparameters, true);
+  this->parameter_sigma = new hemi::Array<float>(this->nparameters, true);
   for (size_t i=0; i<this->nsignals; i++) {
-    this->expectations->writeOnlyHostPtr()[i] = signals[i].nexpected;
+    this->parameter_means->writeOnlyHostPtr()[i] = signals[i].nexpected;
+    this->parameter_sigma->writeOnlyHostPtr()[i] = signals[i].sigma;
+  }
+  for (size_t i=0; i<this->nsystematics; i++) {
+    this->parameter_means->writeOnlyHostPtr()[i] = systematics[i].mean;
+    this->parameter_sigma->writeOnlyHostPtr()[i] = systematics[i].sigma;
   }
 
-  this->constraints = new hemi::Array<float>(this->nsignals, true);
+  // references to pdfz::Eval histograms
+  this->pdfs.resize(this->nsignals);
   for (size_t i=0; i<this->nsignals; i++) {
-    this->constraints->writeOnlyHostPtr()[i] = signals[i].constraint;
+    this->pdfs[i] = signals[i].histogram;
   }
 
-  // Pj(xi) lookup table
-  this->lut = MCMC::build_lut(signals, data);
-
-  // list of variables for output ntuple
+  // list of parameters for output ntuple
   for (size_t i=0; i<signals.size(); i++) {
     this->varlist += (signals[i].name + ":");
-    this->signal_names.push_back(signals[i].name);
+    this->parameter_names.push_back(signals[i].name);
+  }
+  for (size_t i=0; i<systematics.size(); i++) {
+    this->varlist += (systematics[i].name + ":");
+    this->parameter_names.push_back(systematics[i].name);
   }
   this->varlist += "likelihood";
-  this->signal_names.push_back("likelihood");
+  this->parameter_names.push_back("likelihood");
 
-  this->rngs = new hemi::Array<RNGState>(this->nsignals, true);
+  this->rngs = new hemi::Array<RNGState>(this->nparameters, true);
 
   // if compiling device code, initialize the RNGs
 #ifdef __CUDACC__
   this->rngs->writeOnlyHostPtr();
   int bs = 128;
-  int nb = this->nsignals / bs + 1;
+  int nb = this->nparameters / bs + 1;
   assert(nb < 8);
-  init_device_rngs<<<nb, bs>>>(this->nsignals, 1234, this->rngs->ptr());
+  init_device_rngs<<<nb, bs>>>(this->nparameters, 1234, this->rngs->ptr());
 #else
   this->rngs->writeOnlyHostPtr();
 #endif
@@ -71,15 +82,14 @@ MCMC::MCMC(const std::vector<Signal>& signals, TNtuple* data) {
 
 
 MCMC::~MCMC() {
-  delete expectations;
-  delete constraints;
-  delete lut;
+  delete parameter_means;
+  delete parameter_sigma;
   delete rngs;
 }
 
 
-TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
-                          unsigned sync_interval) {
+TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
+                          float burnin_fraction, unsigned sync_interval) {
   // cuda/hemi block sizes
   int bs = 128;
   int nb = this->nsignals / bs + 1;
@@ -92,14 +102,18 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
                             this->varlist.c_str());
 
   // buffers for current and proposed parameter vectors
-  hemi::Array<float> current_vector(this->nsignals, true);
-  for (size_t i=0; i<this->nsignals; i++) {
-    current_vector.writeOnlyHostPtr()[i] =
-      this->expectations->readOnlyHostPtr()[i];
+  hemi::Array<float> current_vector(this->nparameters, true);
+  for (size_t i=0; i<this->nparameters; i++) {
+    current_vector.writeOnlyHostPtr()[i] = \
+      this->parameter_means->readOnlyHostPtr()[i];
   }
 
-  hemi::Array<float> proposed_vector(this->nsignals, true);
+  hemi::Array<float> proposed_vector(this->nparameters, true);
   proposed_vector.writeOnlyHostPtr();  // touch to set valid
+
+  // buffer for normalizations after application of systematics
+  hemi::Array<unsigned> normalizations(this->nsignals, true);
+  normalizations.writeOnlyHostPtr();
 
   // buffers for nll values at current and proposed parameter vectors
   hemi::Array<double> current_nll(1, true);
@@ -109,13 +123,13 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
   proposed_nll.writeOnlyHostPtr();
 
   // initial standard deviations for each dimension
-  hemi::Array<float> sigma(this->nsignals, true);
-  for (size_t i=0; i<this->nsignals; i++) {
-    float expectation = this->expectations->readOnlyHostPtr()[i];
-    float constraint = this->constraints->readOnlyHostPtr()[i];
-    float width = (constraint > 0 ? constraint : sqrt(expectation) / 10);
+  hemi::Array<float> jump_width(this->nparameters, true);
+  for (size_t i=0; i<this->nparameters; i++) {
+    float mean = this->parameter_means->readOnlyHostPtr()[i];
+    float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
+    float width = (sigma > 0 ? sigma : sqrt(mean) / 10);
     width = (width > 0 ? width : 1);
-    sigma.writeOnlyHostPtr()[i] = 0.5 * width;
+    jump_width.writeOnlyHostPtr()[i] = 0.5 * width;
   }
 
   // buffers for computing event term in nll
@@ -135,14 +149,30 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
   hemi::Array<float> jump_buffer(sync_interval * (this->nsignals + 1), true);
   float* jump_vector = new float[this->nsignals + 1];
 
+  // set up histogram and perform initial evaluation
+  size_t nevents = data.size() / this->nparameters;
+  hemi::Array<float> lut(pdfs.size() * nevents, true);
+  for (size_t i=0; i<this->pdfs.size(); i++) {
+    pdfs[i]->SetEvalPoints(data);
+    pdfs[i]->SetPDFValueBuffer(&lut, i, pdfs.size());
+    pdfs[i]->SetNormalizationBuffer(&normalizations, i);
+    pdfs[i]->SetParameterBuffer(&current_vector, this->nsignals);
+    pdfs[i]->EvalAsync();
+  }
+
+  for (size_t i=0; i<this->pdfs.size(); i++) {
+    pdfs[i]->EvalFinished();
+    pdfs[i]->SetParameterBuffer(&proposed_vector, this->nsignals);
+  }
+
   // calculate nll with initial parameters
-  const float* cv = current_vector.readOnlyHostPtr();
-  nll(current_vector.readOnlyPtr(), current_nll.writeOnlyPtr(),
+  nll(lut.readOnlyPtr(), nevents, 
+      current_vector.readOnlyPtr(), current_nll.writeOnlyPtr(),
       event_partial_sums.ptr(), event_total_sum.ptr());
 
   HEMI_KERNEL_LAUNCH(pick_new_vector, 1, 64, 0, 0,
-                     this->nsignals, this->rngs->ptr(),
-                     sigma.readOnlyPtr(),
+                     this->nparameters, this->rngs->ptr(),
+                     jump_width.readOnlyPtr(),
                      current_vector.readOnlyPtr(),
                      proposed_vector.writeOnlyPtr());
 
@@ -150,12 +180,23 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
   TStopwatch timer;
   timer.Start();
   for (unsigned i=0; i<nsteps; i++) {
+    // if systematics are varying, re-evaluate the pdfs
+    if (this->nsystematics > 0) {
+      for (size_t i=0; i<this->pdfs.size(); i++) {
+        pdfs[i]->EvalAsync();
+      }
+      for (size_t i=0; i<this->pdfs.size(); i++) {
+        pdfs[i]->EvalFinished();
+      }
+    }
+
     // re-tune jump distribution based on burn-in phase
     if (i == burnin_steps) {
       std::cout << "MCMC: Burn-in phase completed after " << burnin_steps
                 << " steps" << std::endl;
 
       // fit a Gaussian in each dimension to estimate distribution width
+/*
       for (size_t j=0; j<this->nsignals; j++) {
         std::string name = this->signal_names[j];
         nt->Draw((name + ">>hsproj").c_str());
@@ -185,23 +226,25 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
       }
 
       nt->Reset();
+*/
     }
 
     // partial sums of event term
     HEMI_KERNEL_LAUNCH(nll_event_chunks, this->nnllblocks,
-                     this->nllblocksize, 0, 0,
-                     this->lut->readOnlyPtr(),
-                     proposed_vector.readOnlyPtr(),
-                     this->nevents, this->nsignals,
-                     event_partial_sums.ptr());
+                       this->nllblocksize, 0, 0,
+                       lut.readOnlyPtr(),
+                       proposed_vector.readOnlyPtr(),
+                       nevents, this->nsignals,
+                       event_partial_sums.ptr());
 
     // accept/reject the jump, add current position to the buffer
-    HEMI_KERNEL_LAUNCH(finish_nll_jump_pick_combo, 1, this->nreducethreads, this->nreducethreads * sizeof(double), 0,
+    HEMI_KERNEL_LAUNCH(finish_nll_jump_pick_combo, 1, this->nreducethreads,
+                       this->nreducethreads * sizeof(double), 0,
                        this->nnllthreads,
                        event_partial_sums.ptr(),
                        this->nsignals, 
-                       this->expectations->readOnlyPtr(),
-                       this->constraints->readOnlyPtr(),
+                       this->parameter_means->readOnlyPtr(),
+                       this->parameter_sigma->readOnlyPtr(),
                        this->rngs->ptr(),
                        current_nll.ptr(),
                        proposed_nll.ptr(),
@@ -210,8 +253,8 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
                        accept_counter.ptr(),
                        jump_counter.ptr(),
                        jump_buffer.writeOnlyPtr(),
-                       this->nsignals /* number of parameters */,
-                       sigma.readOnlyPtr());
+                       this->nparameters,
+                       jump_width.readOnlyPtr());
 
     // flush the jump buffer periodically
     if (i % sync_interval == 0 || i == nsteps - 1 || i == burnin_steps - 1) {
@@ -222,13 +265,14 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
                 << naccepted << " accepted)" << std::endl;
       for (int j=0; j<njumps; j++) {
          // first nsignals elements are normalizations
-         for (unsigned k=0; k<this->nsignals; k++) {
-           int idx = j * (this->nsignals + 1) + k;
+         for (unsigned k=0; k<this->nparameters; k++) {
+           int idx = j * (this->nparameters + 1) + k;
            jump_vector[k] = jump_buffer.readOnlyHostPtr()[idx];
          }
          // last element is the likelihood
-         jump_vector[this->nsignals] =
-           jump_buffer.readOnlyHostPtr()[j*(this->nsignals+1)+this->nsignals];
+         jump_vector[this->nparameters] = \
+           jump_buffer.readOnlyHostPtr()[j * (this->nparameters + 1) +
+                                         this->nparameters];
 
          nt->Fill(jump_vector);
       }
@@ -247,73 +291,23 @@ TNtuple* MCMC::operator()(unsigned nsteps, float burnin_fraction,
 }
 
 
-void MCMC::nll(const float* v, double* nll,
-               double* event_partial_sums,
-               double* event_total_sum) {
+void MCMC::nll(const float* lut, size_t nevents, const float* v, double* nll,
+               double* event_partial_sums, double* event_total_sum) {
   // partial sums of event term
-  HEMI_KERNEL_LAUNCH(nll_event_chunks, this->nnllblocks,
-                     this->nllblocksize, 0, 0,
-                     this->lut->readOnlyPtr(),
-                     v,
-                     this->nevents, this->nsignals,
-                     event_partial_sums);
+  HEMI_KERNEL_LAUNCH(nll_event_chunks,
+                     this->nnllblocks, this->nllblocksize, 0, 0,
+                     lut, v, nevents, this->nsignals, event_partial_sums);
 
   // total of event term
   HEMI_KERNEL_LAUNCH(nll_event_reduce, 1, this->nreducethreads,  
-                     this->nreducethreads * sizeof(double),  // shared memory
-                     0,
-                     this->nnllthreads,
-                     event_partial_sums,
-                     event_total_sum);
+                     this->nreducethreads * sizeof(double), 0,
+                     this->nnllthreads, event_partial_sums, event_total_sum);
 
   // constraints + event term
   HEMI_KERNEL_LAUNCH(nll_total, 1, 1, 0, 0,
-                     this->nsignals,
-                     v,
-                     this->expectations->readOnlyPtr(),
-                     this->constraints->readOnlyPtr(),
-                     event_total_sum,
-                     nll);
-}
-    
-
-hemi::Array<float>* MCMC::build_lut(const std::vector<Signal>& signals,
-                                   TNtuple* data) {
-  std::cout << "MCMC::build_lut: Building P(x) lookup table" << std::endl;
-  int nevents = data->GetEntries();
-  hemi::Array<float>* lut = new hemi::Array<float>(signals.size() * nevents,
-                                                   true);
-
-  float minimum_probability = 1.0;
-
-  float e;
-  float r;
-  data->SetBranchAddress("e", &e);
-  data->SetBranchAddress("r", &r);
-
-  for (int i=0; i<nevents; i++) {
-    data->GetEntry(i);
-    for (size_t j=0; j<signals.size(); j++) {
-      double v = 0;
-      if (signals[j].histogram->IsA() == TH2F::Class()) {
-        v = dynamic_cast<TH2F*>(signals[j].histogram)->Interpolate(r, e);
-      }
-      else if (signals[j].histogram->IsA() == TH1D::Class()) {
-        v = dynamic_cast<TH1D*>(signals[j].histogram)->Interpolate(e);
-      }
-      else {
-        std::cerr << "build_lut: Unknown histogram class "
-                  << signals[j].histogram->ClassName() << std::endl;
-        assert(false);
-      }
-
-      if (v < minimum_probability && v > 0) {
-        minimum_probability = v;
-      }
-      lut->writeOnlyHostPtr()[i + nevents * j] = v;
-    }
-  }
-
-  return lut;
+                     this->nparameters, v, this->nsignals,
+                     this->parameter_means->readOnlyPtr(),
+                     this->parameter_sigma->readOnlyPtr(),
+                     event_total_sum, nll);
 }
 
