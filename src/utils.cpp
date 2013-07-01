@@ -92,7 +92,8 @@ SpectralPlot::~SpectralPlot() {
 
 
 void SpectralPlot::add(TH1* _h, std::string title, std::string options) {
-  TH1* h = (TH1*) _h->Clone(("__" + std::string(_h->GetName())).c_str());
+  std::string name = "__" + std::string(_h->GetName());
+  TH1* h = dynamic_cast<TH1*>(_h->Clone(name.c_str()));
 
   h->SetDirectory(NULL);
   h->SetLineWidth(this->line_width);
@@ -123,7 +124,7 @@ void SpectralPlot::save(std::string filename) {
 
 
 TH1* SpectralPlot::make_like(TH1* h, std::string name) {
-  TH1* hnew = (TH1*) h->Clone(name.c_str());
+  TH1* hnew = dynamic_cast<TH1*>(h->Clone(name.c_str()));
   hnew->Reset();
   return hnew;
 }

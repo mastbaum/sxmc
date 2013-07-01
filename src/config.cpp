@@ -113,9 +113,6 @@ FitConfig::FitConfig(std::string filename) {
   this->signal_name = fit_params["signal_name"].asString();
   this->output_file = fit_params.get("output_file", "fit_spectrum").asString();
 
-  size_t nparams = \
-    fit_params["signals"].size() + fit_params["systematics"].size();
-
   for (Json::Value::const_iterator it=fit_params["observables"].begin();
        it!=fit_params["observables"].end(); ++it) {
     this->observables.push_back(all_observables[(*it).asString()]);

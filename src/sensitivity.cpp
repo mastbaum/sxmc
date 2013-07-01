@@ -26,7 +26,6 @@
 #include "mcmc.h"
 #include "utils.h"
 
-
 /** A ROOT color palette in which sequential colors look okay. */
 static const int color[28] = {kRed,      kGreen,    kBlue,      kMagenta,
                               kCyan,     kYellow,   kOrange,    kViolet+2,
@@ -66,8 +65,8 @@ double upper_limit(TH1F* h, double cl=0.682) {
  * sensitivity is the median of the limits of the ensemble.
  *
  * \param signals List of Signals defining PDFs, rates, etc.
- * \param e_range Energy range to consider
- * \param r_range Radial range to consider
+ * \param systematics List of Systematics applied to PDFs
+ * \param observables List of Observables common to PDFs
  * \param steps Number of MCMC random walk steps to take
  * \param burnin_fraction Fraction of initial MCMC steps to throw out
  * \param signal_name The name of the Signal that is the signal
@@ -75,26 +74,31 @@ double upper_limit(TH1F* h, double cl=0.682) {
  * \param nexperiments Number of fake experiments to run
  * \returns A histogram of limits from the experiments
  */
-TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
-               Range<float>& r_range, unsigned steps,
-               float burnin_fraction, std::string signal_name,
+TH1F* ensemble(std::vector<Signal>& signals,
+               std::vector<Systematic>& systematics,
+               std::vector<Observable>& observables,
+               unsigned steps, float burnin_fraction, std::string signal_name,
                float confidence, unsigned nexperiments) {
   TH1F* limits = new TH1F("limits", "Background-fluctuation sensitivity",
                           100, 0, 100);
 
   for (unsigned i=0; i<nexperiments; i++) {
     std::cout << "Experiment " << i << " / " << nexperiments << std::endl;
+
     // make fake data
-    FakeDataGenerator gen(signals, e_range, r_range);
-    float* norms = new float[signals.size()];
+    std::vector<float> params;
     for (size_t i=0; i<signals.size(); i++) {
-      norms[i] = signals[i].nexpected;
+      params.push_back(signals[i].nexpected);
     }
-    TNtuple* data = gen(norms);
+    for (size_t i=0; i<systematics.size(); i++) {
+      params.push_back(systematics[i].mean);
+    }
+    std::vector<float> data = make_fake_dataset(signals, systematics,
+                                                observables, params, true);
 
     // run mcmc
-    MCMC mcmc(signals, data);
-    TNtuple* lspace = mcmc(steps, burnin_fraction);
+    MCMC mcmc(signals, systematics);
+    TNtuple* lspace = mcmc(data, steps, burnin_fraction);
 
     // calculate signal sensitivity
     TH1F hproj("hproj", "hproj", 1000, 0, 100);
@@ -123,22 +127,25 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
     }
 
     // plot and save this fit
+    /*
     SpectralPlot p_all;
     SpectralPlot p_external;
     SpectralPlot p_cosmo;
 
-    TH1* hdata = SpectralPlot::make_like(signals[0].histogram, "hdata");
+    TH1* hpdf0 = signals[0].histogram.CreateHistogram();  // fixme eval at best
+    TH1* hdata = SpectralPlot::make_like(hpdf0, "hdata");
     hdata->SetAxisRange(1e-1, 1e3, "Y");
     hdata->SetAxisRange(1.5, 5.0, "X");
     hdata->SetMarkerStyle(20);
     hdata->SetLineColor(kBlack);
+    
     data->Draw("e>>hdata");
     p_all.add(hdata, "Data");
 
-    TH1* hsum = SpectralPlot::make_like(signals[0].histogram, "hdata");
+    TH1* hsum = SpectralPlot::make_like(hpdf0, "hdata");
     hsum->SetLineColor(kRed);
 
-    TH1* hcosmo = SpectralPlot::make_like(signals[0].histogram, "hcosmo");
+    TH1* hcosmo = SpectralPlot::make_like(hpdf0, "hcosmo");
     hcosmo->SetLineColor(kAzure+1);
 
     TH1* hexternal = SpectralPlot::make_like(hcosmo, "hexternal");
@@ -148,10 +155,11 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
     for (size_t i=0; i<signals.size(); i++) {
       std::cout << " " << signals[i].name << ": " << norms_fit[i]
                 << " (" << norms[i] <<  ")" << std::endl;
-      TH1* hs = (TH1*) signals[i].histogram->Clone("hs");
+      TH1* hpdf = signals[i].histogram->CreateHistogram();
+      TH1* hs = (TH1*) hpdf->Clone("hs");
       int bin1 = hs->FindBin(1.5);
       int bin2 = hs->FindBin(5.0);
-      hs->Scale(norms_fit[i] / signals[i].histogram->Integral(bin1, bin2));
+      hs->Scale(norms_fit[i] / hpdf->Integral(bin1, bin2));
       hs->SetLineColor(color[i+1]);
       hsum->Add(hs);
 
@@ -175,18 +183,6 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
       delete hs;
     }
 
-    std::cout << "Correlation matrix:" << std::endl;
-    std::vector<float> correlations = get_correlation_matrix(lspace);
-    for (size_t i=0; i<signals.size(); i++) {
-      std::cout << std::setw(10) << signals[i].name << " ";
-      for (size_t j=0; j<signals.size(); j++) {
-        std::cout << std::setiosflags(std::ios::fixed)
-                  << std::setprecision(3) << std::setw(8)
-                  << correlations[j + i * (signals.size() + 1)];
-      }
-      std::cout << std::resetiosflags(std::ios::fixed) << std::endl;
-    }
-
     p_all.add(hexternal, "External", "hist");
     p_all.add(hcosmo, "Cosmogenics", "hist");
     p_all.add(hsum, "Fit", "hist");
@@ -204,13 +200,25 @@ TH1F* ensemble(std::vector<Signal>& signals, Range<float>& e_range,
     hproj.Rebin(10);
     hproj.Draw();
     c2.SaveAs("lproj.pdf");
+    */
+
+    std::cout << "Correlation matrix:" << std::endl;
+    std::vector<float> correlations = get_correlation_matrix(lspace);
+    for (size_t i=0; i<signals.size(); i++) {
+      std::cout << std::setw(10) << signals[i].name << " ";
+      for (size_t j=0; j<signals.size(); j++) {
+        std::cout << std::setiosflags(std::ios::fixed)
+                  << std::setprecision(3) << std::setw(8)
+                  << correlations[j + i * (signals.size() + 1)];
+      }
+      std::cout << std::resetiosflags(std::ios::fixed) << std::endl;
+    }
+
     TFile f("lspace.root", "recreate");
     lspace->Write();
     f.Close();
 
-    delete data;
     delete lspace;
-    delete[] norms;
     delete[] norms_branch;
   }
 
@@ -245,9 +253,9 @@ int main(int argc, char* argv[]) {
   fc.print();
 
   // run ensemble
-  TH1F* limits = ensemble(fc.signals, fc.e_range, fc.r_range, fc.steps,
-                          fc.burnin_fraction, fc.signal_name,
-                          fc.confidence, fc.experiments);
+  TH1F* limits = ensemble(fc.signals, fc.systematics, fc.observables, fc.steps,
+                          fc.burnin_fraction, fc.signal_name, fc.confidence,
+                          fc.experiments);
 
   // plot distribution of limits
   TCanvas c1;

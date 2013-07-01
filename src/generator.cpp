@@ -9,10 +9,10 @@
 #include "generator.h"
 #include "signals.h"
 
-std::vector<float> make_fake_dataset(std::vector<Signal> signals,
-                                     std::vector<Systematic> systematics,
-                                     std::vector<Observable> observables,
-                                     float* params, bool poisson) {
+std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
+                                     std::vector<Systematic>& systematics,
+                                     std::vector<Observable>& observables,
+                                     std::vector<float> params, bool poisson) {
   std::cout << "FakeDataGenerator::make_dataset: Generating dataset..."
             << std::endl;
 

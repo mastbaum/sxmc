@@ -25,10 +25,11 @@
  * \return Array with samples
  */
 
-std::vector<float> make_fake_dataset(std::vector<Signal> signals,
-                                     std::vector<Systematic> systematics,
-                                     std::vector<Observable> observables,
-                                     float* params, bool poisson=true);
+std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
+                                     std::vector<Systematic>& systematics,
+                                     std::vector<Observable>& observables,
+                                     std::vector<float> params,
+                                     bool poisson=true);
 
 #endif  // __GENERATOR_H__
 
