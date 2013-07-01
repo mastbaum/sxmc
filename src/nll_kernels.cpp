@@ -212,8 +212,8 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
 #endif
 
   if (hemiGetElementOffset() == 0) {
-    nll_total_device(nparameters, ns, v_proposed, expectations, constraints,
-                     &total_sum, nll_proposed);
+    nll_total_device(nparameters, ns, v_proposed, means, sigmas, &total_sum,
+                     nll_proposed);
 
     jump_decider_device(rng, nll_current, nll_proposed, v_current, v_proposed,
                         nparameters, accepted, counter, jump_buffer);
