@@ -370,6 +370,10 @@ namespace pdfz {
                            nsyst, syst_ptr,
                            this->param_buffer->readOnlyPtr(),
                            this->bins->ptr(), this->norm_buffer->writeOnlyPtr() + this->norm_offset);
+
+        if (this->read_bins == 0)
+            return; // This can happen if someone wants to create a histogram with no eval points.
+
         HEMI_KERNEL_LAUNCH(eval_pdf, this->eval_nblocks, this->eval_nthreads_per_block, 0, this->cuda_state->stream,
                            (int) this->read_bins->size(), this->read_bins->readOnlyPtr(),
                            this->bins->readOnlyPtr(), this->norm_buffer->readOnlyPtr() + this->norm_offset,
@@ -388,6 +392,11 @@ namespace pdfz {
     {
         if (this->nobservables > 3)
             throw Error("Cannot EvalHist::CreateHistogram for dimensions greater than 3!");
+
+        bool orig_optimization_flag = this->needs_optimization;
+        this->needs_optimization = false; // never optimize when making histogram!
+        this->EvalAsync();
+        this->EvalFinished();
 
         const float *lower = this->lower.readOnlyHostPtr();
         const float *upper = this->upper.readOnlyHostPtr();
@@ -445,6 +454,8 @@ namespace pdfz {
             default:
                 throw Error("Impossible EvalHist::CreateHistogram switch case!");
         }
+
+        this->needs_optimization = orig_optimization_flag;
 
         return hist;
     }

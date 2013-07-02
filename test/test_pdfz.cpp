@@ -127,12 +127,9 @@ TEST_F(EvalHistMethods, EvaluationOffsetStride)
 
 TEST_F(EvalHistMethods, CreateHistogram1D)
 {
-    evaluator->SetEvalPoints(eval_points);
     evaluator->SetPDFValueBuffer(pdf_values);
     evaluator->SetNormalizationBuffer(norm);
     evaluator->SetParameterBuffer(params);
-    evaluator->EvalAsync();
-    evaluator->EvalFinished();
 
     TH1 *hist = evaluator->CreateHistogram();
 
