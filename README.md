@@ -9,8 +9,8 @@ Building
 `sxmc` requires the following libraries:
 
 * [ROOT](http://root.cern.ch)
-* [Doxygen](http://doxygen.org) (if building documentation)
 * [HDF5](http://www.hdfgroup.org/HDF5/doc/index.html)
+* [Doxygen](http://doxygen.org) (if building documentation)
 
 It also uses [hemi](https://github.com/harrism/hemi), which is included as a
 git submodule. After cloning `sxmc`, run:
@@ -48,8 +48,9 @@ The output is placed into the `doc` directory.
 
 Usage
 -----
-1. Create PDFs: PDFs are ROOT TH2Fs with event energy and radius dimensions.
-   Each PDF is stored in its own ROOT file and named "pdf".
+1. Create HDF5 data files: The data used to build the PDFs is stored in a row-
+   major array format in HDF5 files. The column labels are specified in the
+   fit configuration file.
 
 2. Configure fit: Set up the fit parameters and signal PDFs using a JSON-format
    configuration file. An example is provided in `config/`.
