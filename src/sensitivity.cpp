@@ -130,7 +130,24 @@ TH1F* ensemble(std::vector<Signal>& signals,
       }
     }
 
+    std::cout << "-- Best fit: NLL = " << ml << " --" << std::endl;
+    for (size_t j=0; j<params.size(); j++) {
+      std::cout << " " << param_names[j] << ": " << params_fit[j]
+                << " (" << params[j] <<  ")" << std::endl;
+    }
+
     // plot and save this fit
+    bool energy_observable_found = false;
+    size_t energy_observable_index = 0;
+    for (size_t j=0; j<observables.size(); j++) {
+      if (observables[i].field == "e") {
+        energy_observable_found = true;
+        energy_observable_index = i;
+        break;
+      }
+    }
+    assert(energy_observable_found);
+
     SpectralPlot p_all;
     SpectralPlot p_external;
     SpectralPlot p_cosmo;
@@ -142,11 +159,11 @@ TH1F* ensemble(std::vector<Signal>& signals,
     norms_buffer.writeOnlyHostPtr();
     phist->SetNormalizationBuffer(&norms_buffer, 0);
 
-    hemi::Array<float> param_buffer(signals.size() + systematics.size(), true);
-    for (size_t j=0; j<signals.size() + systematics.size(); j++) {
+    hemi::Array<float> param_buffer(params.size(), true);
+    for (size_t j=0; j<params.size(); j++) {
       param_buffer.writeOnlyHostPtr()[j] = params_fit[j];
     }
-    phist->SetParameterBuffer(&param_buffer);
+    phist->SetParameterBuffer(&param_buffer, signals.size());
 
     TH1* hpdf0 = phist->CreateHistogram();
     TH1* hdata = SpectralPlot::make_like(hpdf0, "hdata");
@@ -156,8 +173,7 @@ TH1F* ensemble(std::vector<Signal>& signals,
     hdata->SetLineColor(kBlack);
 
     for (size_t idata=0; idata<data.size(); idata++) {
-      // FIXME find E observable
-      hdata->Fill(data[idata * observables.size()]);
+      hdata->Fill(data[idata * observables.size() + energy_observable_index]);
     }
 
     p_all.add(hdata, "Data");
@@ -166,23 +182,15 @@ TH1F* ensemble(std::vector<Signal>& signals,
     hsum->SetLineColor(kRed);
 
     TH1* hcosmo = SpectralPlot::make_like(hpdf0, "hcosmo");
-    hcosmo->SetLineColor(kAzure+1);
+    hcosmo->SetLineColor(kAzure + 1);
 
     TH1* hexternal = SpectralPlot::make_like(hcosmo, "hexternal");
-    hexternal->SetLineColor(kOrange+1);
+    hexternal->SetLineColor(kOrange + 1);
 
-    std::cout << "-- Best fit: NLL = " << ml << " --" << std::endl;
-    for (size_t j=0; j<params.size(); j++) {
-      std::cout << " " << param_names[j] << ": " << params_fit[j]
-                << " (" << params[j] <<  ")" << std::endl;
-
-      if (j >= signals.size()) {
-        continue;
-      }
-
+    for (size_t j=0; j<signals.size(); j++) {
       // create TH1 histogram from pdfz::EvalHist
       phist = dynamic_cast<pdfz::EvalHist*>(signals[j].histogram);
-      phist->SetParameterBuffer(&param_buffer);
+      phist->SetParameterBuffer(&param_buffer, signals.size());
       phist->SetNormalizationBuffer(&norms_buffer, j);
       TH1* hpdf = phist->CreateHistogram();
 
@@ -193,7 +201,7 @@ TH1F* ensemble(std::vector<Signal>& signals,
       //1.0 * norms_buffer.readOnlyHostPtr()[i] / signals[i].nevents;
       float syst_rescale = 1.0;
       hs->Scale(params_fit[j] * syst_rescale / hpdf->Integral(bin1, bin2));
-      hs->SetLineColor(color[j+1]);
+      hs->SetLineColor(color[j + 1]);
       hsum->Add(hs);
 
       hs->SetAxisRange(1e-1, 1e3, "Y");
