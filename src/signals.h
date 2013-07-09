@@ -14,6 +14,7 @@ struct Signal {
   std::string title;  //!< histogram title in ROOT-LaTeX format
   float nexpected;  //!< events expected in this fit
   float sigma;  //!< fractional uncertainty
+  size_t nevents;  //!< number of events in PDF
   pdfz::Eval* histogram;  //!< PDF
 };
 

@@ -29,8 +29,8 @@ size_t get_index_with_append(std::vector<T>& v, T o) {
 
 
 FitConfig::FitConfig(std::string filename) {
-  Json::Value root;
   Json::Reader reader;
+  Json::Value root;
 
   std::ifstream t(filename.c_str());
   std::string data((std::istreambuf_iterator<char>(t)),
@@ -40,7 +40,7 @@ FitConfig::FitConfig(std::string filename) {
   if (!parse_ok) {
     std::cout  << "FitConfig::FitConfig: JSON parse error:" << std::endl
                << reader.getFormattedErrorMessages();
-    assert(false);
+    throw(1);
   }
 
   // experiment parameters
@@ -95,7 +95,7 @@ FitConfig::FitConfig(std::string filename) {
     else {
       std::cerr << "FitConfig::FitConfig: Unknown systematic type "
                 << type_string << std::endl;
-      assert(false);
+      throw(1);
     }
 
     s.mean = s_json["mean"].asFloat();
@@ -109,7 +109,7 @@ FitConfig::FitConfig(std::string filename) {
   const Json::Value fit_params = root["fit"];
   this->experiments = fit_params["experiments"].asInt();
   this->steps = fit_params["steps"].asInt();
-  this->burnin_fraction = fit_params["burnin_fraction"].asFloat();
+  this->burnin_fraction = fit_params.get("burnin_fraction", 0.1).asFloat();
   this->signal_name = fit_params["signal_name"].asString();
   this->output_file = fit_params.get("output_file", "fit_spectrum").asString();
 
@@ -124,26 +124,28 @@ FitConfig::FitConfig(std::string filename) {
   }
 
   // signal parameters
-  std::vector<std::string> fit_signal_names;
+  std::vector<std::string> signal_names;
   for (Json::Value::iterator it=fit_params["signals"].begin();
        it!=fit_params["signals"].end(); ++it) {
-    fit_signal_names.push_back((*it).asString());
+    signal_names.push_back((*it).asString());
   }
 
-  const Json::Value signal_names = root["signals"];
-  for (Json::Value::const_iterator it=signal_names.begin();
-       it!=signal_names.end(); ++it) {
-    if (std::find(fit_signal_names.begin(), fit_signal_names.end(),
-                  it.key().asString()) == fit_signal_names.end()) {
+  const Json::Value all_signals = root["signals"];
+  for (Json::Value::const_iterator it=all_signals.begin();
+       it!=all_signals.end(); ++it) {
+    if (std::find(signal_names.begin(), signal_names.end(),
+                  it.key().asString()) == signal_names.end()) {
       continue;
     }
 
-    const Json::Value signal_params = root["signals"][it.key().asString()];
+    const Json::Value signal_params = all_signals[it.key().asString()];
 
     Signal s;
     s.name = it.key().asString();
     s.title = signal_params.get("title", s.name).asString();
-    s.sigma = signal_params.get("sigma", 0.0).asFloat();
+    s.sigma = \
+      signal_params.get("sigma", 0.0).asFloat() *
+      this->live_time * this->efficiency;
     s.nexpected = \
       signal_params["rate"].asFloat() * this->live_time * this->efficiency;
 
@@ -212,19 +214,21 @@ FitConfig::FitConfig(std::string filename) {
     }
 
     // 2. copy over the relevant data into sample array
-    size_t nevents = rank[0];
-    std::vector<float> samples(nevents * sample_fields.size());
+    s.nevents = rank[0];
+    std::vector<float> samples(s.nevents * sample_fields.size());
 
-    for (size_t i=0; i<nevents; i++) {
+    for (size_t i=0; i<s.nevents; i++) {
       for (size_t j=0; j<sample_fields.size(); j++) {
         samples[i * sample_fields.size() + j] = \
           dataset[i * rank[1] + sample_fields[j]];
       }
     }
 
+    float years = 1.0 * s.nevents / (s.nexpected / this->live_time /
+                  this->efficiency);
+
     std::cout << "FitConfig::FitConfig: Initializing PDF for " << s.name
-              << " using " << nevents << " events ("
-              << 1.0 * nevents / s.nexpected << " y)"
+              << " using " << s.nevents << " events (" << years << " y)"
               << std::endl;
 
     // build bin and limit arrays
@@ -292,7 +296,7 @@ void FitConfig::print() const {
        it!=this->observables.end(); ++it) {
     std::cout << "  " << it - this->observables.begin() << std::endl
               << "    Title: \"" << it->title << "\"" << std::endl
-              << "    Lower bound:  "<< it->lower << std::endl
+              << "    Lower bound: "<< it->lower << std::endl
               << "    Upper bound: " << it->upper << std::endl
               << "    Bins: " << it->bins << std::endl;
   }
@@ -302,7 +306,7 @@ void FitConfig::print() const {
        it!=this->signals.end(); ++it) {
     std::cout << "  " << it->name << std::endl
               << "    Title: \"" << it->title << "\"" << std::endl
-              << "    Expectation:  "<< it->nexpected << std::endl
+              << "    Expectation: "<< it->nexpected << std::endl
               << "    Constraint: ";
     if (it->sigma != 0) {
       std::cout << it->sigma << std::endl;
@@ -318,12 +322,12 @@ void FitConfig::print() const {
          it!=this->systematics.end(); ++it) {
       std::cout << "  " << it - this->systematics.begin() << std::endl
                 << "    Title: \"" << it->title << "\"" << std::endl
-                << "    Type:  "<< it->type << std::endl
-                << "    Observable:  "<< it->observable_field << std::endl;
+                << "    Type: "<< it->type << std::endl
+                << "    Observable: "<< it->observable_field << std::endl;
       if (it->type == pdfz::Systematic::RESOLUTION_SCALE) {
         std::cout << "    Truth: " << it->truth_field << std::endl;
       }
-      std::cout << "    Mean:  "<< it->mean << std::endl
+      std::cout << "    Mean: "<< it->mean << std::endl
                 << "    Constraint: ";
       if (it->sigma != 0) {
         std::cout << it->sigma << std::endl;

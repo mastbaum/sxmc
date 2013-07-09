@@ -21,9 +21,11 @@
 #endif
 
 MCMC::MCMC(const std::vector<Signal>& signals,
-           const std::vector<Systematic>& systematics) {
+           const std::vector<Systematic>& systematics,
+           const std::vector<Observable>& observables) {
   this->nsignals = signals.size();
   this->nsystematics = systematics.size();
+  this->nobservables = observables.size();
 
 #ifdef __CUDACC__
   this->nnllblocks = 64;
@@ -44,8 +46,10 @@ MCMC::MCMC(const std::vector<Signal>& signals,
     this->parameter_sigma->writeOnlyHostPtr()[i] = signals[i].sigma;
   }
   for (size_t i=0; i<this->nsystematics; i++) {
-    this->parameter_means->writeOnlyHostPtr()[i] = systematics[i].mean;
-    this->parameter_sigma->writeOnlyHostPtr()[i] = systematics[i].sigma;
+    this->parameter_means->writeOnlyHostPtr()[this->nsignals + i] = \
+      systematics[i].mean;
+    this->parameter_sigma->writeOnlyHostPtr()[this->nsignals + i] = \
+      systematics[i].sigma;
   }
 
   // references to pdfz::Eval histograms
@@ -127,9 +131,10 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
   for (size_t i=0; i<this->nparameters; i++) {
     float mean = this->parameter_means->readOnlyHostPtr()[i];
     float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
-    float width = (sigma > 0 ? sigma : sqrt(mean) / 10);
+    float width = (sigma > 0 ? sigma : sqrt(mean));
     width = (width > 0 ? width : 1);
-    jump_width.writeOnlyHostPtr()[i] = 0.5 * width;
+    jump_width.writeOnlyHostPtr()[i] = \
+      width * this->nparameters * this->nparameters;
   }
 
   // buffers for computing event term in nll
@@ -146,23 +151,23 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
   hemi::Array<int> accept_counter(1, true);
   accept_counter.writeOnlyHostPtr()[0] = 0;
 
-  hemi::Array<float> jump_buffer(sync_interval * (this->nsignals + 1), true);
-  float* jump_vector = new float[this->nsignals + 1];
+  hemi::Array<float> jump_buffer(sync_interval * (this->nparameters + 1),
+                                 true);
+
+  float* jump_vector = new float[this->nparameters + 1];
 
   // set up histogram and perform initial evaluation
-  size_t nevents = data.size() / this->nparameters;
-  hemi::Array<float> lut(pdfs.size() * nevents, true);
+  size_t nevents = data.size() / this->nobservables;
+  hemi::Array<float> lut(nevents * this->nsignals, true);
   for (size_t i=0; i<this->pdfs.size(); i++) {
-    pdfs[i]->SetEvalPoints(data);
-    pdfs[i]->SetPDFValueBuffer(&lut, i, pdfs.size());
-    pdfs[i]->SetNormalizationBuffer(&normalizations, i);
-    pdfs[i]->SetParameterBuffer(&current_vector, this->nsignals);
-    pdfs[i]->EvalAsync();
-  }
-
-  for (size_t i=0; i<this->pdfs.size(); i++) {
-    pdfs[i]->EvalFinished();
-    pdfs[i]->SetParameterBuffer(&proposed_vector, this->nsignals);
+    pdfz::Eval* p = this->pdfs[i];
+    p->SetEvalPoints(data);
+    p->SetPDFValueBuffer(&lut, i * nevents, 1);
+    p->SetNormalizationBuffer(&normalizations, i);
+    p->SetParameterBuffer(&current_vector, this->nsignals);
+    p->EvalAsync();
+    p->EvalFinished();
+    p->SetParameterBuffer(&proposed_vector, this->nsignals);
   }
 
   // calculate nll with initial parameters
@@ -196,9 +201,8 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
                 << " steps" << std::endl;
 
       // fit a Gaussian in each dimension to estimate distribution width
-/*
-      for (size_t j=0; j<this->nsignals; j++) {
-        std::string name = this->signal_names[j];
+      for (size_t j=0; j<this->nparameters; j++) {
+        std::string name = this->parameter_names[j];
         nt->Draw((name + ">>hsproj").c_str());
         TH1F* hsproj = (TH1F*) gDirectory->Get("hsproj");
 
@@ -216,17 +220,16 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
         }
 
         double fit_width = fsproj->GetParameter(2);
-        const float scale_factor = 0.11;  // tuned to get around 23% acceptance
+        const float scale_factor = 1.0 / this->nparameters;
 
         std::cout << "MCMC: Rescaling jump sigma: " << name << ": "
                   << scale_factor * fit_width << std::endl;
-        sigma.writeOnlyHostPtr()[j] = scale_factor * fit_width;
+        jump_width.writeOnlyHostPtr()[j] = scale_factor * fit_width;
 
         hsproj->Delete();
       }
 
-      nt->Reset();
-*/
+      //nt->Reset();
     }
 
     // partial sums of event term

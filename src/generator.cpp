@@ -8,61 +8,57 @@
 #include <TH3D.h>
 #include "generator.h"
 #include "signals.h"
+#include <TCanvas.h>
 
 std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
                                      std::vector<Systematic>& systematics,
                                      std::vector<Observable>& observables,
                                      std::vector<float> params, bool poisson) {
-  std::cout << "FakeDataGenerator::make_dataset: Generating dataset..."
-            << std::endl;
+  std::cout << "make_fake_dataset: Generating dataset..." << std::endl;
 
   assert(observables.size() <= 3);
 
-  std::vector<unsigned> observed(signals.size());
-
-  size_t nevents = 0;
-  for (size_t i=0; i<signals.size(); i++) {
-    if (poisson) {
-      observed[i] = gRandom->Poisson(params[i]);
-    }
-    else {
-      observed[i] = TMath::Nint(params[i]);  // round to nearest integer
-    }
-    nevents += observed[i];
-  }
-
-  std::vector<float> data(nevents * observables.size());
-
-  // evaluate the histogram once to force binning, and extract TH1 histogram
-  std::vector<float> eval_points(signals.size());
-  for (size_t i=0; i<signals.size(); i++) {
-    eval_points[i] = 0;
-  }
-
+  // extract TH1 histogram from pdfz::Eval
   hemi::Array<float> param_buffer(signals.size() + systematics.size(), true);
-  for (size_t i=signals.size(); i<signals.size()+systematics.size(); i++) {
+  for (size_t i=0; i<signals.size() + systematics.size(); i++) {
     param_buffer.writeOnlyHostPtr()[i] = params[i];
   }
 
-  hemi::Array<float> value_buffer(1, true);
-  hemi::Array<unsigned> norms_buffer(1, true);
+  hemi::Array<unsigned> norms_buffer(signals.size(), true);
+  norms_buffer.writeOnlyHostPtr();
 
   std::vector<TH1*> histograms(signals.size());
-
   for (size_t i=0; i<signals.size(); i++) {
     pdfz::Eval* p = signals[i].histogram;
-    p->SetEvalPoints(eval_points);
-    p->SetPDFValueBuffer(&value_buffer);
-    p->SetNormalizationBuffer(&norms_buffer);
-    p->SetParameterBuffer(&param_buffer);
-    p->EvalAsync();
-    p->EvalFinished();
+    p->SetNormalizationBuffer(&norms_buffer, i);
+    p->SetParameterBuffer(&param_buffer, signals.size());
     histograms[i] = dynamic_cast<pdfz::EvalHist*>(p)->CreateHistogram();
+    TCanvas c1;
+    histograms[i]->Draw();
+    gPad->Update();
+    c1.SaveAs("a.pdf");
+    std::cin.get();
+  }
+
+  std::vector<unsigned> observed(signals.size());
+  size_t nevents = 0;
+  for (size_t i=0; i<signals.size(); i++) {
+    float r = params[i];
+
+    if (poisson) {
+      observed[i] = gRandom->Poisson(r);
+    }
+    else {
+      observed[i] = TMath::Nint(r);  // round to the nearest integer
+    }
+
+    nevents += observed[i];
   }
 
   // generate event array by sampling ROOT histograms, including only events
   // that pass cuts
-  std::vector<float> events(nevents * signals.size());
+  size_t obs_id = 0;
+  std::vector<float> events(nevents * observables.size());
   for (size_t i=0; i<signals.size(); i++) {
     std::cout << "make_fake_dataset: " << signals[i].name << ": "
               << observed[i] << " events (" << signals[i].nexpected
@@ -77,7 +73,7 @@ std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
           obs = ht->GetRandom();
         } while(obs > observables[0].upper || obs < observables[0].lower);
 
-        events[i] = obs;
+        events[obs_id++] = obs;
       }
     }
     else if (histograms[i]->IsA() == TH2D::Class()) {
@@ -91,8 +87,8 @@ std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
         } while(obs0 > observables[0].upper || obs0 < observables[0].lower ||
                 obs1 > observables[1].upper || obs1 < observables[1].lower);
 
-        events[i * signals.size() + 0] = obs0;
-        events[i * signals.size() + 1] = obs1;
+        events[obs_id++] = obs0;
+        events[obs_id++] = obs1;
       }
     }
     else if (histograms[i]->IsA() == TH3D::Class()) {
@@ -108,9 +104,9 @@ std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
                 obs1 > observables[1].upper || obs1 < observables[1].lower ||
                 obs2 > observables[2].upper || obs2 < observables[2].lower);
 
-        events[i * signals.size() + 0] = obs0;
-        events[i * signals.size() + 1] = obs1;
-        events[i * signals.size() + 2] = obs2;
+        events[obs_id++] = obs0;
+        events[obs_id++] = obs1;
+        events[obs_id++] = obs2;
       }
     }
     else {

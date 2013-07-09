@@ -347,7 +347,7 @@ namespace pdfz {
     }
     ///// End EvalHist kernels
 
-    void EvalHist::EvalAsync()
+    void EvalHist::EvalAsync(bool do_eval_pdf)
     {
         if (this->needs_optimization)
             this->Optimize();
@@ -371,7 +371,7 @@ namespace pdfz {
                            this->param_buffer->readOnlyPtr(),
                            this->bins->ptr(), this->norm_buffer->writeOnlyPtr() + this->norm_offset);
 
-        if (this->read_bins == 0)
+        if (this->read_bins == 0 || !do_eval_pdf)
             return; // This can happen if someone wants to create a histogram with no eval points.
 
         HEMI_KERNEL_LAUNCH(eval_pdf, this->eval_nblocks, this->eval_nthreads_per_block, 0, this->cuda_state->stream,
@@ -395,7 +395,7 @@ namespace pdfz {
 
         bool orig_optimization_flag = this->needs_optimization;
         this->needs_optimization = false; // never optimize when making histogram!
-        this->EvalAsync();
+        this->EvalAsync(false);
         this->EvalFinished();
 
         const float *lower = this->lower.readOnlyHostPtr();

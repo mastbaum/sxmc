@@ -1,6 +1,6 @@
 # Optimization flags
 ifeq ($(OPTIMIZE),1)
-$(warning ***Generating optimized build!  CUDA error checking is OFF! ***)
+$(warning *** Generating optimized build! CUDA error checking is OFF! ***)
 OPT_CFLAGS = -O2
 OPT_NVCCFLAGS = 
 else

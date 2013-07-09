@@ -249,7 +249,7 @@ namespace pdfz {
             completes.  The output and normalization arrays should not be read, and the 
             parameter buffer should not be written to until EvalFinished() is called.
         */
-        virtual void EvalAsync()=0;
+        virtual void EvalAsync(bool do_eval_pdf=true)=0;
 
         /** Wait until the evaluation launched in EvalAsync() has completed.
 
@@ -316,7 +316,7 @@ namespace pdfz {
         virtual void OptimizeBin();
         virtual void OptimizeEval();
 
-        virtual void EvalAsync();
+        virtual void EvalAsync(bool do_eval_pdf=true);
         virtual void EvalFinished();
 
     protected:
@@ -354,7 +354,7 @@ namespace pdfz {
 
         virtual ~EvalKernel();
         virtual void SetEvalPoints(const std::vector<float> &points);
-        virtual void EvalAsync();
+        virtual void EvalAsync(bool do_eval_pdf=true);
         virtual void EvalFinished();
     };
 

@@ -8,6 +8,7 @@
  */
 
 #include <iostream>
+#include <vector>
 #include <iomanip>
 #include <string>
 #include <algorithm>
@@ -87,17 +88,20 @@ TH1F* ensemble(std::vector<Signal>& signals,
 
     // make fake data
     std::vector<float> params;
-    for (size_t i=0; i<signals.size(); i++) {
-      params.push_back(signals[i].nexpected);
+    std::vector<std::string> param_names;
+    for (size_t j=0; j<signals.size(); j++) {
+      params.push_back(signals[j].nexpected);
+      param_names.push_back(signals[j].name);
     }
-    for (size_t i=0; i<systematics.size(); i++) {
-      params.push_back(systematics[i].mean);
+    for (size_t j=0; j<systematics.size(); j++) {
+      params.push_back(systematics[j].mean);
+      param_names.push_back(systematics[j].name);
     }
     std::vector<float> data = make_fake_dataset(signals, systematics,
                                                 observables, params, true);
 
     // run mcmc
-    MCMC mcmc(signals, systematics);
+    MCMC mcmc(signals, systematics, observables);
     TNtuple* lspace = mcmc(data, steps, burnin_fraction);
 
     // calculate signal sensitivity
@@ -108,38 +112,54 @@ TH1F* ensemble(std::vector<Signal>& signals,
     limits->Fill(limit);
 
     // extract likelihood-maximizing parameters
-    float* norms_branch = new float[signals.size()];
-    for (size_t i=0; i<signals.size(); i++) {
-      lspace->SetBranchAddress(signals[i].name.c_str(), &norms_branch[i]);
+    float* params_branch = new float[params.size()];
+    for (size_t j=0; j<params.size(); j++) {
+      lspace->SetBranchAddress(param_names[j].c_str(), &params_branch[j]);
     }
     float ml_branch;
     lspace->SetBranchAddress("likelihood", &ml_branch);
-    float* norms_fit = new float[signals.size()];
+    float* params_fit = new float[params.size()];
     float ml = 1e9;
     for (int j=0; j<lspace->GetEntries(); j++) {
       lspace->GetEntry(j);
       if (ml_branch < ml) {
         ml = ml_branch;
-        for (size_t k=0; k<signals.size(); k++) {
-          norms_fit[k] = norms_branch[k];
+        for (size_t k=0; k<params.size(); k++) {
+          params_fit[k] = params_branch[k];
         }
       }
     }
 
     // plot and save this fit
-    /*
     SpectralPlot p_all;
     SpectralPlot p_external;
     SpectralPlot p_cosmo;
 
-    TH1* hpdf0 = signals[0].histogram.CreateHistogram();  // fixme eval at best
+    pdfz::EvalHist* phist = \
+      dynamic_cast<pdfz::EvalHist*>(signals[0].histogram);
+
+    hemi::Array<unsigned> norms_buffer(signals.size(), true);
+    norms_buffer.writeOnlyHostPtr();
+    phist->SetNormalizationBuffer(&norms_buffer, 0);
+
+    hemi::Array<float> param_buffer(signals.size() + systematics.size(), true);
+    for (size_t j=0; j<signals.size() + systematics.size(); j++) {
+      param_buffer.writeOnlyHostPtr()[j] = params_fit[j];
+    }
+    phist->SetParameterBuffer(&param_buffer);
+
+    TH1* hpdf0 = phist->CreateHistogram();
     TH1* hdata = SpectralPlot::make_like(hpdf0, "hdata");
     hdata->SetAxisRange(1e-1, 1e3, "Y");
     hdata->SetAxisRange(1.5, 5.0, "X");
     hdata->SetMarkerStyle(20);
     hdata->SetLineColor(kBlack);
-    
-    data->Draw("e>>hdata");
+
+    for (size_t idata=0; idata<data.size(); idata++) {
+      // FIXME find E observable
+      hdata->Fill(data[idata * observables.size()]);
+    }
+
     p_all.add(hdata, "Data");
 
     TH1* hsum = SpectralPlot::make_like(hpdf0, "hdata");
@@ -152,33 +172,46 @@ TH1F* ensemble(std::vector<Signal>& signals,
     hexternal->SetLineColor(kOrange+1);
 
     std::cout << "-- Best fit: NLL = " << ml << " --" << std::endl;
-    for (size_t i=0; i<signals.size(); i++) {
-      std::cout << " " << signals[i].name << ": " << norms_fit[i]
-                << " (" << norms[i] <<  ")" << std::endl;
-      TH1* hpdf = signals[i].histogram->CreateHistogram();
+    for (size_t j=0; j<params.size(); j++) {
+      std::cout << " " << param_names[j] << ": " << params_fit[j]
+                << " (" << params[j] <<  ")" << std::endl;
+
+      if (j >= signals.size()) {
+        continue;
+      }
+
+      // create TH1 histogram from pdfz::EvalHist
+      phist = dynamic_cast<pdfz::EvalHist*>(signals[j].histogram);
+      phist->SetParameterBuffer(&param_buffer);
+      phist->SetNormalizationBuffer(&norms_buffer, j);
+      TH1* hpdf = phist->CreateHistogram();
+
       TH1* hs = (TH1*) hpdf->Clone("hs");
       int bin1 = hs->FindBin(1.5);
       int bin2 = hs->FindBin(5.0);
-      hs->Scale(norms_fit[i] / hpdf->Integral(bin1, bin2));
-      hs->SetLineColor(color[i+1]);
+      //float syst_rescale = 
+      //1.0 * norms_buffer.readOnlyHostPtr()[i] / signals[i].nevents;
+      float syst_rescale = 1.0;
+      hs->Scale(params_fit[j] * syst_rescale / hpdf->Integral(bin1, bin2));
+      hs->SetLineColor(color[j+1]);
       hsum->Add(hs);
 
       hs->SetAxisRange(1e-1, 1e3, "Y");
       hs->SetAxisRange(1.5, 5.0, "X");
 
-      std::string n = signals[i].name;
+      std::string n = signals[j].name;
       if (n == "av_tl208" || n == "av_bi214" || n == "water_tl208" ||
           n == "water_bi214" || n == "pmt_bg") {
-        p_external.add(hs, signals[i].title, "hist");
+        p_external.add(hs, signals[j].title, "hist");
         hexternal->Add(hs);
       }
-      else if (n != "0vbb" && n != "2vbb" && n != "int_tl208" &&
+      else if (n != "zeronu" && n != "twonu" && n != "int_tl208" &&
                n != "int_bi214" && n != "b8") {
-        p_cosmo.add(hs, signals[i].title, "hist");
+        p_cosmo.add(hs, signals[j].title, "hist");
         hcosmo->Add(hs);
       }
       else {
-        p_all.add(hs, signals[i].title, "hist");
+        p_all.add(hs, signals[j].title, "hist");
       }
       delete hs;
     }
@@ -200,16 +233,15 @@ TH1F* ensemble(std::vector<Signal>& signals,
     hproj.Rebin(10);
     hproj.Draw();
     c2.SaveAs("lproj.pdf");
-    */
 
-    std::cout << "Correlation matrix:" << std::endl;
+    std::cout << "-- Correlation matrix --" << std::endl;
     std::vector<float> correlations = get_correlation_matrix(lspace);
-    for (size_t i=0; i<signals.size(); i++) {
-      std::cout << std::setw(10) << signals[i].name << " ";
-      for (size_t j=0; j<signals.size(); j++) {
+    for (size_t j=0; j<params.size(); j++) {
+      std::cout << std::setw(20) << param_names[j] << " ";
+      for (size_t k=0; k<params.size(); k++) {
         std::cout << std::setiosflags(std::ios::fixed)
                   << std::setprecision(3) << std::setw(8)
-                  << correlations[j + i * (signals.size() + 1)];
+                  << correlations[k + j * (params.size() + 1)];
       }
       std::cout << std::resetiosflags(std::ios::fixed) << std::endl;
     }
@@ -219,7 +251,7 @@ TH1F* ensemble(std::vector<Signal>& signals,
     f.Close();
 
     delete lspace;
-    delete[] norms_branch;
+    delete[] params_branch;
   }
 
   return limits;

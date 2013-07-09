@@ -34,10 +34,12 @@ class MCMC {
      * Constructor
      *
      * \param signals List of Signals defining the PDFs and expectations
-     * \param signals List of systematic parameter definitions
+     * \param systematics List of systematic parameter definitions
+     * \param observables List of observables in the data
      */
     MCMC(const std::vector<Signal>& signals,
-         const std::vector<Systematic>& systematics);
+         const std::vector<Systematic>& systematics,
+         const std::vector<Observable>& observables);
 
     /**
      * Destructor
@@ -87,6 +89,7 @@ class MCMC {
     size_t nsignals;  //!< number of signal parameters
     size_t nsystematics;  //!< number of systematic parameters
     size_t nparameters;  //!< total number of parameters
+    size_t nobservables;  //!< number of observables in data
     unsigned nnllblocks;  //!< number of cuda blocks for nll partial sums
     unsigned nllblocksize;  //!< size of cuda blocks for nll partial sums
     unsigned nnllthreads;  //!< number of threads for nll partial sums
