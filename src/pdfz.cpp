@@ -243,17 +243,17 @@ namespace pdfz {
 
     ///// EvalHist kernels
     HEMI_DEV_CALLABLE_INLINE
-    void apply_systematic(const SystematicDescriptor *syst, float *fields, const float *parameters)
+    void apply_systematic(const SystematicDescriptor *syst, float *fields, const float *parameters, const int param_stride)
     {
         switch (syst->type) {
             case Systematic::SHIFT:
-            fields[syst->obs] += parameters[syst->par];
+            fields[syst->obs] += parameters[syst->par * param_stride];
             break;
             case Systematic::SCALE:
-            fields[syst->obs] *= (1 + parameters[syst->par]);
+            fields[syst->obs] *= (1 + parameters[syst->par * param_stride]);
             break;
             case Systematic::RESOLUTION_SCALE:
-            fields[syst->obs] += parameters[syst->par] * (fields[syst->obs] - fields[syst->extra_field]);
+            fields[syst->obs] += parameters[syst->par * param_stride] * (fields[syst->obs] - fields[syst->extra_field]);
             break;
         }
     }
@@ -275,7 +275,7 @@ namespace pdfz {
                              const int * __restrict__ bin_stride, const int * __restrict__ nbins,
                              const float * __restrict__ lower, const float * __restrict__ upper,
                              const int nsyst, const SystematicDescriptor * __restrict__ syst,
-                             const float * __restrict__ parameters,
+                             const float * __restrict__ parameters, const int param_stride,
                              unsigned int *bins, unsigned int *norm)
     {
         int offset = hemiGetElementOffset();
@@ -299,7 +299,7 @@ namespace pdfz {
 
             // Apply systematics
             for (int isyst=0; isyst < nsyst; isyst++)
-                apply_systematic(syst + isyst, field_buffer, parameters);
+                apply_systematic(syst + isyst, field_buffer, parameters, param_stride);
 
             // Compute histogram bin
             for (int iobs=0; iobs < nobs; iobs++) {
@@ -368,7 +368,7 @@ namespace pdfz {
                            this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
                            this->lower.readOnlyPtr(), this->upper.readOnlyPtr(),
                            nsyst, syst_ptr,
-                           this->param_buffer->readOnlyPtr(),
+                           this->param_buffer->readOnlyPtr() + this->param_offset, this->param_stride,
                            this->bins->ptr(), this->norm_buffer->writeOnlyPtr() + this->norm_offset);
 
         if (this->read_bins == 0 || !do_eval_pdf)
@@ -528,7 +528,7 @@ namespace pdfz {
                       this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
                       this->lower.readOnlyPtr(), this->upper.readOnlyPtr(),
                       nsyst, syst_ptr,
-                      this->param_buffer->readOnlyPtr(),
+                      this->param_buffer->readOnlyPtr() + this->param_offset, this->param_stride,
                       this->bins->ptr(), this->norm_buffer->writeOnlyPtr() + this->norm_offset);
                 }
                 checkCuda( cudaStreamSynchronize(this->cuda_state->stream) );

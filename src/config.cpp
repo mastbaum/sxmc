@@ -237,10 +237,10 @@ FitConfig::FitConfig(std::string filename) {
     std::vector<int> nbins(this->observables.size());
     for (size_t i=0; i<sample_fields.size(); i++) {
       for (size_t j=0; j<this->observables.size(); j++) {
-        if (this->observables[i].field_index == i) {
-          lower[i] = this->observables[i].lower;
-          upper[i] = this->observables[i].upper;
-          nbins[i] = this->observables[i].bins;
+        if (this->observables[j].field_index == i) {
+          lower[i] = this->observables[j].lower;
+          upper[i] = this->observables[j].upper;
+          nbins[i] = this->observables[j].bins;
           break;
         }
       }

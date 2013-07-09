@@ -8,7 +8,6 @@
 #include <TH3D.h>
 #include "generator.h"
 #include "signals.h"
-#include <TCanvas.h>
 
 std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
                                      std::vector<Systematic>& systematics,
