@@ -59,6 +59,27 @@ double upper_limit(TH1F* h, double cl=0.682) {
 
 
 /**
+ * Find a lower limit
+ *
+ * Locate the x value that a fraction 1-CL/2 of the distribution falls below.
+ * This may over-cover due to finite histogram bin widths.
+ *
+ * \param h 1D histogram to calculate limit on
+ * \param cl Confidence level
+ * \returns The nearest bin edge covering at least the desired confidence
+ */
+double lower_limit(TH1F* h, double cl=0.682) {
+  double tail = (1.0 - cl) / 2;
+  double integral = 0;
+  int thisbin = 1;
+  while (integral < tail * h->Integral()) {
+    integral = h->Integral(1, thisbin++);
+  }
+  return h->GetBinLowEdge(thisbin) - h->GetBinWidth(thisbin - 1);
+}
+
+
+/**
  * Run an ensemble of independent fake experiments
  *
  * Run experiments, fit with mcmc, and tabulate background-fluctuation
@@ -132,8 +153,14 @@ TH1F* ensemble(std::vector<Signal>& signals,
 
     std::cout << "-- Best fit: NLL = " << ml << " --" << std::endl;
     for (size_t j=0; j<params.size(); j++) {
+      TH1F hp("hp", "hp", 20000, -1000, 1000);
+      lspace->Draw((param_names[j] + ">>hp").c_str(), "", "goff");
+      double lower = params_fit[j] - lower_limit(&hp);
+      double upper = upper_limit(&hp) - params_fit[j];
       std::cout << " " << param_names[j] << ": " << params_fit[j]
-                << " (" << params[j] <<  ")" << std::endl;
+                << " -" << lower << " +" << upper
+                << (j < signals.size() ? " (N = " : " (mean = ")
+                << params[j] <<  ")" << std::endl;
     }
 
     // plot and save this fit

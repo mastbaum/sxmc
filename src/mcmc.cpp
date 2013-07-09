@@ -128,13 +128,13 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
 
   // initial standard deviations for each dimension
   hemi::Array<float> jump_width(this->nparameters, true);
+  const float scale_factor = \
+    2.4 * 2.4 / (this->nparameters * this->nparameters);  // Haario, 2001
   for (size_t i=0; i<this->nparameters; i++) {
     float mean = this->parameter_means->readOnlyHostPtr()[i];
     float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
     float width = (sigma > 0 ? sigma : sqrt(mean));
-    width = (width > 0 ? width : 1);
-    jump_width.writeOnlyHostPtr()[i] = \
-      width * this->nparameters * this->nparameters;
+    jump_width.writeOnlyHostPtr()[i] = (width > 0 ? width : 1) * scale_factor;
   }
 
   // buffers for computing event term in nll
@@ -220,7 +220,6 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
         }
 
         double fit_width = fsproj->GetParameter(2);
-        const float scale_factor = 1.0 / this->nparameters;
 
         std::cout << "MCMC: Rescaling jump sigma: " << name << ": "
                   << scale_factor * fit_width << std::endl;
@@ -229,7 +228,7 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
         hsproj->Delete();
       }
 
-      //nt->Reset();
+      nt->Reset();
     }
 
     // partial sums of event term

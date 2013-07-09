@@ -294,7 +294,7 @@ void FitConfig::print() const {
   std::cout << "Observables:" << std::endl;
   for (std::vector<Observable>::const_iterator it=this->observables.begin();
        it!=this->observables.end(); ++it) {
-    std::cout << "  " << it - this->observables.begin() << std::endl
+    std::cout << "  " << it->name << std::endl
               << "    Title: \"" << it->title << "\"" << std::endl
               << "    Lower bound: "<< it->lower << std::endl
               << "    Upper bound: " << it->upper << std::endl
@@ -320,7 +320,7 @@ void FitConfig::print() const {
     std::cout << "Systematics:" << std::endl;
     for (std::vector<Systematic>::const_iterator it=this->systematics.begin();
          it!=this->systematics.end(); ++it) {
-      std::cout << "  " << it - this->systematics.begin() << std::endl
+      std::cout << "  " << it->name << std::endl
                 << "    Title: \"" << it->title << "\"" << std::endl
                 << "    Type: "<< it->type << std::endl
                 << "    Observable: "<< it->observable_field << std::endl;
