@@ -33,11 +33,6 @@ std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
     p->SetNormalizationBuffer(&norms_buffer, i);
     p->SetParameterBuffer(&param_buffer, signals.size());
     histograms[i] = dynamic_cast<pdfz::EvalHist*>(p)->CreateHistogram();
-    TCanvas c1;
-    histograms[i]->Draw();
-    gPad->Update();
-    c1.SaveAs("a.pdf");
-    std::cin.get();
   }
 
   std::vector<unsigned> observed(signals.size());
