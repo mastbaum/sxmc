@@ -46,7 +46,7 @@ class MCMC {
      *
      * Free HEMI arrays
      */
-     ~MCMC();
+    ~MCMC();
 
     /**
      * Perform walk.

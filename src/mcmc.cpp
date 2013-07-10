@@ -129,7 +129,7 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
   // initial standard deviations for each dimension
   hemi::Array<float> jump_width(this->nparameters, true);
   const float scale_factor = \
-    2.4 * 2.4 / (this->nparameters * this->nparameters);  // Haario, 2001
+    2.4 * 2.4 / (this->nparameters * this->nparameters);  // Haario, 2001-ish
   for (size_t i=0; i<this->nparameters; i++) {
     float mean = this->parameter_means->readOnlyHostPtr()[i];
     float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
@@ -171,7 +171,7 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
   }
 
   // calculate nll with initial parameters
-  nll(lut.readOnlyPtr(), nevents, 
+  nll(lut.readOnlyPtr(), nevents,
       current_vector.readOnlyPtr(), current_nll.writeOnlyPtr(),
       event_partial_sums.ptr(), event_total_sum.ptr());
 

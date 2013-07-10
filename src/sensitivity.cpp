@@ -59,23 +59,54 @@ double upper_limit(TH1F* h, double cl=0.682) {
 
 
 /**
- * Find a lower limit
+ * Find a confidence interval
  *
- * Locate the x value that a fraction 1-CL/2 of the distribution falls below.
+ * Locate the boundaries of a confidence interval, optionally bounded at zero.
+ * Typically, we integrate outward from the central value such that a
+ * fraction CL/2 falls on either side. In the bounded case, the interval is
+ * shifted upward so that it all falls above 0, and the upper boundary is
+ * reported as a limit, in the spirit of Feldman & Cousins.
+ *
  * This may over-cover due to finite histogram bin widths.
  *
  * \param h 1D histogram to calculate limit on
+ * \param mu Central value
+ * \param lower Lower boundary of the interval
+ * \param upper Upper boundary of the interval
+ * \param limit True if the upper boundary is a limit
+ * \param bounded Apply a boundary at zero
  * \param cl Confidence level
- * \returns The nearest bin edge covering at least the desired confidence
  */
-double lower_limit(TH1F* h, double cl=0.682) {
-  double tail = (1.0 - cl) / 2;
-  double integral = 0;
-  int thisbin = 1;
-  while (integral < tail * h->Integral()) {
-    integral = h->Integral(1, thisbin++);
+void find_interval(TH1F* h, float mu, float& lower, float& upper, bool& limit,
+                   bool bounded=false, double cl=0.682) {
+  int central_bin = h->FindBin(mu);
+  float total_integral = h->Integral();
+  limit = false;
+
+  // lower boundary
+  int lower_bin = central_bin;
+  float integral = 0;
+  while (integral < cl/2 * total_integral) {
+    integral = h->Integral(lower_bin--, central_bin);
+
+    // crashed into zero?
+    if (lower_bin == 0 && bounded) {
+      lower_bin = 1;
+      limit = true;
+      break;
+    }
   }
-  return h->GetBinLowEdge(thisbin) - h->GetBinWidth(thisbin - 1);
+
+  lower = h->GetBinLowEdge(lower_bin);
+
+  // upper boundary, starting from lower boundary
+  int upper_bin = lower_bin;
+  integral = 0;
+  while (integral < cl * total_integral) {
+    integral = h->Integral(lower_bin, upper_bin++);
+  }
+
+  upper = h->GetBinLowEdge(upper_bin);
 }
 
 
@@ -153,14 +184,26 @@ TH1F* ensemble(std::vector<Signal>& signals,
 
     std::cout << "-- Best fit: NLL = " << ml << " --" << std::endl;
     for (size_t j=0; j<params.size(); j++) {
-      TH1F hp("hp", "hp", 20000, -1000, 1000);
+      TH1F hp("hp", "hp", 10000, -1000, 1000);
       lspace->Draw((param_names[j] + ">>hp").c_str(), "", "goff");
-      double lower = params_fit[j] - lower_limit(&hp);
-      double upper = upper_limit(&hp) - params_fit[j];
-      std::cout << " " << param_names[j] << ": " << params_fit[j]
-                << " -" << lower << " +" << upper
-                << (j < signals.size() ? " (N = " : " (mean = ")
-                << params[j] <<  ")" << std::endl;
+      float lower_boundary;
+      float upper_boundary;
+      bool is_limit;
+      find_interval(&hp, params_fit[j], lower_boundary, upper_boundary,
+                    is_limit, (j < signals.size()), 0.682);
+      float lower_error = params_fit[j] - lower_boundary;
+      float upper_error = upper_boundary - params_fit[j];
+
+      std::cout << " " << param_names[j] << ": " << params_fit[j];
+      if (is_limit) {
+        std::cout << " <" << upper_error << " @ 68\% CL";
+      }
+      else {
+        std::cout << " -" << lower_error << " +" << upper_error;
+      }
+      std::cout << (j < signals.size() ? " (N = " : " (mean = ")
+                << params[j] <<  ")";
+      std::cout << std::endl;
     }
 
     // plot and save this fit
