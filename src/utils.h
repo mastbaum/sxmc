@@ -9,9 +9,9 @@
 #include <vector>
 #include <string>
 #include <TCanvas.h>
+#include <TLegend.h>
 
 class TNtuple;
-class TLegend;
 class TH1;
 
 
@@ -71,8 +71,27 @@ class SpectralPlot {
     SpectralPlot(int _line_width=2, float _xmin=1.5, float _xmax=5.0,
                  float _ymin=1e-1, float _ymax=1e3, bool _logy=true,
                  std::string _title="",
-                 std::string _xtitle="Energy (MeV)",
-                 std::string _ytitle="Counts/40 keV/2 y");
+                 std::string _xtitle="",
+                 std::string _ytitle="Counts/bin");
+
+    /** Copy constructor */
+    SpectralPlot(const SpectralPlot& o) {
+      this->first = first;
+      this->logy = o.logy;
+      this->line_width = o.line_width;
+      this->xmin = o.xmin;
+      this->xmax = o.xmax;
+      this->ymin = o.ymin;
+      this->ymax = o.ymax;
+      this->title = o.title;
+      this->xtitle = o.xtitle;
+      this->ytitle = o.ytitle;
+      for (size_t i=0; i<o.histograms.size(); i++) {
+        this->histograms.push_back(o.histograms[i]);
+      }
+      this->c = new TCanvas();
+      this->legend = (TLegend*) o.legend->Clone("");
+    }
 
     /** Destructor */
     ~SpectralPlot();
@@ -114,7 +133,7 @@ class SpectralPlot {
     std::string title;  //!< plot title
     std::string xtitle;  //!< x axis title
     std::string ytitle;  //!< y axis title
-    TCanvas c;  //!< Canvas to plot on
+    TCanvas* c;  //!< Canvas to plot on
     std::vector<TH1*> histograms;  //!< Pointers to plotted histograms
     TLegend* legend;  //!< Plot legend
 };

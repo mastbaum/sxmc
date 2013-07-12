@@ -74,11 +74,13 @@ SpectralPlot::SpectralPlot(int _line_width, float _xmin, float _xmax,
   : first(true), logy(_logy), line_width(_line_width), xmin(_xmin),
     xmax(_xmax), ymin(_ymin), ymax(_ymax), title(_title), xtitle(_xtitle),
     ytitle(_ytitle) {
+  this->c = new TCanvas();
+
   if (this->logy) {
-    this->c.SetLogy();
+    this->c->SetLogy();
   }
 
-  this->legend = new TLegend(0.825, 0.15, 0.985, 0.95);
+  this->legend = new TLegend(0.85, 0.15, 0.985, 0.95);
   this->legend->SetFillColor(kWhite);
 }
 
@@ -104,22 +106,33 @@ void SpectralPlot::add(TH1* _h, std::string title, std::string options) {
   this->legend->AddEntry(h, title.c_str());
 
   this->histograms.push_back(h);
-  this->c.cd();
+  this->c->cd();
 
   if (this->first) {
-    h->Draw(options.c_str());
+    h->SetAxisRange(this->ymin, this->ymax, "Y");
+    h->SetAxisRange(this->xmin, this->xmax, "X");
+    h->GetXaxis()->SetLabelFont(132);
+    h->GetXaxis()->SetTitleFont(132);
+    h->GetYaxis()->SetLabelFont(132);
+    h->GetYaxis()->SetTitleFont(132);
+    if (this->logy) {
+      this->c->SetLogy();
+    }
+    h->DrawClone(options.c_str());
     this->first = false;
   }
   else {
-    h->Draw(("same " + options).c_str());
+    h->DrawClone(("same " + options).c_str());
   }
 }
 
 
 void SpectralPlot::save(std::string filename) {
-  this->c.cd();
+  this->c->cd();
+  this->legend->SetTextFont(132);
   this->legend->Draw();
-  this->c.SaveAs(filename.c_str());
+  this->c->Update();
+  this->c->SaveAs(filename.c_str());
 }
 
 

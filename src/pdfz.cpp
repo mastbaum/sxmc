@@ -197,7 +197,7 @@ namespace pdfz {
             throw Error("Number of entries in evaluation points array not divisible by number of observables.");
 
         delete this->read_bins;
-        this->read_bins = new hemi::Array<int>(points.size(), false);
+        this->read_bins = new hemi::Array<int>(points.size() / this->nobservables, false);
         int *read_bins = this->read_bins->writeOnlyHostPtr();
 
         // Precompute the bin number corresponding to each evaluation point
@@ -217,7 +217,7 @@ namespace pdfz {
             bin_scale[iobs] = nbins[iobs] / span;
         }
 
-        for (unsigned int ipoint=0; ipoint < points.size(); ipoint++) {
+        for (unsigned int ipoint=0; ipoint < points.size() / this->nobservables; ipoint++) {
             bool in_pdf_domain = true;
             int bin_id = 0;
 

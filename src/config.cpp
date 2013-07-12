@@ -69,6 +69,7 @@ FitConfig::FitConfig(std::string filename) {
     o.bins = o_json["bins"].asInt();
     o.lower = o_json["min"].asFloat();
     o.upper = o_json["max"].asFloat();
+    o.units = o_json["units"].asString();
     all_observables[it.key().asString()] = o;
   }
 

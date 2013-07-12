@@ -27,6 +27,7 @@ struct Observable {
   std::string name;
   std::string title;
   std::string field;
+  std::string units;  //!< Units as string, used in plotting
   size_t field_index;
   size_t bins;
   float lower;
