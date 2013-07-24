@@ -8,7 +8,6 @@
 #include <TMath.h>
 #include "utils.h"
 
-
 float get_ntuple_entry(TNtuple* nt, int i, std::string field) {
   float v;
   nt->SetBranchAddress(field.c_str(), &v);
@@ -71,9 +70,8 @@ SpectralPlot::SpectralPlot(int _line_width, float _xmin, float _xmax,
                            std::string _title,
                            std::string _xtitle,
                            std::string _ytitle)
-  : first(true), logy(_logy), line_width(_line_width), xmin(_xmin),
-    xmax(_xmax), ymin(_ymin), ymax(_ymax), title(_title), xtitle(_xtitle),
-    ytitle(_ytitle) {
+  : logy(_logy), line_width(_line_width), xmin(_xmin), xmax(_xmax),
+    ymin(_ymin), ymax(_ymax), title(_title), xtitle(_xtitle), ytitle(_ytitle) {
   this->c = new TCanvas();
 
   if (this->logy) {
@@ -94,10 +92,11 @@ SpectralPlot::~SpectralPlot() {
 
 
 void SpectralPlot::add(TH1* _h, std::string title, std::string options) {
+  _h->SetDirectory(NULL);
   std::string name = "__" + std::string(_h->GetName());
   TH1* h = dynamic_cast<TH1*>(_h->Clone(name.c_str()));
-
   h->SetDirectory(NULL);
+
   h->SetLineWidth(this->line_width);
   h->SetTitle(this->title.c_str());
   h->SetXTitle(xtitle.c_str());
@@ -106,9 +105,8 @@ void SpectralPlot::add(TH1* _h, std::string title, std::string options) {
   this->legend->AddEntry(h, title.c_str());
 
   this->histograms.push_back(h);
-  this->c->cd();
 
-  if (this->first) {
+  if (this->histograms.size() == 1) {
     h->SetAxisRange(this->ymin, this->ymax, "Y");
     h->SetAxisRange(this->xmin, this->xmax, "X");
     h->GetXaxis()->SetLabelFont(132);
@@ -118,12 +116,14 @@ void SpectralPlot::add(TH1* _h, std::string title, std::string options) {
     if (this->logy) {
       this->c->SetLogy();
     }
+    this->c->cd();
     h->DrawClone(options.c_str());
-    this->first = false;
   }
   else {
+    this->c->cd();
     h->DrawClone(("same " + options).c_str());
   }
+  this->c->Update();
 }
 
 

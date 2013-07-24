@@ -36,15 +36,15 @@
  *     const int nparams = 2; // two systematic parameters
  *
  *     std::vector<float> samples(nsamples * nfields);
- *     std::vector<float> lower(nobs);
- *     std::vector<float> upper(nobs);
+ *     std::vector<double> lower(nobs);
+ *     std::vector<double> upper(nobs);
  *     std::vector<float> eval_points(neval_points * nobs);
  *
  *     // Fill vectors with appropriate information here....
  *     // .........
  *   
  *     // CPU/GPU storage of evaluation inputs and outputs
- *     hemi::Array<float> parameters(nparams);
+ *     hemi::Array<double> parameters(nparams);
  *     hemi::Array<float> pdf_values(neval_points);
  *     hemi::Array<unsigned int> normalizations(1); // Only 1 PDF!
  *   
@@ -184,7 +184,7 @@ namespace pdfz {
             nobservables > nfields, or if nobservables == 0. 
         */
         Eval(const std::vector<float> &samples, int nfields, int nobservables,
-             const std::vector<float> &lower, const std::vector<float> &upper);
+             const std::vector<double> &lower, const std::vector<double> &upper);
 
         virtual ~Eval();
 
@@ -232,7 +232,7 @@ namespace pdfz {
             At evaluation time, the systematic parameter j will be read from:
                 params[offset + j * stride]
         */
-        virtual void SetParameterBuffer(hemi::Array<float> *params, int offset=0, int stride=1);
+        virtual void SetParameterBuffer(hemi::Array<double> *params, int offset=0, int stride=1);
 
 
         /** Add a systematic transformation to this PDF */
@@ -263,8 +263,8 @@ namespace pdfz {
         int nfields;
         int nobservables;
 
-        hemi::Array<float> lower;
-        hemi::Array<float> upper;
+        hemi::Array<double> lower;
+        hemi::Array<double> upper;
 
         hemi::Array<float> *pdf_buffer;
         int pdf_offset;
@@ -273,7 +273,7 @@ namespace pdfz {
         hemi::Array<unsigned int> *norm_buffer;
         int norm_offset;
 
-        hemi::Array<float> *param_buffer;
+        hemi::Array<double> *param_buffer;
         int param_offset;
         int param_stride;
 
@@ -299,7 +299,7 @@ namespace pdfz {
             configuration will be optimized the first time EvalAsync() is called.
         */
         EvalHist(const std::vector<float> &samples, int nfields, int nobservables,
-                 const std::vector<float> &lower, const std::vector<float> &upper,
+                 const std::vector<double> &lower, const std::vector<double> &upper,
                  const std::vector<int> &nbins, bool optimize=true);
 
         virtual ~EvalHist();
@@ -325,7 +325,7 @@ namespace pdfz {
         hemi::Array<int> nbins;
         hemi::Array<int> bin_stride;
         int total_nbins;
-        float bin_volume;
+        double bin_volume;
         hemi::Array<unsigned int> *bins;
 
         int bin_nthreads_per_block;
@@ -349,8 +349,8 @@ namespace pdfz {
             bandwidth_scale.size() != nobs.
         */
         EvalKernel(const std::vector<float> &samples, int nfields, int nobservables,
-                   const std::vector<float> &lower, const std::vector<float> &upper,
-                   const std::vector<float> &bandwidth_scale);
+                   const std::vector<double> &lower, const std::vector<double> &upper,
+                   const std::vector<double> &bandwidth_scale);
 
         virtual ~EvalKernel();
         virtual void SetEvalPoints(const std::vector<float> &points);

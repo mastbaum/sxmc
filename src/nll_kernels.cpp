@@ -29,17 +29,17 @@ __global__ void init_device_rngs(int nthreads, unsigned long long seed,
 HEMI_DEV_CALLABLE_INLINE
 void pick_new_vector_device(int nthreads, RNGState* rng,
                             const float* sigma,
-                            const float* current_vector,
-                            float* proposed_vector) {
+                            const double* current_vector,
+                            double* proposed_vector) {
   int offset = hemiGetElementOffset();
   int stride = hemiGetElementStride();
 
   for (int i=offset; i<(int)nthreads; i+=stride) {
 #ifdef HEMI_DEV_CODE
-    float u = curand_normal(&rng[i]);
+    double u = curand_normal(&rng[i]);
     proposed_vector[i] = current_vector[i] + sigma[i] * u;
 #else
-    float u = gRandom->Gaus(current_vector[i], sigma[i]);
+    double u = gRandom->Gaus(current_vector[i], sigma[i]);
     proposed_vector[i] = u;
 #endif
   }
@@ -48,19 +48,20 @@ void pick_new_vector_device(int nthreads, RNGState* rng,
 
 HEMI_DEV_CALLABLE_INLINE
 void jump_decider_device(RNGState* rng, double* nll_current,
-                         const double* nll_proposed, float* v_current,
-                         const float* v_proposed, unsigned nparameters,
-                         int* accepted, int* counter, float* jump_buffer) {
+                         const double* nll_proposed, double* v_current,
+                         const double* v_proposed, unsigned nparameters,
+                         int* accepted, int* counter, float* jump_buffer,
+                         const bool debug_mode=false) {
 #ifdef HEMI_DEV_CODE
-  float u = curand_uniform(&rng[0]);
+  double u = curand_uniform(&rng[0]);
 #else
-  float u = gRandom->Uniform();
+  double u = gRandom->Uniform();
 #endif
 
   // metropolis algorithm
   double np = nll_proposed[0];
   double nc = nll_current[0];
-  if (np < nc || u <= exp(nc - np)) {
+  if (debug_mode || (np < nc || u <= exp(nc - np))) {
     nll_current[0] = np;
     for (unsigned i=0; i<nparameters; i++) {
       v_current[i] = v_proposed[i];
@@ -79,7 +80,7 @@ void jump_decider_device(RNGState* rng, double* nll_current,
 
 
 HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
-                              const float* __restrict__ pars,
+                              const double* __restrict__ pars,
                               const size_t ne, const size_t ns,
                               double* sums) {
   int offset = hemiGetElementOffset();
@@ -125,14 +126,15 @@ void nll_event_reduce_device(const size_t nthreads, const double* sums,
   __syncthreads();
 #endif
   total_sum[0] = block_sums[0];
+
 }
 
 
 HEMI_DEV_CALLABLE_INLINE
 void nll_total_device(const size_t nparameters, const size_t nsignals,
-                      const float* pars,
-                      const float* means,
-                      const float* sigmas,
+                      const double* pars,
+                      const double* means,
+                      const double* sigmas,
                       const double* events_total,
                       double* nll) {
   // total from sum over events, once
@@ -152,7 +154,7 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
 
     // gaussian constraints
     if (sigmas[i] > 0) {
-      float x = (pars[i] - means[i]) / sigmas[i];
+      double x = (pars[i] - means[i]) / sigmas[i];
       sum += x * x;
     }
   }
@@ -163,16 +165,16 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
 
 HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
                              const float* sigma,
-                             const float* current_vector,
-                             float* proposed_vector) {
+                             const double* current_vector,
+                             double* proposed_vector) {
   pick_new_vector_device(nthreads, rng, sigma, current_vector,
                          proposed_vector);
 }
 
 
 HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
-                          const double* nll_proposed, float* v_current,
-                          const float* v_proposed, unsigned nparameters,
+                          const double* nll_proposed, double* v_current,
+                          const double* v_proposed, unsigned nparameters,
                           int* accepted, int* counter, float* jump_buffer) {
   jump_decider_device(rng, nll_current, nll_proposed, v_current, v_proposed,
                       nparameters, accepted, counter, jump_buffer);
@@ -185,9 +187,9 @@ HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
 }
 
 
-HEMI_KERNEL(nll_total)(const size_t npars, const float* pars,
+HEMI_KERNEL(nll_total)(const size_t npars, const double* pars,
                        const size_t nsignals,
-                       const float* means, const float* sigmas,
+                       const double* means, const double* sigmas,
                        const double* events_total,
                        double* nll) {
   nll_total_device(npars, nsignals, pars, means, sigmas, events_total, nll);
@@ -196,15 +198,16 @@ HEMI_KERNEL(nll_total)(const size_t npars, const float* pars,
 
 HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
                                         const double* sums, const size_t ns,
-                                        const float* means,
-                                        const float* sigmas,
+                                        const double* means,
+                                        const double* sigmas,
                                         RNGState* rng,
                                         double *nll_current,
                                         double *nll_proposed,
-                                        float *v_current, float *v_proposed,
+                                        double *v_current, double *v_proposed,
                                         int* accepted, int* counter,
                                         float* jump_buffer, int nparameters,
-                                        const float* sigma) {
+                                        const float* sigma,
+                                        const bool debug_mode) {
   double total_sum;
 
   nll_event_reduce_device(npartial_sums, sums, &total_sum);
@@ -218,7 +221,8 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
                      nll_proposed);
 
     jump_decider_device(rng, nll_current, nll_proposed, v_current, v_proposed,
-                        nparameters, accepted, counter, jump_buffer);
+                        nparameters, accepted, counter, jump_buffer,
+                        debug_mode);
   }
 
 #ifdef HEMI_DEV_CODE

@@ -14,7 +14,7 @@ JSONCPP_INC = contrib/jsoncpp-src-0.6.0-rc2/include
 
 INCLUDE = -Isrc -I$(RATROOT)/include -I$(ROOTSYS)/include -I$(RATROOT)/src/stlplus -Icontrib/hemi -I/usr/local/cuda/include -I/opt/local/include -I/opt/cuda-5.0/include -I$(JSONCPP_INC)
 CFLAGS = -DVERBOSE=true $(OPT_CFLAGS) $(INCLUDE)
-GCCFLAGS = -Wall -Werror -Wno-unused-variable -ffast-math -fdiagnostics-show-option  # -Wunused-variable errors with HEMI macros
+GCCFLAGS = -Wall -Werror -Wno-unused-variable -ftrapv -ffast-math -fdiagnostics-show-option  # -Wunused-variable errors with HEMI macros
 NOT_NVCC_CFLAGS =
 NVCCFLAGS = -gencode arch=compute_20,code=sm_20 -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=\"sm_35,compute_35\" -use_fast_math $(OPT_NVCCFLAGS)
 ROOTLIBS =  -lCore -lCint -lRIO -lMathCore -lHist -lGpad -lTree -lTree -lGraf -lm

@@ -18,7 +18,7 @@ std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
   assert(observables.size() <= 3);
 
   // extract TH1 histogram from pdfz::Eval
-  hemi::Array<float> param_buffer(signals.size() + systematics.size(), true);
+  hemi::Array<double> param_buffer(signals.size() + systematics.size(), true);
   for (size_t i=0; i<signals.size() + systematics.size(); i++) {
     param_buffer.writeOnlyHostPtr()[i] = params[i];
   }

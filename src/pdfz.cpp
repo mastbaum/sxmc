@@ -43,7 +43,7 @@ namespace pdfz {
     };
 
     Eval::Eval(const std::vector<float> &_samples, int _nfields, int _nobservables,
-               const std::vector<float> &_lower, const std::vector<float> &_upper) :
+               const std::vector<double> &_lower, const std::vector<double> &_upper) :
         nfields(_nfields), nobservables(_nobservables),
         lower(_lower.size(), true), upper(_upper.size(), true), syst(0)
     {
@@ -96,7 +96,7 @@ namespace pdfz {
         this->norm_offset = offset;
     }
 
-    void Eval::SetParameterBuffer(hemi::Array<float> *params, int offset, int stride)
+    void Eval::SetParameterBuffer(hemi::Array<double> *params, int offset, int stride)
     {
         this->param_buffer = params;
         this->param_offset = offset;
@@ -136,7 +136,7 @@ namespace pdfz {
     ///////////////////// EvalHist ///////////////////////
 
     EvalHist::EvalHist(const std::vector<float> &_samples, int nfields, int nobservables,
-                       const std::vector<float> &lower, const std::vector<float> &upper,
+                       const std::vector<double> &lower, const std::vector<double> &upper,
                        const std::vector<int> &_nbins, bool optimize) :
         Eval(_samples, nfields, nobservables, lower, upper),
         samples(_samples.size(), false), read_bins(0), 
@@ -205,15 +205,15 @@ namespace pdfz {
 
 
         // Pointer aliases to Hemi array contents (for convenience)
-        const float *lower = this->lower.readOnlyHostPtr();
-        const float *upper = this->upper.readOnlyHostPtr();
+        const double *lower = this->lower.readOnlyHostPtr();
+        const double *upper = this->upper.readOnlyHostPtr();
         const int *nbins = this->nbins.readOnlyHostPtr();
         const int *bin_stride = this->bin_stride.readOnlyHostPtr();
 
-        std::vector<float> bin_scale(this->nobservables);
+        std::vector<double> bin_scale(this->nobservables);
 
         for (int iobs=0; iobs < this->nobservables; iobs++) {
-            float span = upper[iobs] - lower[iobs];
+            double span = upper[iobs] - lower[iobs];
             bin_scale[iobs] = nbins[iobs] / span;
         }
 
@@ -223,7 +223,7 @@ namespace pdfz {
 
             for (int iobs=0; iobs < this->nobservables; iobs++) {
                 int ielement = this->nobservables * ipoint + iobs;
-                float element = points[ielement];
+                double element = points[ielement];
 
                 // Throw out this event if outside of PDF domain
                 if (element < lower[iobs] || element >= upper[iobs]) {
@@ -243,7 +243,7 @@ namespace pdfz {
 
     ///// EvalHist kernels
     HEMI_DEV_CALLABLE_INLINE
-    void apply_systematic(const SystematicDescriptor *syst, float *fields, const float *parameters, const int param_stride)
+    void apply_systematic(const SystematicDescriptor *syst, double *fields, const double *parameters, const int param_stride)
     {
         switch (syst->type) {
             case Systematic::SHIFT:
@@ -273,17 +273,17 @@ namespace pdfz {
     HEMI_KERNEL(bin_samples)(int ndata, const float *data,
                              const int nobs, const int nfields, 
                              const int * __restrict__ bin_stride, const int * __restrict__ nbins,
-                             const float * __restrict__ lower, const float * __restrict__ upper,
+                             const double * __restrict__ lower, const double * __restrict__ upper,
                              const int nsyst, const SystematicDescriptor * __restrict__ syst,
-                             const float * __restrict__ parameters, const int param_stride,
+                             const double * __restrict__ parameters, const int param_stride,
                              unsigned int *bins, unsigned int *norm)
     {
         int offset = hemiGetElementOffset();
         int stride = hemiGetElementStride();
-        float field_buffer[MAX_NFIELDS];
+        double field_buffer[MAX_NFIELDS];
         const int nsamples = ndata / nfields;
 
-        float bin_scale[MAX_NFIELDS];
+        double bin_scale[MAX_NFIELDS];
         for (int iobs=0; iobs < nobs; iobs++)
           bin_scale[iobs] = nbins[iobs] / (upper[iobs] - lower[iobs]);
 
@@ -303,7 +303,7 @@ namespace pdfz {
 
             // Compute histogram bin
             for (int iobs=0; iobs < nobs; iobs++) {
-                float element = field_buffer[iobs];
+                double element = field_buffer[iobs];
                 // Throw out this event if outside of PDF domain
                 if (element < lower[iobs] || element >= upper[iobs]) {
                     in_pdf_domain = false;
@@ -326,17 +326,17 @@ namespace pdfz {
     HEMI_KERNEL(eval_pdf)(int npoints, const int *read_bins,
                           const unsigned int * __restrict__ bins,
                           const unsigned int * __restrict__ norm,
-                          float bin_volume,
+                          double bin_volume,
                           float *output, int output_stride)
     {
         int offset = hemiGetElementOffset();
         int stride = hemiGetElementStride();
-        const float bin_norm = *norm * bin_volume;
+        const double bin_norm = *norm * bin_volume;
 
         for (int ipoint=offset; ipoint < npoints; ipoint += stride) {
             int bin_id = read_bins[ipoint];
 
-            float pdf_value = 0.0f;
+            double pdf_value = 0.0f;
             if (bin_id < 0)
                 pdf_value = nanf("");
             else
@@ -398,8 +398,8 @@ namespace pdfz {
         this->EvalAsync(false);
         this->EvalFinished();
 
-        const float *lower = this->lower.readOnlyHostPtr();
-        const float *upper = this->upper.readOnlyHostPtr();
+        const double *lower = this->lower.readOnlyHostPtr();
+        const double *upper = this->upper.readOnlyHostPtr();
         const int *nbins = this->nbins.readOnlyHostPtr();
         const unsigned int *bins = this->bins->readOnlyHostPtr();
         const int *bin_stride = this->bin_stride.readOnlyHostPtr();
@@ -507,7 +507,7 @@ namespace pdfz {
         this->norm_buffer->writeOnlyPtr();
 
         // Benchmark all possible grid sizes
-        float best_time = 1e9;
+        double best_time = 1e9;
         TStopwatch timer;
 
         for (int igrid=0; igrid < ngrid_sizes; igrid++) {

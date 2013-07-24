@@ -39,8 +39,8 @@ MCMC::MCMC(const std::vector<Signal>& signals,
 
   // set mean/expectation and sigma for all parameters
   this->nparameters = this->nsignals + this->nsystematics;
-  this->parameter_means = new hemi::Array<float>(this->nparameters, true);
-  this->parameter_sigma = new hemi::Array<float>(this->nparameters, true);
+  this->parameter_means = new hemi::Array<double>(this->nparameters, true);
+  this->parameter_sigma = new hemi::Array<double>(this->nparameters, true);
   for (size_t i=0; i<this->nsignals; i++) {
     this->parameter_means->writeOnlyHostPtr()[i] = signals[i].nexpected;
     this->parameter_sigma->writeOnlyHostPtr()[i] = signals[i].sigma;
@@ -93,7 +93,8 @@ MCMC::~MCMC() {
 
 
 TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
-                          float burnin_fraction, unsigned sync_interval) {
+                          float burnin_fraction, const bool debug_mode,
+                          unsigned sync_interval) {
   // cuda/hemi block sizes
   int bs = 128;
   int nb = this->nsignals / bs + 1;
@@ -106,13 +107,13 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
                             this->varlist.c_str());
 
   // buffers for current and proposed parameter vectors
-  hemi::Array<float> current_vector(this->nparameters, true);
+  hemi::Array<double> current_vector(this->nparameters, true);
   for (size_t i=0; i<this->nparameters; i++) {
     current_vector.writeOnlyHostPtr()[i] = \
       this->parameter_means->readOnlyHostPtr()[i];
   }
 
-  hemi::Array<float> proposed_vector(this->nparameters, true);
+  hemi::Array<double> proposed_vector(this->nparameters, true);
   proposed_vector.writeOnlyHostPtr();  // touch to set valid
 
   // buffer for normalizations after application of systematics
@@ -128,13 +129,13 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
 
   // initial standard deviations for each dimension
   hemi::Array<float> jump_width(this->nparameters, true);
-  const float scale_factor = \
-    2.4 * 2.4 / (this->nparameters * this->nparameters);  // Haario, 2001-ish
+  const float scale_factor = 2.4 * 2.4 / this->nparameters;  // Haario, 2001
   for (size_t i=0; i<this->nparameters; i++) {
     float mean = this->parameter_means->readOnlyHostPtr()[i];
     float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
     float width = (sigma > 0 ? sigma : sqrt(mean));
-    jump_width.writeOnlyHostPtr()[i] = (width > 0 ? width : 1) * scale_factor;
+    jump_width.writeOnlyHostPtr()[i] = \
+      (width > 0 ? width : 10.0) * scale_factor;
   }
 
   // buffers for computing event term in nll
@@ -228,7 +229,10 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
         hsproj->Delete();
       }
 
-      nt->Reset();
+      // save all steps when in debug mode
+      if (!debug_mode) {
+        nt->Reset();
+      }
     }
 
     // partial sums of event term
@@ -256,7 +260,8 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
                        jump_counter.ptr(),
                        jump_buffer.writeOnlyPtr(),
                        this->nparameters,
-                       jump_width.readOnlyPtr());
+                       jump_width.readOnlyPtr(),
+                       debug_mode);
 
     // flush the jump buffer periodically
     if (i % sync_interval == 0 || i == nsteps - 1 || i == burnin_steps - 1) {
@@ -293,7 +298,7 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
 }
 
 
-void MCMC::nll(const float* lut, size_t nevents, const float* v, double* nll,
+void MCMC::nll(const float* lut, size_t nevents, const double* v, double* nll,
                double* event_partial_sums, double* event_total_sum) {
   // partial sums of event term
   HEMI_KERNEL_LAUNCH(nll_event_chunks,

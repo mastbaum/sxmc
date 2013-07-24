@@ -76,7 +76,6 @@ class SpectralPlot {
 
     /** Copy constructor */
     SpectralPlot(const SpectralPlot& o) {
-      this->first = first;
       this->logy = o.logy;
       this->line_width = o.line_width;
       this->xmin = o.xmin;
@@ -123,7 +122,6 @@ class SpectralPlot {
      */
     static TH1* make_like(TH1* h, std::string name);
 
-    bool first;  //!< Are we drawing the first plot?
     bool logy;  //!< Log y axis on/off
     int line_width;  //!< Histogram line width
     float xmin;  //!< x-range minimum

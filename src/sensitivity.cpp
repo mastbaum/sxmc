@@ -94,22 +94,27 @@ void find_interval(TH1F* h, float mu, float& lower, float& upper, bool& limit,
     integral = h->Integral(lower_bin--, central_bin);
 
     // crashed into zero?
-    if (lower_bin == 0 && bounded) {
+    if ((h->GetBinLowEdge(lower_bin) <= 0 && bounded) || lower_bin == 0) {
       lower_bin = 1;
       limit = true;
       break;
     }
   }
 
-  lower = h->GetBinLowEdge(lower_bin);
-
   // upper boundary, starting from lower boundary
   int upper_bin = lower_bin;
   integral = 0;
   while (integral < cl * total_integral) {
     integral = h->Integral(lower_bin, upper_bin++);
+
+    // we've run out of pdf... shift the interval down
+    if (upper_bin > h->GetNbinsX() + 1) {
+      upper_bin--;
+      lower_bin--;
+    }
   }
 
+  lower = h->GetBinLowEdge(lower_bin);
   upper = h->GetBinLowEdge(upper_bin);
 }
 
@@ -129,13 +134,16 @@ void find_interval(TH1F* h, float mu, float& lower, float& upper, bool& limit,
  * \param signal_name The name of the Signal that is the signal
  * \param confidence Desired confidence level for limits
  * \param nexperiments Number of fake experiments to run
+ * \param radius_cut FV cut, used for calculating m_bb
+ * \param debug_mode If true, accept and save all steps
  * \returns A histogram of limits from the experiments
  */
 TH1F* ensemble(std::vector<Signal>& signals,
                std::vector<Systematic>& systematics,
                std::vector<Observable>& observables,
                unsigned steps, float burnin_fraction, std::string signal_name,
-               float confidence, unsigned nexperiments, float live_time) {
+               float confidence, unsigned nexperiments, float live_time,
+               float radius_cut, const bool debug_mode) {
   TH1F* limits = new TH1F("limits", "Background-fluctuation sensitivity",
                           1000, 0, 1000);
 
@@ -158,7 +166,7 @@ TH1F* ensemble(std::vector<Signal>& signals,
 
     // run mcmc
     MCMC mcmc(signals, systematics, observables);
-    TNtuple* lspace = mcmc(data, steps, burnin_fraction);
+    TNtuple* lspace = mcmc(data, steps, burnin_fraction, debug_mode);
 
     TFile f("lspace.root", "recreate");
     TNtuple* lsclone = (TNtuple*) lspace->Clone("ls");
@@ -166,10 +174,23 @@ TH1F* ensemble(std::vector<Signal>& signals,
     f.Close();
 
     // calculate signal sensitivity
-    TH1F hproj("hproj", "hproj", 1000, 0, 100);
+    TH1F hproj("hproj", "hproj", 2000, 0, 500);
     lspace->Draw((signal_name + ">>hproj").c_str(), "", "goff");
     double limit = upper_limit(&hproj, confidence);
-    std::cout << confidence * 100 << "\% limit: " << limit << std::endl;
+
+    float n_te130 = 7.46e26 * TMath::Power(radius_cut / 3500, 3);
+    std::cout << "rcut = " << radius_cut << std::endl;
+    float Mbb = 4.03;  // IBM-2
+    float Gphase = 3.69e-14;  // y^-1, using g_A = 1.269
+    float m_beta = 511e3;  // 511 keV, in eV
+
+    std::cout << "sensitivity: " << confidence * 100 << "\% limit";
+    std::cout << " " << limit << " counts" << std::endl;
+    float lifetime = n_te130 * live_time * 0.69315 / limit;
+    std::cout << " T_1/2 = " << lifetime << " y" << std::endl;
+    float mass = m_beta / TMath::Sqrt(lifetime * Gphase * Mbb * Mbb);
+    std::cout << " Mass = " << 1000 * mass << " meV" << std::endl;
+
     limits->Fill(limit);
 
     // extract likelihood-maximizing parameters
@@ -195,7 +216,7 @@ TH1F* ensemble(std::vector<Signal>& signals,
     for (size_t j=0; j<params.size(); j++) {
       float fp = params_fit[j];
       float sqrt_fp = TMath::Sqrt(fp);
-      TH1F hp("hp", "hp", 10000, fp - sqrt_fp, fp + sqrt_fp);
+      TH1F hp("hp", "hp", 10000, fp - 50.0 * sqrt_fp, fp + 50.0 * sqrt_fp);
       lspace->Draw((param_names[j] + ">>hp").c_str(), "", "goff");
       float lower_boundary;
       float upper_boundary;
@@ -238,11 +259,11 @@ TH1F* ensemble(std::vector<Signal>& signals,
       std::stringstream ytitle;
       ytitle << "Counts/" << (o->upper - o->lower) / o->bins << " "
              << o->units << "/" << live_time << " y";
-      plots_full.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 5e5,
+      plots_full.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 1e6,
                            true, "", o->title, ytitle.str().c_str()));
-      plots_external.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 5e5,
+      plots_external.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 1e6,
                                true, "", o->title, ytitle.str().c_str()));
-      plots_cosmogenic.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 5e5,
+      plots_cosmogenic.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 1e6,
                                  true, "", o->title, ytitle.str().c_str()));
     }
 
@@ -253,7 +274,7 @@ TH1F* ensemble(std::vector<Signal>& signals,
     hemi::Array<unsigned> norms_buffer(signals.size(), true);
     norms_buffer.writeOnlyHostPtr();
 
-    hemi::Array<float> param_buffer(params.size(), true);
+    hemi::Array<double> param_buffer(params.size(), true);
     for (size_t j=0; j<params.size(); j++) {
       param_buffer.writeOnlyHostPtr()[j] = params_fit[j];
     }
@@ -298,23 +319,23 @@ TH1F* ensemble(std::vector<Signal>& signals,
             n == "hd_ropes_tl208" || n == "hd_ropes_bi214" ||
             n == "pmt_bg") {
           plots_external[k].add(hpdf[k], signals[j].title, "hist");
+          std::string hname = "et" + signals[j].name + observables[k].name;
           if (external_total[k] == NULL) {
-            std::string hname = "ext_total_" + signals[j].name;
             external_total[k] = (TH1D*) hpdf[k]->Clone(hname.c_str());
           }
           else {
-            external_total[k]->Add(hpdf[k]);
+            external_total[k]->Add((TH1D*) hpdf[k]->Clone(hname.c_str()));
           }
         }
         else if (n != "zeronu" && n != "twonu" && n != "int_tl208" &&
                  n != "int_bi214" && n != "b8") {
           plots_cosmogenic[k].add(hpdf[k], signals[j].title, "hist");
+          std::string hname = "ct" + signals[j].name + observables[k].name;
           if (cosmogenic_total[k] == NULL) {
-            std::string hname = "cosmogenic_total_" + signals[j].name;
             cosmogenic_total[k] = (TH1D*) hpdf[k]->Clone(hname.c_str());
           }
           else {
-            cosmogenic_total[k]->Add(hpdf[k]);
+            cosmogenic_total[k]->Add((TH1D*) hpdf[k]->Clone(hname.c_str()));
           }
         }
         else {
@@ -336,16 +357,14 @@ TH1F* ensemble(std::vector<Signal>& signals,
 
       if (external_total[j] != NULL) {
         external_total[j]->SetLineColor(kOrange + 1);
-        std::cout << "ext to " << observables[j].name << std::endl;
-        TH1D* et = (TH1D*) external_total[i]->Clone("et");
+        TH1D* et = (TH1D*) external_total[j]->Clone("et");
         et->SetLineStyle(2);
         plots_external[j].add(et, "Total", "hist");
         plots_full[j].add(external_total[j], "External", "hist");
       }
       if (cosmogenic_total[j] != NULL) {
         cosmogenic_total[j]->SetLineColor(kAzure + 1);
-        std::cout << "cos to " << observables[j].name << std::endl;
-        TH1D* ct = (TH1D*) cosmogenic_total[i]->Clone("ct");
+        TH1D* ct = (TH1D*) cosmogenic_total[j]->Clone("ct");
         ct->SetLineStyle(2);
         plots_cosmogenic[j].add(ct, "Total", "hist");
         plots_full[j].add(cosmogenic_total[j], "Cosmogenic", "hist");
@@ -365,6 +384,7 @@ TH1F* ensemble(std::vector<Signal>& signals,
 
     delete lspace;
     delete[] params_branch;
+    delete[] params_fit;
   }
 
   return limits;
@@ -397,10 +417,19 @@ int main(int argc, char* argv[]) {
   FitConfig fc(config_filename);
   fc.print();
 
+  float radius_cut = 0;
+  for (size_t i=0; i<fc.observables.size(); i++) {
+    if (fc.observables[i].name == "radius") {
+      radius_cut = fc.observables[i].upper;
+      break;
+    }
+  }
+
   // run ensemble
   TH1F* limits = ensemble(fc.signals, fc.systematics, fc.observables, fc.steps,
                           fc.burnin_fraction, fc.signal_name, fc.confidence,
-                          fc.experiments, fc.live_time);
+                          fc.experiments, fc.live_time, radius_cut,
+                          fc.debug_mode);
 
   // plot distribution of limits
   TCanvas c1;

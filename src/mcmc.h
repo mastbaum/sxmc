@@ -53,11 +53,13 @@ class MCMC {
      *
      * \param nsteps Number of random-walk steps to take
      * \param burnin_fraction Fraction of initial steps to throw out
+     * \param debug_mode If true, accept and save all steps
      * \param sync_interval How often to copy accepted from GPU to storage
      * \returns TNtuple containing accepted points and their likelihoods
      */
     TNtuple* operator()(std::vector<float>& data, unsigned nsteps,
-                        float burnin_fraction, unsigned sync_interval=1000);
+                        float burnin_fraction, const bool debug_mode=false,
+                        unsigned sync_interval=1000);
 
   protected:
     /**
@@ -81,7 +83,7 @@ class MCMC {
      * \param event_total_sum Pre-allocated buffer for event term total
      */
     void nll(const float* lut, size_t nevents,
-             const float* v, double* nll,
+             const double* v, double* nll,
              double* event_partial_sums,
              double* event_total_sum);
 
@@ -98,8 +100,8 @@ class MCMC {
     unsigned blocksize;  //!< size of blocks for per-signal kernels
     unsigned nblocks;  //!< number of blocks for per-signal kernels
     std::string varlist;  //!< string identifier list for ntuple indexing
-    hemi::Array<float>* parameter_means;  //!< parameter central values
-    hemi::Array<float>* parameter_sigma;  //!< parameter Gaussian uncertainties
+    hemi::Array<double>* parameter_means;  //!< parameter central values
+    hemi::Array<double>* parameter_sigma;  //!< parameter Gaussian uncertainty
     hemi::Array<RNGState>* rngs;  //!< CURAND RNGs, ignored in CPU mode
     std::vector<std::string> parameter_names;  //!< string name of each param
     std::vector<pdfz::Eval*> pdfs;  //!< references to signal pdfs

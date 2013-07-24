@@ -12,8 +12,8 @@
 struct Signal {
   std::string name;  //!< string identifier
   std::string title;  //!< histogram title in ROOT-LaTeX format
-  float nexpected;  //!< events expected in this fit
-  float sigma;  //!< fractional uncertainty
+  double nexpected;  //!< events expected in this fit
+  double sigma;  //!< fractional uncertainty
   size_t nevents;  //!< number of events in PDF
   pdfz::Eval* histogram;  //!< PDF
 };
@@ -47,8 +47,8 @@ struct Systematic {
   size_t observable_field_index;
   size_t truth_field_index;
   pdfz::Systematic::Type type;
-  float mean;
-  float sigma;
+  double mean;
+  double sigma;
   bool fixed;
 };
 

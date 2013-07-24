@@ -58,8 +58,8 @@ __global__ void init_device_rngs(int nthreads, unsigned long long seed,
  */
 HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
                              const float* sigma,
-                             const float* current_vector,
-                             float* proposed_vector);
+                             const double* current_vector,
+                             double* proposed_vector);
 
 
 /**
@@ -83,8 +83,8 @@ HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
  * \param jump_buffer The step buffer
  */
 HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
-                          const double* nll_proposed, float* v_current,
-                          const float* v_proposed, unsigned nparameters,
+                          const double* nll_proposed, double* v_current,
+                          const double* v_proposed, unsigned nparameters,
                           int* accepted, int* counter, float* jump_buffer);
 
 
@@ -99,7 +99,7 @@ HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
  * \param ns Number of signals
  * \param sums Output sums for subsets of events
  */
-HEMI_KERNEL(nll_event_chunks)(const float* lut, const float* pars,
+HEMI_KERNEL(nll_event_chunks)(const float* lut, const double* pars,
                               const size_t ne, const size_t ns,
                               double* sums);
 
@@ -130,10 +130,10 @@ HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
  * \param events_total Sum of event term contribution
  * \param nll The total NLL
  */
-HEMI_KERNEL(nll_total)(const size_t nparameters, const float* pars,
+HEMI_KERNEL(nll_total)(const size_t nparameters, const double* pars,
                        const size_t nsignals,
-                       const float* means,
-                       const float* sigmas,
+                       const double* means,
+                       const double* sigmas,
                        const double* events_total,
                        double* nll);
 
@@ -159,18 +159,20 @@ HEMI_KERNEL(nll_total)(const size_t nparameters, const float* pars,
  * \param jump_buffer The buffer of steps (vectors and likelihoods)
  * \param nparameters The number of parameters (dimensions in the L space)
  * \param sigma The jump distribution widths in each dimension
+ * \param debug_mode Enable debugging mode, where every step is accepted
  */
 HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
                                         const double* sums, const size_t ns,
-                                        const float* means,
-                                        const float* sigmas,
+                                        const double* means,
+                                        const double* sigmas,
                                         RNGState* rng,
                                         double *nll_current,
                                         double *nll_proposed,
-                                        float *v_current, float *v_proposed,
+                                        double *v_current, double *v_proposed,
                                         int* accepted, int* counter,
                                         float* jump_buffer, int nparameters,
-                                        const float* sigma);
+                                        const float* sigma,
+                                        const bool debug_mode=false);
 
 #endif  // __NLL_H__
 

@@ -113,6 +113,7 @@ FitConfig::FitConfig(std::string filename) {
   this->burnin_fraction = fit_params.get("burnin_fraction", 0.1).asFloat();
   this->signal_name = fit_params["signal_name"].asString();
   this->output_file = fit_params.get("output_file", "fit_spectrum").asString();
+  this->debug_mode = fit_params.get("debug_mode", false).asBool();
 
   for (Json::Value::const_iterator it=fit_params["observables"].begin();
        it!=fit_params["observables"].end(); ++it) {
@@ -233,8 +234,8 @@ FitConfig::FitConfig(std::string filename) {
               << std::endl;
 
     // build bin and limit arrays
-    std::vector<float> lower(this->observables.size());
-    std::vector<float> upper(this->observables.size());
+    std::vector<double> lower(this->observables.size());
+    std::vector<double> upper(this->observables.size());
     std::vector<int> nbins(this->observables.size());
     for (size_t i=0; i<sample_fields.size(); i++) {
       for (size_t j=0; j<this->observables.size(); j++) {
@@ -270,12 +271,33 @@ FitConfig::FitConfig(std::string filename) {
                                                                    i));
       }
       else {
-        std::cerr << "Unknown systematic ID " << (int)syst->type << std::endl;
+        std::cerr << "FitConfig::FitConfig: Unknown systematic ID "
+                  << (int)syst->type << std::endl;
         assert(false);
       }
     }
 
     this->signals.push_back(s);
+  }
+
+  // rescale expectations using fractions falling inside the pdfs
+  hemi::Array<double> param_buffer(this->systematics.size(), true);
+  param_buffer.writeOnlyHostPtr();
+  for (size_t i=0; i<this->systematics.size(); i++) {
+    param_buffer.writeOnlyHostPtr()[i] = this->systematics[i].mean;                             
+  }
+
+  hemi::Array<unsigned> norms_buffer(signals.size(), true);
+  norms_buffer.writeOnlyHostPtr();
+
+  for (size_t i=0; i<this->signals.size(); i++) {
+    pdfz::Eval* p = this->signals[i].histogram;
+    p->SetNormalizationBuffer(&norms_buffer, i);
+    p->SetParameterBuffer(&param_buffer);
+    dynamic_cast<pdfz::EvalHist*>(p)->CreateHistogram();
+
+    this->signals[i].nexpected *= \
+      (1.0 * norms_buffer.readOnlyHostPtr()[i] / this->signals[i].nevents);
   }
 }
 
