@@ -136,16 +136,23 @@ void find_interval(TH1F* h, float mu, float& lower, float& upper, bool& limit,
  * \param nexperiments Number of fake experiments to run
  * \param radius_cut FV cut, used for calculating m_bb
  * \param debug_mode If true, accept and save all steps
- * \returns A histogram of limits from the experiments
+ * \returns A (name, histogram limits from the experiments) map
  */
-TH1F* ensemble(std::vector<Signal>& signals,
-               std::vector<Systematic>& systematics,
-               std::vector<Observable>& observables,
-               unsigned steps, float burnin_fraction, std::string signal_name,
-               float confidence, unsigned nexperiments, float live_time,
-               float radius_cut, const bool debug_mode) {
-  TH1F* limits = new TH1F("limits", "Background-fluctuation sensitivity",
-                          1000, 0, 1000);
+std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
+                                     std::vector<Systematic>& systematics,
+                                     std::vector<Observable>& observables,
+                                     unsigned steps, float burnin_fraction,
+                                     std::string signal_name,
+                                     float confidence, unsigned nexperiments,
+                                     float live_time, float radius_cut,
+                                     const bool debug_mode) {
+  std::map<std::string, TH1F> limits;
+  limits["counts"] = TH1F("limits_c", ";Counts in fit range;Fraction",
+                          150, 0, 300);
+  limits["lifetime"] = TH1F("limits_l", ";T_{1/2} limit (y);Fraction",
+                            100, 2e25, 1e26);
+  limits["mass"] = TH1F("limits_m", ";m_{#beta#beta} limit (meV);Fraction",
+                        75, 50, 200);
 
   for (unsigned i=0; i<nexperiments; i++) {
     std::cout << "Experiment " << i << " / " << nexperiments << std::endl;
@@ -184,14 +191,18 @@ TH1F* ensemble(std::vector<Signal>& signals,
     float Gphase = 3.69e-14;  // y^-1, using g_A = 1.269
     float m_beta = 511e3;  // 511 keV, in eV
 
-    std::cout << "sensitivity: " << confidence * 100 << "\% limit";
-    std::cout << " " << limit << " counts" << std::endl;
     float lifetime = n_te130 * live_time * 0.69315 / limit;
-    std::cout << " T_1/2 = " << lifetime << " y" << std::endl;
     float mass = m_beta / TMath::Sqrt(lifetime * Gphase * Mbb * Mbb);
+
+    std::cout << "-- Sensitivity: " << confidence * 100 << "\% CL --"
+              << std::endl;
+    std::cout << " Counts: " << limit << std::endl;
+    std::cout << " T_1/2 = " << lifetime << " y" << std::endl;
     std::cout << " Mass = " << 1000 * mass << " meV" << std::endl;
 
-    limits->Fill(limit);
+    limits["counts"].Fill(limit);
+    limits["lifetime"].Fill(lifetime);
+    limits["mass"].Fill(1000 * mass);
 
     // extract likelihood-maximizing parameters
     float* params_branch = new float[params.size()];
@@ -426,27 +437,37 @@ int main(int argc, char* argv[]) {
   }
 
   // run ensemble
-  TH1F* limits = ensemble(fc.signals, fc.systematics, fc.observables, fc.steps,
-                          fc.burnin_fraction, fc.signal_name, fc.confidence,
-                          fc.experiments, fc.live_time, radius_cut,
-                          fc.debug_mode);
+  std::map<std::string, TH1F> limits = \
+    ensemble(fc.signals, fc.systematics, fc.observables, fc.steps,
+             fc.burnin_fraction, fc.signal_name, fc.confidence,
+             fc.experiments, fc.live_time, radius_cut, fc.debug_mode);
 
   // plot distribution of limits
   TCanvas c1;
-  limits->Draw();
-  limits->GetXaxis()->SetRangeUser(0, 100);
-  c1.SaveAs((fc.output_file + "_limits.pdf").c_str());
-  c1.SaveAs((fc.output_file + "_limits.C").c_str());
+  std::map<std::string, TH1F>::iterator it;
+  for (it=limits.begin(); it!=limits.end(); it++) {
+    it->second.DrawNormalized();
+    c1.SaveAs((fc.output_file + "_limits_" + it->first + ".pdf").c_str());
+    c1.SaveAs((fc.output_file + "_limits_" + it->first + ".C").c_str());
 
-  // find median
-  double xq[1] = {0.5};
-  double yq[1];
-  limits->GetQuantiles(1, yq, xq);
+    // find median
+    double xq[1] = {0.5};
+    double yq[1];
+    it->second.GetQuantiles(1, yq, xq);
 
-  std::cout << "Median " << fc.confidence * 100 << "\% limit: " << yq[0]
-            << std::endl;
+    float lower_boundary, upper_boundary;
+    bool is_limit;
+    find_interval(&it->second, yq[0], lower_boundary, upper_boundary,
+                  is_limit, false, 0.682);
+    float lower_error = yq[0] - lower_boundary;
+    float upper_error = upper_boundary - yq[0];
 
-  delete limits;
+    std::cout << "Average-limit sensitivity " << it->first << " at "
+              << fc.confidence * 100 << "\%: " << yq[0]
+              << " -" << lower_error
+              << " +" << upper_error
+              << std::endl;
+  }
 
   return 0;
 }
