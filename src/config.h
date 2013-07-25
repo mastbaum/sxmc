@@ -57,6 +57,7 @@ class FitConfig {
     std::vector<Signal> signals;  //!< signal histograms and metadata
     std::vector<Systematic> systematics;  //!< Systematics used in PDFs
     std::vector<Observable> observables;  //!< Observables used in PDFs
+    std::vector<Observable> cuts;  //!< Cuts applied before fit
 };
 
 #endif  // __CONFIG_H__

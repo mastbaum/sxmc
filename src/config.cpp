@@ -120,6 +120,11 @@ FitConfig::FitConfig(std::string filename) {
     this->observables.push_back(all_observables[(*it).asString()]);
   }
 
+  for (Json::Value::const_iterator it=fit_params["cuts"].begin();
+       it!=fit_params["cuts"].end(); ++it) {
+    this->cuts.push_back(all_observables[(*it).asString()]);
+  }
+
   for (Json::Value::const_iterator it=fit_params["systematics"].begin();
        it!=fit_params["systematics"].end(); ++it) {
     this->systematics.push_back(all_systematics[(*it).asString()]);
@@ -219,11 +224,51 @@ FitConfig::FitConfig(std::string filename) {
     s.nevents = rank[0];
     std::vector<float> samples(s.nevents * sample_fields.size());
 
+    for (size_t i=0; i<this->cuts.size(); i++) {
+      std::string field_name = this->cuts[i].field;
+      size_t index = (std::find(hdf5_fields.begin(), hdf5_fields.end(),
+                                field_name) -
+                      hdf5_fields.begin());
+
+      this->cuts[i].field_index = index;  // index in hdf5 file
+    }
+
+    std::vector<bool> field_has_cut(hdf5_fields.size(), false);
+    std::vector<double> field_cut_lower(hdf5_fields.size());
+    std::vector<double> field_cut_upper(hdf5_fields.size());
+    for (size_t i=0; i<hdf5_fields.size(); i++) {
+      for (size_t j=0; j<this->cuts.size(); j++) {
+        if (this->cuts[j].field_index == i) {
+          field_has_cut[i] = true;
+          field_cut_lower[i] = this->cuts[j].lower;
+          field_cut_upper[i] = this->cuts[j].upper;
+        }
+      }
+    }
+
+    size_t sample_index = 0;
     for (size_t i=0; i<s.nevents; i++) {
+      // apply cuts
+      if (!this->cuts.empty()) {
+        bool event_valid = true;
+        for (size_t j=0; j<hdf5_fields.size(); j++) {
+          float v = dataset[i * rank[1] + j];
+          if (field_has_cut[j] &&
+              (v < field_cut_lower[j] || v > field_cut_upper[j])) {
+            event_valid = false;
+            break;
+          }
+        }
+        if (!event_valid) {
+          continue;
+        }
+      }
+
       for (size_t j=0; j<sample_fields.size(); j++) {
-        samples[i * sample_fields.size() + j] = \
+        samples[sample_index * sample_fields.size() + j] = \
           dataset[i * rank[1] + sample_fields[j]];
       }
+      sample_index++;
     }
 
     float years = 1.0 * s.nevents / (s.nexpected / this->live_time /
@@ -232,6 +277,15 @@ FitConfig::FitConfig(std::string filename) {
     std::cout << "FitConfig::FitConfig: Initializing PDF for " << s.name
               << " using " << s.nevents << " events (" << years << " y)"
               << std::endl;
+
+    // perhaps we skipped some events due to cuts
+    if (sample_index != s.nevents) {
+      std::cout << "FitConfig::FitConfig: " << s.nevents - sample_index
+                << " events cut" << std::endl;
+    }
+    samples.resize(sample_index * sample_fields.size());
+    s.nexpected *= (1.0 * sample_index / s.nevents);
+    s.nevents = sample_index;
 
     // build bin and limit arrays
     std::vector<double> lower(this->observables.size());
@@ -295,9 +349,10 @@ FitConfig::FitConfig(std::string filename) {
     p->SetNormalizationBuffer(&norms_buffer, i);
     p->SetParameterBuffer(&param_buffer);
     dynamic_cast<pdfz::EvalHist*>(p)->CreateHistogram();
-
-    this->signals[i].nexpected *= \
-      (1.0 * norms_buffer.readOnlyHostPtr()[i] / this->signals[i].nevents);
+    if (this->signals[i].nevents > 0) {
+      this->signals[i].nexpected *= \
+        (1.0 * norms_buffer.readOnlyHostPtr()[i] / this->signals[i].nevents);
+    }
   }
 }
 
@@ -313,6 +368,15 @@ void FitConfig::print() const {
   std::cout << "Experiment:" << std::endl
             << "  Live time: " << this->live_time << " y" << std::endl
             << "  Confidence level: " << this->confidence << std::endl;
+
+  std::cout << "Cuts:" << std::endl;
+  for (std::vector<Observable>::const_iterator it=this->cuts.begin();
+       it!=this->cuts.end(); ++it) {
+    std::cout << "  " << it->name << std::endl
+              << "    Title: \"" << it->title << "\"" << std::endl
+              << "    Lower bound: "<< it->lower << std::endl
+              << "    Upper bound: " << it->upper << std::endl;
+  }
 
   std::cout << "Observables:" << std::endl;
   for (std::vector<Observable>::const_iterator it=this->observables.begin();

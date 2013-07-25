@@ -59,7 +59,7 @@ class MCMC {
      */
     TNtuple* operator()(std::vector<float>& data, unsigned nsteps,
                         float burnin_fraction, const bool debug_mode=false,
-                        unsigned sync_interval=1000);
+                        unsigned sync_interval=10000);
 
   protected:
     /**

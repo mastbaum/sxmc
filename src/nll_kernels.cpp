@@ -90,7 +90,8 @@ HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
   for (int i=offset; i<(int)ne; i+=stride) {
     double s = 0;
     for (size_t j=0; j<ns; j++) {
-      s += pars[j] * lut[j * ne + i];
+      float v = lut[j * ne + i];
+      s += pars[j] * (!isnan(v) ? v : 0);  // handle nans from empty hists
     }
     sum += log(s);
   }
@@ -126,7 +127,6 @@ void nll_event_reduce_device(const size_t nthreads, const double* sums,
   __syncthreads();
 #endif
   total_sum[0] = block_sums[0];
-
 }
 
 

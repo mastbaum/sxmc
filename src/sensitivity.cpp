@@ -129,23 +129,23 @@ void find_interval(TH1F* h, float mu, float& lower, float& upper, bool& limit,
  * \param signals List of Signals defining PDFs, rates, etc.
  * \param systematics List of Systematics applied to PDFs
  * \param observables List of Observables common to PDFs
+ * \param cuts List of cuts applied to data set
  * \param steps Number of MCMC random walk steps to take
  * \param burnin_fraction Fraction of initial MCMC steps to throw out
  * \param signal_name The name of the Signal that is the signal
  * \param confidence Desired confidence level for limits
  * \param nexperiments Number of fake experiments to run
- * \param radius_cut FV cut, used for calculating m_bb
  * \param debug_mode If true, accept and save all steps
  * \returns A (name, histogram limits from the experiments) map
  */
 std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
                                      std::vector<Systematic>& systematics,
                                      std::vector<Observable>& observables,
+                                     std::vector<Observable>& cuts,
                                      unsigned steps, float burnin_fraction,
                                      std::string signal_name,
                                      float confidence, unsigned nexperiments,
-                                     float live_time, float radius_cut,
-                                     const bool debug_mode) {
+                                     float live_time, const bool debug_mode) {
   std::map<std::string, TH1F> limits;
   limits["counts"] = TH1F("limits_c", ";Counts in fit range;Fraction",
                           150, 0, 300);
@@ -168,8 +168,8 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
       params.push_back(systematics[j].mean);
       param_names.push_back(systematics[j].name);
     }
-    std::vector<float> data = make_fake_dataset(signals, systematics,
-                                                observables, params, true);
+    std::vector<float> data = \
+      make_fake_dataset(signals, systematics, observables, params, true);
 
     // run mcmc
     MCMC mcmc(signals, systematics, observables);
@@ -184,6 +184,20 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
     TH1F hproj("hproj", "hproj", 2000, 0, 500);
     lspace->Draw((signal_name + ">>hproj").c_str(), "", "goff");
     double limit = upper_limit(&hproj, confidence);
+
+    float radius_cut = 0;
+    for (size_t j=0; j<observables.size(); j++) {
+      if (observables[j].name == "radius") {
+        radius_cut = observables[j].upper;
+        break;
+      }
+    }
+    for (size_t j=0; j<cuts.size(); j++) {
+      if (cuts[j].name == "radius") {
+        radius_cut = cuts[j].upper;
+        break;
+      }
+    }
 
     float n_te130 = 7.46e26 * TMath::Power(radius_cut / 3500, 3);
     std::cout << "rcut = " << radius_cut << std::endl;
@@ -428,19 +442,11 @@ int main(int argc, char* argv[]) {
   FitConfig fc(config_filename);
   fc.print();
 
-  float radius_cut = 0;
-  for (size_t i=0; i<fc.observables.size(); i++) {
-    if (fc.observables[i].name == "radius") {
-      radius_cut = fc.observables[i].upper;
-      break;
-    }
-  }
-
   // run ensemble
   std::map<std::string, TH1F> limits = \
-    ensemble(fc.signals, fc.systematics, fc.observables, fc.steps,
+    ensemble(fc.signals, fc.systematics, fc.observables, fc.cuts, fc.steps,
              fc.burnin_fraction, fc.signal_name, fc.confidence,
-             fc.experiments, fc.live_time, radius_cut, fc.debug_mode);
+             fc.experiments, fc.live_time, fc.debug_mode);
 
   // plot distribution of limits
   TCanvas c1;
