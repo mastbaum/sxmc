@@ -1,3 +1,4 @@
+#include <iostream>
 #include <cmath>
 #include <hemi/hemi.h>
 #include <TRandom.h>
@@ -95,8 +96,9 @@ HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
     }
     sum += log(s);
   }
-
-  sums[offset] = sum;
+  if (!isnan(sum)) {
+    sums[offset] = sum;
+  }
 }
 
 
@@ -140,10 +142,15 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
   // total from sum over events, once
   double sum = -events_total[0];
 
+  if (isnan(sum)) {
+    nll[0] = 1e18;
+    return;
+  }
+
   for (unsigned i=0; i<nparameters; i++) {
     // non-negative rates
     if (i < nsignals && pars[i] < 0) {
-      nll[0] = 1e6;
+      nll[0] = 1e18;
       return;      
     }
 

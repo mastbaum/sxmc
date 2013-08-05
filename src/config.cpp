@@ -151,7 +151,7 @@ FitConfig::FitConfig(std::string filename) {
     s.name = it.key().asString();
     s.title = signal_params.get("title", s.name).asString();
     s.sigma = \
-      signal_params.get("sigma", 0.0).asFloat() *
+      signal_params.get("constraint", 0.0).asFloat() *
       this->live_time * this->efficiency;
     s.nexpected = \
       signal_params["rate"].asFloat() * this->live_time * this->efficiency;
@@ -282,10 +282,11 @@ FitConfig::FitConfig(std::string filename) {
     if (sample_index != s.nevents) {
       std::cout << "FitConfig::FitConfig: " << s.nevents - sample_index
                 << " events cut" << std::endl;
+      samples.resize(sample_index * sample_fields.size());
+      s.nexpected *= (1.0 * sample_index / s.nevents);
+      s.sigma *= (1.0 * sample_index / s.nevents);
+      s.nevents = sample_index;
     }
-    samples.resize(sample_index * sample_fields.size());
-    s.nexpected *= (1.0 * sample_index / s.nevents);
-    s.nevents = sample_index;
 
     // build bin and limit arrays
     std::vector<double> lower(this->observables.size());
@@ -344,14 +345,22 @@ FitConfig::FitConfig(std::string filename) {
   hemi::Array<unsigned> norms_buffer(signals.size(), true);
   norms_buffer.writeOnlyHostPtr();
 
+  this->signal_eff = 1.0;
   for (size_t i=0; i<this->signals.size(); i++) {
     pdfz::Eval* p = this->signals[i].histogram;
     p->SetNormalizationBuffer(&norms_buffer, i);
     p->SetParameterBuffer(&param_buffer);
     dynamic_cast<pdfz::EvalHist*>(p)->CreateHistogram();
     if (this->signals[i].nevents > 0) {
-      this->signals[i].nexpected *= \
+      float rescale = \
         (1.0 * norms_buffer.readOnlyHostPtr()[i] / this->signals[i].nevents);
+      this->signals[i].nexpected *= rescale;
+      this->signals[i].sigma *= rescale;
+      if (this->signals[i].name == this->signal_name) {
+        this->signal_eff = rescale;
+        std::cout << "FitConfig::FitConfig: Signal efficiency: "
+                  << this->signal_eff << std::endl;
+      }
     }
   }
 }

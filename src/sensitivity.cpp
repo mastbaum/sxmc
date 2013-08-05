@@ -26,6 +26,7 @@
 #include <TRandom.h>
 #include <TRandom2.h>
 #include <TMath.h>
+#include <TFeldmanCousins.h>
 #include "config.h"
 #include "generator.h"
 #include "mcmc.h"
@@ -56,9 +57,9 @@ double upper_limit(TH1F* h, double cl=0.682) {
   double integral = 0;
   int thisbin = h->GetNbinsX();
   while (integral < tail * h->Integral()) {
-    integral = h->Integral(thisbin--, h->GetNbinsX());
+    integral = h->Integral(thisbin--, h->GetNbinsX()+1);
   }
-  return h->GetBinLowEdge(thisbin);
+  return h->GetBinLowEdge(thisbin + 1);
 }
 
 
@@ -133,6 +134,7 @@ void find_interval(TH1F* h, float mu, float& lower, float& upper, bool& limit,
  * \param steps Number of MCMC random walk steps to take
  * \param burnin_fraction Fraction of initial MCMC steps to throw out
  * \param signal_name The name of the Signal that is the signal
+ * \param signal_eff Efficiency for detecting signal
  * \param confidence Desired confidence level for limits
  * \param nexperiments Number of fake experiments to run
  * \param debug_mode If true, accept and save all steps
@@ -143,7 +145,7 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
                                      std::vector<Observable>& observables,
                                      std::vector<Observable>& cuts,
                                      unsigned steps, float burnin_fraction,
-                                     std::string signal_name,
+                                     std::string signal_name, float signal_eff,
                                      float confidence, unsigned nexperiments,
                                      float live_time, const bool debug_mode) {
   std::map<std::string, TH1F> limits;
@@ -153,6 +155,30 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
                             100, 2e25, 1e26);
   limits["mass"] = TH1F("limits_m", ";m_{#beta#beta} limit (meV);Fraction",
                         75, 50, 200);
+  limits["fc_counts"] = TH1F("fc_limits_c", ";Counts in fit range;Fraction",
+                             150, 0, 300);
+  limits["fc_lifetime"] = TH1F("fc_limits_l", ";T_{1/2} limit (y);Fraction",
+                               100, 2e25, 1e26);
+  limits["fc_mass"] = TH1F("fc_limits_m",
+                           ";m_{#beta#beta} limit (meV);Fraction",
+                           75, 50, 200);
+  limits["contour_counts"] = TH1F("contour_limits_c",
+                                  ";Counts in fit range;Fraction",
+                                  150, 0, 300);
+  limits["contour_lifetime"] = TH1F("contour_limits_l",
+                                    ";T_{1/2} limit (y);Fraction",
+                                    100, 2e25, 1e26);
+  limits["contour_mass"] = TH1F("contour_limits_m",
+                                ";m_{#beta#beta} limit (meV);Fraction",
+                                75, 50, 200);
+
+  // coverage calculation
+  TH1F hfccoverage("hfccoverage", ";True N;Coverage", 50, 0, 50);
+  hfccoverage.Sumw2();
+  TH1F hcontcoverage("hcontcoverage", ";True N;Coverage", 50, 0, 50);
+  hcontcoverage.Sumw2();
+  TH1F hcounts("hcounts", ";True N;Event count;", 50, 0, 50);
+  hcounts.Sumw2();
 
   for (unsigned i=0; i<nexperiments; i++) {
     std::cout << "Experiment " << i << " / " << nexperiments << std::endl;
@@ -160,9 +186,11 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
     // make fake data
     std::vector<float> params;
     std::vector<std::string> param_names;
+    float nexpected = 0;
     for (size_t j=0; j<signals.size(); j++) {
       params.push_back(signals[j].nexpected);
       param_names.push_back(signals[j].name);
+      nexpected += signals[j].nexpected;
     }
     for (size_t j=0; j<systematics.size(); j++) {
       params.push_back(systematics[j].mean);
@@ -170,6 +198,9 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
     }
     std::vector<float> data = \
       make_fake_dataset(signals, systematics, observables, params, true);
+
+    size_t nevents = (int) 1.0 * data.size() / observables.size();
+    hcounts.Fill(nevents);
 
     // run mcmc
     MCMC mcmc(signals, systematics, observables);
@@ -181,7 +212,7 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
     f.Close();
 
     // calculate signal sensitivity
-    TH1F hproj("hproj", "hproj", 2000, 0, 500);
+    TH1F hproj("hproj", "hproj", 20000, 0, 500);
     lspace->Draw((signal_name + ">>hproj").c_str(), "", "goff");
     double limit = upper_limit(&hproj, confidence);
 
@@ -199,26 +230,8 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
       }
     }
 
-    float n_te130 = 7.46e26 * TMath::Power(radius_cut / 3500, 3);
-    std::cout << "rcut = " << radius_cut << std::endl;
-    float Mbb = 4.03;  // IBM-2
-    float Gphase = 3.69e-14;  // y^-1, using g_A = 1.269
-    float m_beta = 511e3;  // 511 keV, in eV
-
-    float lifetime = n_te130 * live_time * 0.69315 / limit;
-    float mass = m_beta / TMath::Sqrt(lifetime * Gphase * Mbb * Mbb);
-
-    std::cout << "-- Sensitivity: " << confidence * 100 << "\% CL --"
-              << std::endl;
-    std::cout << " Counts: " << limit << std::endl;
-    std::cout << " T_1/2 = " << lifetime << " y" << std::endl;
-    std::cout << " Mass = " << 1000 * mass << " meV" << std::endl;
-
-    limits["counts"].Fill(limit);
-    limits["lifetime"].Fill(lifetime);
-    limits["mass"].Fill(1000 * mass);
-
     // extract likelihood-maximizing parameters
+    std::cout << "Finding maximum likelihood..." << std::endl;
     float* params_branch = new float[params.size()];
     for (size_t j=0; j<params.size(); j++) {
       lspace->SetBranchAddress(param_names[j].c_str(), &params_branch[j]);
@@ -227,16 +240,122 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
     lspace->SetBranchAddress("likelihood", &ml_branch);
     float* params_fit = new float[params.size()];
     float ml = 1e9;
+    float nfit = 0;
     for (int j=0; j<lspace->GetEntries(); j++) {
       lspace->GetEntry(j);
       if (ml_branch < ml) {
         ml = ml_branch;
+        nfit = 0;
         for (size_t k=0; k<params.size(); k++) {
           params_fit[k] = params_branch[k];
+          if (k < signals.size()) {
+            nfit += params_fit[k];
+          }
         }
       }
     }
+    std::cout << "Fit " << nfit << " events" << std::endl;
 
+    // find contour
+    std::cout << "Generating " << 100 * confidence
+              << " contour..." << std::endl;
+    float delta = 0.5 * TMath::ChisquareQuantile(confidence, 1);
+    TNtuple* lscontour = (TNtuple*) lspace->Clone("lscontour");
+    lscontour->Reset();
+
+    float* v = new float[params.size() + 1];
+    for (int j=0; j<lspace->GetEntries(); j++) {
+      lspace->GetEntry(j);
+      // build a list of points inside the contour
+      if (ml_branch < ml + delta) {
+        for (size_t k=0; k<params.size(); k++) {
+          v[k] = params_branch[k];
+        }
+        v[params.size()] = ml_branch;
+        lscontour->Fill(v);
+      }
+    }
+    delete[] v;
+    
+    TH1F hcproj("hcproj", "hcproj", 20000, 0, 500);
+    lscontour->Draw((signal_name + ">>hcproj").c_str(), "", "goff");
+    int ul_bin = hcproj.FindLastBinAbove(0);
+    int ll_bin = hcproj.FindFirstBinAbove(0);
+    double ul_contour = hcproj.GetBinLowEdge(ul_bin) +
+                        hcproj.GetBinWidth(ul_bin);
+    double ll_contour = hcproj.GetBinLowEdge(ll_bin);
+
+    // parameters for counts -> lifetime -> mass conversion
+    float n_te130 = 7.46e26 * TMath::Power(radius_cut / 3500, 3);
+    std::cout << "rcut = " << radius_cut << std::endl;
+    float Mbb = 4.03;  // IBM-2
+    float Gphase = 3.69e-14;  // y^-1, using g_A = 1.269
+    float m_beta = 511e3;  // 511 keV, in eV
+
+    // calculate sensitivity by integrating over backgrounds
+    float lifetime = n_te130 * live_time * 0.69315 * signal_eff / limit;
+    float mass = m_beta / TMath::Sqrt(lifetime * Gphase * Mbb * Mbb);
+
+    std::cout << "-- Sensitivity (marginalized backgrounds): "
+              << confidence * 100 << "\% CL --" << std::endl;
+    std::cout << " Counts: " << limit << std::endl;
+    std::cout << " T_1/2:  " << lifetime << " y" << std::endl;
+    std::cout << " Mass:   " << 1000 * mass << " meV" << std::endl;
+
+    limits["counts"].Fill(limit);
+    limits["lifetime"].Fill(lifetime);
+    limits["mass"].Fill(1000 * mass);
+
+    // sensitivity using minos-like contour
+    float lifetime_contour = \
+      n_te130 * live_time * 0.69315 * signal_eff / ul_contour;
+    float mass_contour = \
+      m_beta / TMath::Sqrt(lifetime_contour * Gphase * Mbb * Mbb);
+
+    std::cout << "-- Contour Sensitivity: " << confidence * 100 << "\% CL --"
+              << std::endl;
+    std::cout << " Delta Chi2: " << 2 * delta << std::endl;
+    std::cout << " UL Counts:  " << ul_contour << std::endl;
+    std::cout << " LL Counts:  " << ll_contour << std::endl;
+    std::cout << " T_1/2:      " << lifetime_contour << " y" << std::endl;
+    std::cout << " Mass:       " << 1000 * mass_contour << " meV" << std::endl;
+
+    limits["contour_counts"].Fill(ul_contour);
+    limits["contour_lifetime"].Fill(lifetime_contour);
+    limits["contour_mass"].Fill(1000 * mass_contour);
+    if (0 >= ll_contour && 0 <= ul_contour) {
+      std::cout << "covered" << std::endl;
+      hcontcoverage.Fill(nevents);
+    }
+
+    // sensitivity using feldman-cousins
+    if (nevents < 25) {
+      TFeldmanCousins tfc(confidence);
+      tfc.SetMuMax(2500);
+      float fc_limit = tfc.CalculateUpperLimit(nevents, nexpected);
+      float fc_llimit = tfc.CalculateLowerLimit(nevents, nexpected);
+      float fc_lifetime = n_te130 * live_time * 0.69315 * signal_eff / fc_limit;
+      float fc_mass = m_beta / TMath::Sqrt(fc_lifetime * Gphase * Mbb * Mbb);
+      std::cout << "-- Feldman-Cousins Sensitivity: "
+                << 100 * confidence << "\% CL --" << std::endl;
+      std::cout << " UL Counts: " << fc_limit << std::endl;
+      std::cout << " LL Counts: " << fc_llimit << std::endl;
+      std::cout << " T_1/2:     " << fc_lifetime << " y" << std::endl;
+      std::cout << " Mass:      " << 1000 * fc_mass << " meV" << std::endl;
+  
+      limits["fc_counts"].Fill(fc_limit);
+      limits["fc_lifetime"].Fill(fc_lifetime);
+      limits["fc_mass"].Fill(1000 * fc_mass);
+      if (0 >= fc_llimit && 0 <= fc_limit) {
+        std::cout << "covered" << std::endl;
+        hfccoverage.Fill(nevents);
+      }
+    }
+    else {
+      std::cout << "Skipping Feldman-Cousins calculation" << std::endl;
+    }
+
+    // output best-fit parameters
     std::cout << "-- Best fit: NLL = " << ml << " --" << std::endl;
     for (size_t j=0; j<params.size(); j++) {
       float fp = params_fit[j];
@@ -412,6 +531,21 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
     delete[] params_fit;
   }
 
+  hcontcoverage.Divide(&hcounts);
+  hfccoverage.Divide(&hcounts);
+
+  TCanvas ccov;
+  hcontcoverage.SetLineColor(kRed);
+  hcontcoverage.SetLineWidth(2);
+  hcontcoverage.Draw();
+  hcontcoverage.GetXaxis()->SetRangeUser(0, 20);
+  hfccoverage.SetLineColor(kBlue);
+  hfccoverage.SetLineWidth(2);
+  hfccoverage.SetLineStyle(2);
+  hfccoverage.Draw("same");
+  ccov.SaveAs("coverage.pdf");
+  ccov.SaveAs("coverage.C");
+
   return limits;
 }
 
@@ -445,7 +579,7 @@ int main(int argc, char* argv[]) {
   // run ensemble
   std::map<std::string, TH1F> limits = \
     ensemble(fc.signals, fc.systematics, fc.observables, fc.cuts, fc.steps,
-             fc.burnin_fraction, fc.signal_name, fc.confidence,
+             fc.burnin_fraction, fc.signal_name, fc.signal_eff, fc.confidence,
              fc.experiments, fc.live_time, fc.debug_mode);
 
   // plot distribution of limits

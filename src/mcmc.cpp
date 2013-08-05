@@ -132,10 +132,11 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
   const float scale_factor = 2.4 * 2.4 / this->nparameters;  // Haario, 2001
   for (size_t i=0; i<this->nparameters; i++) {
     float mean = this->parameter_means->readOnlyHostPtr()[i];
-    float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
+    float sigma = this->parameter_sigma->readOnlyHostPtr()[i] / 10;
     float width = (sigma > 0 ? sigma : sqrt(mean));
     jump_width.writeOnlyHostPtr()[i] = \
       (width > 0 ? width : 10.0) * scale_factor;
+    std::cout << this->parameter_names[i] << " " << this->parameter_means->readOnlyHostPtr()[i] << " " << this->parameter_sigma->readOnlyHostPtr()[i] << " " << jump_width.readOnlyHostPtr()[i] << std::endl;
   }
 
   // buffers for computing event term in nll
@@ -201,26 +202,13 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
       std::cout << "MCMC: Burn-in phase completed after " << burnin_steps
                 << " steps" << std::endl;
 
-      // fit a Gaussian in each dimension to estimate distribution width
+      // rescale jumps in each dimension based on RMS during burn-in
       for (size_t j=0; j<this->nparameters; j++) {
         std::string name = this->parameter_names[j];
         nt->Draw((name + ">>hsproj").c_str());
         TH1F* hsproj = (TH1F*) gDirectory->Get("hsproj");
 
-        if (!hsproj) {
-          std::cerr << "MCMC: failed to get signal projection" << std::endl;
-          continue;
-        }
-
-        hsproj->Fit("gaus", "q");
-        TF1* fsproj = hsproj->GetFunction("gaus");
-
-        if (!fsproj) {
-          std::cerr << "MCMC: failed to fit signal projection" << std::endl;
-          continue;
-        }
-
-        double fit_width = fsproj->GetParameter(2);
+        double fit_width = hsproj->GetRMS();
 
         std::cout << "MCMC: Rescaling jump sigma: " << name << ": "
                   << scale_factor * fit_width << std::endl;
