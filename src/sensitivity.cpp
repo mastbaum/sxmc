@@ -150,27 +150,27 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
                                      float live_time, const bool debug_mode) {
   std::map<std::string, TH1F> limits;
   limits["counts"] = TH1F("limits_c", ";Counts in fit range;Fraction",
-                          150, 0, 300);
+                          10000, 0, 500);
   limits["lifetime"] = TH1F("limits_l", ";T_{1/2} limit (y);Fraction",
-                            100, 2e25, 1e26);
+                            10000, 1e24, 1e27);
   limits["mass"] = TH1F("limits_m", ";m_{#beta#beta} limit (meV);Fraction",
-                        75, 50, 200);
+                        1000, 0, 1000);
   limits["fc_counts"] = TH1F("fc_limits_c", ";Counts in fit range;Fraction",
-                             150, 0, 300);
+                             1000, 0, 500);
   limits["fc_lifetime"] = TH1F("fc_limits_l", ";T_{1/2} limit (y);Fraction",
-                               100, 2e25, 1e26);
+                               10000, 1e24, 1e27);
   limits["fc_mass"] = TH1F("fc_limits_m",
                            ";m_{#beta#beta} limit (meV);Fraction",
-                           75, 50, 200);
+                           10000, 0, 1000);
   limits["contour_counts"] = TH1F("contour_limits_c",
                                   ";Counts in fit range;Fraction",
-                                  150, 0, 300);
+                                  10000, 0, 500);
   limits["contour_lifetime"] = TH1F("contour_limits_l",
                                     ";T_{1/2} limit (y);Fraction",
-                                    100, 2e25, 1e26);
+                                    10000, 1e24, 1e27);
   limits["contour_mass"] = TH1F("contour_limits_m",
                                 ";m_{#beta#beta} limit (meV);Fraction",
-                                75, 50, 200);
+                                1000, 0, 1000);
 
   // coverage calculation
   TH1F hfccoverage("hfccoverage", ";True N;Coverage", 50, 0, 50);
@@ -287,7 +287,6 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
 
     // parameters for counts -> lifetime -> mass conversion
     float n_te130 = 7.46e26 * TMath::Power(radius_cut / 3500, 3);
-    std::cout << "rcut = " << radius_cut << std::endl;
     float Mbb = 4.03;  // IBM-2
     float Gphase = 3.69e-14;  // y^-1, using g_A = 1.269
     float m_beta = 511e3;  // 511 keV, in eV
@@ -454,8 +453,14 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
           fit_total[k] = (TH1D*) hpdf[k]->Clone(hfname.c_str());
         }
         else {
-          fit_total[k]->Add(hpdf[k]);
+          if (hpdf[k] && hpdf[k]->Integral() > 0) {
+            fit_total[k]->Add(hpdf[k]);
+          }
         }
+  	TCanvas c1;
+	fit_total[k]->Draw();
+	c1.SaveAs((signals[j].name + ".pdf").c_str());
+
 
         if (n == "av_tl208" || n == "av_bi214" ||
             n == "water_tl208" || n == "water_bi214" ||
@@ -468,7 +473,9 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
             external_total[k] = (TH1D*) hpdf[k]->Clone(hname.c_str());
           }
           else {
-            external_total[k]->Add((TH1D*) hpdf[k]->Clone(hname.c_str()));
+            if (hpdf[k] && hpdf[k]->Integral() > 0) {
+              external_total[k]->Add((TH1D*) hpdf[k]->Clone(hname.c_str()));
+            }
           }
         }
         else if (n != "zeronu" && n != "twonu" && n != "int_tl208" &&
@@ -483,7 +490,9 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
           }
         }
         else {
-          plots_full[k].add(hpdf[k], signals[j].title, "hist");
+          if (hpdf[k] && hpdf[k]->Integral() > 0) {
+            plots_full[k].add(hpdf[k], signals[j].title, "hist");
+          }
         }
       }
     }

@@ -89,6 +89,10 @@ class SpectralPlot {
         this->histograms.push_back(o.histograms[i]);
       }
       this->c = new TCanvas();
+
+      if (o.logy) {
+        this->c->SetLogy();
+      }
       this->legend = (TLegend*) o.legend->Clone("");
     }
 

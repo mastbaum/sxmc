@@ -135,8 +135,7 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
     float sigma = this->parameter_sigma->readOnlyHostPtr()[i] / 10;
     float width = (sigma > 0 ? sigma : sqrt(mean));
     jump_width.writeOnlyHostPtr()[i] = \
-      (width > 0 ? width : 10.0) * scale_factor;
-    std::cout << this->parameter_names[i] << " " << this->parameter_means->readOnlyHostPtr()[i] << " " << this->parameter_sigma->readOnlyHostPtr()[i] << " " << jump_width.readOnlyHostPtr()[i] << std::endl;
+      (width > 0 ? width : 10) * scale_factor;
   }
 
   // buffers for computing event term in nll

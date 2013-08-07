@@ -70,6 +70,14 @@ FitConfig::FitConfig(std::string filename) {
     o.lower = o_json["min"].asFloat();
     o.upper = o_json["max"].asFloat();
     o.units = o_json["units"].asString();
+    if (o_json.isMember("exclude")) {
+      o.exclude = true;
+      o.exclude_min = o_json["exclude"][0].asFloat();
+      o.exclude_max = o_json["exclude"][1].asFloat();
+    }
+    else {
+      o.exclude = false;
+    }
     all_observables[it.key().asString()] = o;
   }
 
@@ -246,22 +254,54 @@ FitConfig::FitConfig(std::string filename) {
       }
     }
 
+    std::vector<bool> field_has_exclude(hdf5_fields.size(), false);
+    std::vector<double> field_exclude_lower(hdf5_fields.size());
+    std::vector<double> field_exclude_upper(hdf5_fields.size());
+    for (size_t i=0; i<hdf5_fields.size(); i++) {
+      for (size_t j=0; j<this->observables.size(); j++) {
+        std::string field_name = this->observables[j].field;
+        size_t index = (std::find(hdf5_fields.begin(), hdf5_fields.end(),
+                                  field_name) -
+                        hdf5_fields.begin());
+
+        if (this->observables[j].field == hdf5_fields[i] &&
+            this->observables[j].exclude) {
+          field_has_exclude[i] = true;
+          field_exclude_lower[i] = this->observables[j].exclude_min;
+          field_exclude_upper[i] = this->observables[j].exclude_max;
+        }
+      }
+    }
+
+    assert(rank[1] == hdf5_fields.size());
     size_t sample_index = 0;
     for (size_t i=0; i<s.nevents; i++) {
       // apply cuts
-      if (!this->cuts.empty()) {
-        bool event_valid = true;
-        for (size_t j=0; j<hdf5_fields.size(); j++) {
-          float v = dataset[i * rank[1] + j];
-          if (field_has_cut[j] &&
-              (v < field_cut_lower[j] || v > field_cut_upper[j])) {
-            event_valid = false;
-            break;
+      bool event_valid = true;
+      size_t excludes_total = 0;
+      size_t excludes_cut = 0;
+
+      for (size_t j=0; j<hdf5_fields.size(); j++) {
+        float v = dataset[i * rank[1] + j];
+
+        // cut on unobserved observables
+        if (field_has_cut[j] &&
+            (v < field_cut_lower[j] || v > field_cut_upper[j])) {
+          event_valid = false;
+          break;
+        }
+
+        // union of excluded regions in observable ranges
+        if (field_has_exclude[j]) {
+          excludes_total++;
+          if (v >= field_exclude_lower[j] && v <= field_exclude_upper[j]) {
+            excludes_cut++;
           }
         }
-        if (!event_valid) {
-          continue;
-        }
+      }
+
+      if (!event_valid || excludes_cut == excludes_total) {
+        continue;
       }
 
       for (size_t j=0; j<sample_fields.size(); j++) {
@@ -277,6 +317,10 @@ FitConfig::FitConfig(std::string filename) {
     std::cout << "FitConfig::FitConfig: Initializing PDF for " << s.name
               << " using " << s.nevents << " events (" << years << " y)"
               << std::endl;
+
+    if (s.name == this->signal_name) {
+      this->signal_eff = 1.0 * sample_index / s.nevents;
+    }
 
     // perhaps we skipped some events due to cuts
     if (sample_index != s.nevents) {
@@ -345,7 +389,6 @@ FitConfig::FitConfig(std::string filename) {
   hemi::Array<unsigned> norms_buffer(signals.size(), true);
   norms_buffer.writeOnlyHostPtr();
 
-  this->signal_eff = 1.0;
   for (size_t i=0; i<this->signals.size(); i++) {
     pdfz::Eval* p = this->signals[i].histogram;
     p->SetNormalizationBuffer(&norms_buffer, i);
@@ -357,7 +400,7 @@ FitConfig::FitConfig(std::string filename) {
       this->signals[i].nexpected *= rescale;
       this->signals[i].sigma *= rescale;
       if (this->signals[i].name == this->signal_name) {
-        this->signal_eff = rescale;
+        this->signal_eff *= rescale;
         std::cout << "FitConfig::FitConfig: Signal efficiency: "
                   << this->signal_eff << std::endl;
       }

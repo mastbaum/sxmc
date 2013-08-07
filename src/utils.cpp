@@ -92,8 +92,7 @@ SpectralPlot::~SpectralPlot() {
 
 
 void SpectralPlot::add(TH1* _h, std::string title, std::string options) {
-  _h->SetDirectory(NULL);
-  std::string name = "__" + std::string(_h->GetName());
+  std::string name = "__" + std::string(title);
   TH1* h = dynamic_cast<TH1*>(_h->Clone(name.c_str()));
   h->SetDirectory(NULL);
 
@@ -103,6 +102,10 @@ void SpectralPlot::add(TH1* _h, std::string title, std::string options) {
   h->SetYTitle(ytitle.c_str());
 
   this->legend->AddEntry(h, title.c_str());
+
+  if (!h || h->Integral() == 0) {
+    return;
+  }
 
   this->histograms.push_back(h);
 
