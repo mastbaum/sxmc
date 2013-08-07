@@ -31,8 +31,8 @@ protected:
   int nobservables;
   int nfields;
   std::vector<float> samples;
-  std::vector<float> lower;
-  std::vector<float> upper;
+  std::vector<double> lower;
+  std::vector<double> upper;
   std::vector<int> nbins;
 };
 
@@ -51,7 +51,7 @@ protected:
 
         pdf_values = new hemi::Array<float>(20, true);
         norm = new hemi::Array<unsigned int>(3, true);
-        params = new hemi::Array<float>(5, true);
+        params = new hemi::Array<double>(5, true);
         params->writeOnlyHostPtr(); // Force memory allocation
     }
 
@@ -68,7 +68,7 @@ protected:
     std::vector<float> eval_points;
     hemi::Array<float> *pdf_values;
     hemi::Array<unsigned int> *norm;
-    hemi::Array<float> *params;
+    hemi::Array<double> *params;
 };
 
 

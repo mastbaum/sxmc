@@ -43,8 +43,8 @@ void bench_pdfz()
          << "        # of bins = " << nbins << "\n"
          << "        # of systematics = 1\n";
 
-    std::vector<float> lower(1);
-    std::vector<float> upper(1);
+    std::vector<double> lower(1);
+    std::vector<double> upper(1);
     std::vector<int> nbins_vec(1);
 
     pdfz::ShiftSystematic shift(0,0);
@@ -64,7 +64,7 @@ void bench_pdfz()
 
     hemi::Array<float> pdf_values(neval_points, true);
     hemi::Array<unsigned int> norm (1, true);
-    hemi::Array<float> params(1, true);
+    hemi::Array<double> params(1, true);
     params.writeOnlyHostPtr()[0] = 0.0f;
 
     evaluator.SetEvalPoints(eval_points);
@@ -106,8 +106,8 @@ void bench_pdfz_group()
     const int neval_points = 100000;
     const int nbins = 1000;
 
-    std::vector<float> lower(1);
-    std::vector<float> upper(1);
+    std::vector<double> lower(1);
+    std::vector<double> upper(1);
     std::vector<int> nbins_vec(1);
 
     pdfz::ShiftSystematic shift(0,0);
@@ -170,7 +170,7 @@ void bench_pdfz_group()
 
     hemi::Array<float> pdf_values(neval_points * nsignals, true);
     hemi::Array<unsigned int> norm (nsignals, true);
-    hemi::Array<float> params(1, true);
+    hemi::Array<double> params(1, true);
     params.writeOnlyHostPtr()[0] = 0.0f;
 
     // Don't profile warmup stage (w/ optimization of block size)
