@@ -229,6 +229,7 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
         break;
       }
     }
+    std::cout << "Radius cut: " << radius_cut << std::endl;
 
     // extract likelihood-maximizing parameters
     std::cout << "Finding maximum likelihood..." << std::endl;

@@ -300,7 +300,8 @@ FitConfig::FitConfig(std::string filename) {
         }
       }
 
-      if (!event_valid || excludes_cut == excludes_total) {
+      if (!event_valid ||
+          (excludes_total > 0 && excludes_cut == excludes_total)) {
         continue;
       }
 

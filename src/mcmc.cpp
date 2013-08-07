@@ -135,7 +135,7 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
     float sigma = this->parameter_sigma->readOnlyHostPtr()[i] / 10;
     float width = (sigma > 0 ? sigma : sqrt(mean));
     jump_width.writeOnlyHostPtr()[i] = \
-      (width > 0 ? width : 10) * scale_factor;
+      (width > 0 ? width : 1.0 / this->nobservables) * scale_factor;
   }
 
   // buffers for computing event term in nll
@@ -210,8 +210,11 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
         double fit_width = hsproj->GetRMS();
 
         std::cout << "MCMC: Rescaling jump sigma: " << name << ": "
-                  << scale_factor * fit_width << std::endl;
+                  << jump_width.readOnlyHostPtr()[j] << " -> ";
+
         jump_width.writeOnlyHostPtr()[j] = scale_factor * fit_width;
+
+        std::cout << jump_width.readOnlyHostPtr()[j] << std::endl;
 
         hsproj->Delete();
       }
