@@ -115,10 +115,12 @@ namespace pdfz {
         if (syst.type == Systematic::SHIFT) {
             const ShiftSystematic &shift = dynamic_cast<const ShiftSystematic &>(syst);
             desc.obs = shift.obs;
+            desc.extra_field = 0;
             desc.par = shift.par;
         } else if (syst.type == Systematic::SCALE) {
             const ScaleSystematic &scale = dynamic_cast<const ScaleSystematic &>(syst);
             desc.obs = scale.obs;
+            desc.extra_field = 0;
             desc.par = scale.par;
         } else if (syst.type == Systematic::RESOLUTION_SCALE) {
             const ResolutionScaleSystematic &res = dynamic_cast<const ResolutionScaleSystematic &>(syst);
