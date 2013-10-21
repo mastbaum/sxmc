@@ -11,6 +11,7 @@
 #include <TH1.h>
 #include <TH1D.h>
 #include <TH2F.h>
+#include <TMath.h>
 #include "signals.h"
 #include "config.h"
 #include "utils.h"
@@ -273,6 +274,28 @@ FitConfig::FitConfig(std::string filename) {
       }
     }
 
+    // hack to do (r/r_av)^3 since it's not in the hdf5 files yet
+    std::vector<bool> do_r3_transform(sample_fields.size(), false);
+    for (size_t i=0; i<this->observables.size(); i++) {
+      if (this->observables[i].name != "R_CUBED") {
+        continue;
+      }
+
+      std::string field_name = this->observables[i].field;
+      size_t field = (std::find(hdf5_fields.begin(), hdf5_fields.end(),
+                                field_name) -
+                      hdf5_fields.begin());
+      assert(field < hdf5_fields.size());
+
+      for (size_t j=0; j<sample_fields.size(); j++) {
+        if (field == sample_fields[j]) {
+          do_r3_transform[j] = true;
+          std::cout << "FitConfig::FitConfig: Doing R^3 transformation on "
+                    << sample_fields[j] << std::endl;
+        }
+      }
+    }
+
     assert(rank[1] == hdf5_fields.size());
     size_t sample_index = 0;
     for (size_t i=0; i<s.nevents; i++) {
@@ -306,8 +329,12 @@ FitConfig::FitConfig(std::string filename) {
       }
 
       for (size_t j=0; j<sample_fields.size(); j++) {
-        samples[sample_index * sample_fields.size() + j] = \
-          dataset[i * rank[1] + sample_fields[j]];
+        float data = dataset[i * rank[1] + sample_fields[j]];
+        if (do_r3_transform[j]) {
+          data = TMath::Power(data / 6005.0, 3);
+        }
+        samples[sample_index * sample_fields.size() + j] = data;
+          
       }
       sample_index++;
     }

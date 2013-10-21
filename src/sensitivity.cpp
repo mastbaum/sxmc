@@ -181,7 +181,7 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
   hcounts.Sumw2();
 
   for (unsigned i=0; i<nexperiments; i++) {
-    std::cout << "Experiment " << i << " / " << nexperiments << std::endl;
+    std::cout << "Experiment " << i + 1 << " / " << nexperiments << std::endl;
 
     // make fake data
     std::vector<float> params;
@@ -222,6 +222,10 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
         radius_cut = observables[j].upper;
         break;
       }
+      if (observables[j].name == "R_CUBED") {
+        radius_cut = 6005.0 * TMath::Power(observables[j].upper, 1.0 / 3);
+        break;
+      }
     }
     for (size_t j=0; j<cuts.size(); j++) {
       if (cuts[j].name == "radius") {
@@ -259,7 +263,7 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
 
     // find contour
     std::cout << "Generating " << 100 * confidence
-              << " contour..." << std::endl;
+              << "\% CL contour..." << std::endl;
     float delta = 0.5 * TMath::ChisquareQuantile(confidence, 1);
     TNtuple* lscontour = (TNtuple*) lspace->Clone("lscontour");
     lscontour->Reset();
@@ -401,8 +405,9 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
     for (size_t j=0; j<observables.size(); j++) {
       Observable* o = &observables[j];
       std::stringstream ytitle;
-      ytitle << "Counts/" << (o->upper - o->lower) / o->bins << " "
-             << o->units << "/" << live_time << " y";
+      ytitle << "Counts/" << std::setprecision(3)
+             << (o->upper - o->lower) / o->bins << " " << o->units
+             << "/" << live_time << " y";
       plots_full.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 1e6,
                            true, "", o->title, ytitle.str().c_str()));
       plots_external.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 1e6,
@@ -458,10 +463,6 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
             fit_total[k]->Add(hpdf[k]);
           }
         }
-  	TCanvas c1;
-	fit_total[k]->Draw();
-	c1.SaveAs((signals[j].name + ".pdf").c_str());
-
 
         if (n == "av_tl208" || n == "av_bi214" ||
             n == "water_tl208" || n == "water_bi214" ||
@@ -506,6 +507,10 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
       hdata->SetLineColor(kBlack);
 
       for (size_t idata=0; idata<data.size() / observables.size(); idata++) {
+        // hack to include only radius ROI
+        if (j == 0 && data[idata * observables.size() + 1] > radius_cut) {
+          continue;
+        }
         hdata->Fill(data[idata * observables.size() + j]);
       }
 
