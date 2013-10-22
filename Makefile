@@ -48,12 +48,12 @@ OBJECTS = $(SOURCES:src/%.cpp=$(OBJ_DIR)/%.o)
 JSONCPP_SOURCES = $(wildcard $(JSONCPP_SRC)/*.cpp)
 JSONCPP_OBJECTS = $(JSONCPP_SOURCES:$(JSONCPP_SRC)/%.cpp=$(OBJ_DIR)/jsoncpp/%.o)
 
-# For unit test suit
-SXMC_NO_MAIN_FUNCTION_OBJECTS = $(filter-out build/sensitivity.o, $(OBJECTS) $(JSONCPP_OBJECTS) build/mcmc.o build/nll_kernels.o build/pdfz.o)
+# For unit test suite
+SXMC_NO_MAIN_FUNCTION_OBJECTS = $(filter-out build/sxmc.o, $(OBJECTS) $(JSONCPP_OBJECTS) build/mcmc.o build/nll_kernels.o build/pdfz.o)
 TEST_SOURCES = $(wildcard test/*.cpp)
 TEST_OBJECTS = $(TEST_SOURCES:test/%.cpp=$(OBJ_DIR)/test/%.o)
 
-EXE = bin/sensitivity
+EXE = bin/sxmc
 
 ifndef RATROOT
 $(error RATROOT is not set)
@@ -133,3 +133,4 @@ $(OBJ_DIR)/bench_sxmc.o: bench/bench_sxmc.cpp
 
 bin/bench_sxmc: $(OBJ_DIR)/bench_sxmc.o $(SXMC_NO_MAIN_FUNCTION_OBJECTS)
 	$(GCC) -o $@ $^ $(GCCFLAGS) $(LFLAGS) $(CUDA_LFLAGS)
+

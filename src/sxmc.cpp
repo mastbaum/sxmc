@@ -1,5 +1,5 @@
 /**
- * \file sensitivity.cpp
+ * \file sxmc.cpp
  * \brief Calculate sensitivity with an MCMC
  *
  * An ensemble of fake experiments is generated and each fit with an MCMC, with
@@ -31,6 +31,7 @@
 #include "generator.h"
 #include "mcmc.h"
 #include "utils.h"
+#include "likelihood.h"
 
 /** A ROOT color palette in which sequential colors look okay. */
 static const int color[28] = {kRed,      kGreen,    kBlue,      kMagenta,
@@ -40,84 +41,6 @@ static const int color[28] = {kRed,      kGreen,    kBlue,      kMagenta,
                               kGreen-7,  kBlue-7,   kMagenta-7, kCyan-7,
                               kYellow-7, kOrange-7, kRed-6,     kAzure+1,
                               kTeal+1,   kSpring-9, kAzure-9};
-
-
-/**
- * Find an upper limit
- *
- * Locate the x value that a fraction 1-CL/2 of the distribution falls above.
- * This may over-cover due to finite histogram bin widths.
- *
- * \param h 1D histogram to calculate limit on
- * \param cl Confidence level
- * \returns The nearest bin edge covering at least the desired confidence
- */
-double upper_limit(TH1F* h, double cl=0.682) {
-  double tail = (1.0 - cl) / 2;
-  double integral = 0;
-  int thisbin = h->GetNbinsX();
-  while (integral < tail * h->Integral()) {
-    integral = h->Integral(thisbin--, h->GetNbinsX()+1);
-  }
-  return h->GetBinLowEdge(thisbin + 1);
-}
-
-
-/**
- * Find a confidence interval
- *
- * Locate the boundaries of a confidence interval, optionally bounded at zero.
- * Typically, we integrate outward from the central value such that a
- * fraction CL/2 falls on either side. In the bounded case, the interval is
- * shifted upward so that it all falls above 0, and the upper boundary is
- * reported as a limit, in the spirit of Feldman & Cousins.
- *
- * This may over-cover due to finite histogram bin widths.
- *
- * \param h 1D histogram to calculate limit on
- * \param mu Central value
- * \param lower Lower boundary of the interval
- * \param upper Upper boundary of the interval
- * \param limit True if the upper boundary is a limit
- * \param bounded Apply a boundary at zero
- * \param cl Confidence level
- */
-void find_interval(TH1F* h, float mu, float& lower, float& upper, bool& limit,
-                   bool bounded=false, double cl=0.682) {
-  int central_bin = h->FindBin(mu);
-  float total_integral = h->Integral();
-  limit = false;
-
-  // lower boundary
-  int lower_bin = central_bin;
-  float integral = 0;
-  while (integral < cl/2 * total_integral) {
-    integral = h->Integral(lower_bin--, central_bin);
-
-    // crashed into zero?
-    if ((h->GetBinLowEdge(lower_bin) <= 0 && bounded) || lower_bin == 0) {
-      lower_bin = 1;
-      limit = true;
-      break;
-    }
-  }
-
-  // upper boundary, starting from lower boundary
-  int upper_bin = lower_bin;
-  integral = 0;
-  while (integral < cl * total_integral) {
-    integral = h->Integral(lower_bin, upper_bin++);
-
-    // we've run out of pdf... shift the interval down
-    if (upper_bin > h->GetNbinsX() + 1) {
-      upper_bin--;
-      lower_bin--;
-    }
-  }
-
-  lower = h->GetBinLowEdge(lower_bin);
-  upper = h->GetBinLowEdge(upper_bin);
-}
 
 
 /**
@@ -204,201 +127,20 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
 
     // run mcmc
     MCMC mcmc(signals, systematics, observables);
-    TNtuple* lspace = mcmc(data, steps, burnin_fraction, debug_mode);
+    TNtuple* ls_samples = mcmc(data, steps, burnin_fraction, debug_mode);
 
     TFile f("lspace.root", "recreate");
-    TNtuple* lsclone = (TNtuple*) lspace->Clone("ls");
+    TNtuple* lsclone = (TNtuple*) ls_samples->Clone("ls_samples");
     lsclone->Write();
+    //lsclone->Delete();
     f.Close();
 
     // calculate signal sensitivity
-    TH1F hproj("hproj", "hproj", 20000, 0, 500);
-    lspace->Draw((signal_name + ">>hproj").c_str(), "", "goff");
-    double limit = upper_limit(&hproj, confidence);
-
-    float radius_cut = 0;
-    for (size_t j=0; j<observables.size(); j++) {
-      if (observables[j].name == "radius") {
-        radius_cut = observables[j].upper;
-        break;
-      }
-      if (observables[j].name == "R_CUBED") {
-        radius_cut = 6005.0 * TMath::Power(observables[j].upper, 1.0 / 3);
-        break;
-      }
-    }
-    for (size_t j=0; j<cuts.size(); j++) {
-      if (cuts[j].name == "radius") {
-        radius_cut = cuts[j].upper;
-        break;
-      }
-    }
-    std::cout << "Radius cut: " << radius_cut << std::endl;
-
-    // extract likelihood-maximizing parameters
-    std::cout << "Finding maximum likelihood..." << std::endl;
-    float* params_branch = new float[params.size()];
-    for (size_t j=0; j<params.size(); j++) {
-      lspace->SetBranchAddress(param_names[j].c_str(), &params_branch[j]);
-    }
-    float ml_branch;
-    lspace->SetBranchAddress("likelihood", &ml_branch);
-    float* params_fit = new float[params.size()];
-    float ml = 1e9;
-    float nfit = 0;
-    for (int j=0; j<lspace->GetEntries(); j++) {
-      lspace->GetEntry(j);
-      if (ml_branch < ml) {
-        ml = ml_branch;
-        nfit = 0;
-        for (size_t k=0; k<params.size(); k++) {
-          params_fit[k] = params_branch[k];
-          if (k < signals.size()) {
-            nfit += params_fit[k];
-          }
-        }
-      }
-    }
-    std::cout << "Fit " << nfit << " events" << std::endl;
-
-    // find contour
-    std::cout << "Generating " << 100 * confidence
-              << "\% CL contour..." << std::endl;
-    float delta = 0.5 * TMath::ChisquareQuantile(confidence, 1);
-    TNtuple* lscontour = (TNtuple*) lspace->Clone("lscontour");
-    lscontour->Reset();
-
-    float* v = new float[params.size() + 1];
-    for (int j=0; j<lspace->GetEntries(); j++) {
-      lspace->GetEntry(j);
-      // build a list of points inside the contour
-      if (ml_branch < ml + delta) {
-        for (size_t k=0; k<params.size(); k++) {
-          v[k] = params_branch[k];
-        }
-        v[params.size()] = ml_branch;
-        lscontour->Fill(v);
-      }
-    }
-    delete[] v;
-    
-    TH1F hcproj("hcproj", "hcproj", 20000, 0, 500);
-    lscontour->Draw((signal_name + ">>hcproj").c_str(), "", "goff");
-    int ul_bin = hcproj.FindLastBinAbove(0);
-    int ll_bin = hcproj.FindFirstBinAbove(0);
-    double ul_contour = hcproj.GetBinLowEdge(ul_bin) +
-                        hcproj.GetBinWidth(ul_bin);
-    double ll_contour = hcproj.GetBinLowEdge(ll_bin);
-
-    // parameters for counts -> lifetime -> mass conversion
-    float n_te130 = 7.46e26 * TMath::Power(radius_cut / 3500, 3);
-    float Mbb = 4.03;  // IBM-2
-    float Gphase = 3.69e-14;  // y^-1, using g_A = 1.269
-    float m_beta = 511e3;  // 511 keV, in eV
-
-    // calculate sensitivity by integrating over backgrounds
-    float lifetime = n_te130 * live_time * 0.69315 * signal_eff / limit;
-    float mass = m_beta / TMath::Sqrt(lifetime * Gphase * Mbb * Mbb);
-
-    std::cout << "-- Sensitivity (marginalized backgrounds): "
-              << confidence * 100 << "\% CL --" << std::endl;
-    std::cout << " Counts: " << limit << std::endl;
-    std::cout << " T_1/2:  " << lifetime << " y" << std::endl;
-    std::cout << " Mass:   " << 1000 * mass << " meV" << std::endl;
-
-    limits["counts"].Fill(limit);
-    limits["lifetime"].Fill(lifetime);
-    limits["mass"].Fill(1000 * mass);
-
-    // sensitivity using minos-like contour
-    float lifetime_contour = \
-      n_te130 * live_time * 0.69315 * signal_eff / ul_contour;
-    float mass_contour = \
-      m_beta / TMath::Sqrt(lifetime_contour * Gphase * Mbb * Mbb);
-
-    std::cout << "-- Contour Sensitivity: " << confidence * 100 << "\% CL --"
-              << std::endl;
-    std::cout << " Delta Chi2: " << 2 * delta << std::endl;
-    std::cout << " UL Counts:  " << ul_contour << std::endl;
-    std::cout << " LL Counts:  " << ll_contour << std::endl;
-    std::cout << " T_1/2:      " << lifetime_contour << " y" << std::endl;
-    std::cout << " Mass:       " << 1000 * mass_contour << " meV" << std::endl;
-
-    limits["contour_counts"].Fill(ul_contour);
-    limits["contour_lifetime"].Fill(lifetime_contour);
-    limits["contour_mass"].Fill(1000 * mass_contour);
-    if (0 >= ll_contour && 0 <= ul_contour) {
-      std::cout << "covered" << std::endl;
-      hcontcoverage.Fill(nevents);
-    }
-
-    // sensitivity using feldman-cousins
-    if (nevents < 25) {
-      TFeldmanCousins tfc(confidence);
-      tfc.SetMuMax(2500);
-      float fc_limit = tfc.CalculateUpperLimit(nevents, nexpected);
-      float fc_llimit = tfc.CalculateLowerLimit(nevents, nexpected);
-      float fc_lifetime = n_te130 * live_time * 0.69315 * signal_eff / fc_limit;
-      float fc_mass = m_beta / TMath::Sqrt(fc_lifetime * Gphase * Mbb * Mbb);
-      std::cout << "-- Feldman-Cousins Sensitivity: "
-                << 100 * confidence << "\% CL --" << std::endl;
-      std::cout << " UL Counts: " << fc_limit << std::endl;
-      std::cout << " LL Counts: " << fc_llimit << std::endl;
-      std::cout << " T_1/2:     " << fc_lifetime << " y" << std::endl;
-      std::cout << " Mass:      " << 1000 * fc_mass << " meV" << std::endl;
-  
-      limits["fc_counts"].Fill(fc_limit);
-      limits["fc_lifetime"].Fill(fc_lifetime);
-      limits["fc_mass"].Fill(1000 * fc_mass);
-      if (0 >= fc_llimit && 0 <= fc_limit) {
-        std::cout << "covered" << std::endl;
-        hfccoverage.Fill(nevents);
-      }
-    }
-    else {
-      std::cout << "Skipping Feldman-Cousins calculation" << std::endl;
-    }
-
-    // output best-fit parameters
-    std::cout << "-- Best fit: NLL = " << ml << " --" << std::endl;
-    for (size_t j=0; j<params.size(); j++) {
-      float fp = params_fit[j];
-      float sqrt_fp = TMath::Sqrt(fp);
-      TH1F hp("hp", "hp", 10000, fp - 50.0 * sqrt_fp, fp + 50.0 * sqrt_fp);
-      lspace->Draw((param_names[j] + ">>hp").c_str(), "", "goff");
-      float lower_boundary;
-      float upper_boundary;
-      bool is_limit;
-      find_interval(&hp, params_fit[j], lower_boundary, upper_boundary,
-                    is_limit, (j < signals.size()), 0.682);
-      float lower_error = params_fit[j] - lower_boundary;
-      float upper_error = upper_boundary - params_fit[j];
-
-      std::cout << " " << param_names[j] << ": " << params_fit[j];
-      if (is_limit) {
-        std::cout << " <" << upper_error << " @ 68\% CL";
-      }
-      else {
-        std::cout << " -" << lower_error << " +" << upper_error;
-      }
-      std::cout << (j < signals.size() ? " (N = " : " (mean = ")
-                << params[j] <<  ")";
-      std::cout << std::endl;
-    }
-
-    std::cout << "-- Correlation matrix --" << std::endl;
-    std::vector<float> correlations = get_correlation_matrix(lspace);
-    for (size_t j=0; j<params.size(); j++) {
-      std::cout << std::setw(20) << param_names[j] << " ";
-      for (size_t k=0; k<params.size(); k++) {
-        std::cout << std::setiosflags(std::ios::fixed)
-                  << std::setprecision(3) << std::setw(8)
-                  << correlations[k + j * (params.size() + 1)];
-      }
-      std::cout << std::resetiosflags(std::ios::fixed) << std::endl;
-    }
-
-    // plot and save this fit
+    LikelihoodSpace lspace(ls_samples);
+    lspace.print_best_fit();
+    lspace.print_correlations();
+/*
+    // plot this fit
     std::vector<SpectralPlot> plots_full;
     std::vector<SpectralPlot> plots_external;
     std::vector<SpectralPlot> plots_cosmogenic;
@@ -544,6 +286,9 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
     delete lspace;
     delete[] params_branch;
     delete[] params_fit;
+*/
+    //ls_samples->Delete();
+
   }
 
   hcontcoverage.Divide(&hcounts);
@@ -605,6 +350,7 @@ int main(int argc, char* argv[]) {
     c1.SaveAs((fc.output_file + "_limits_" + it->first + ".pdf").c_str());
     c1.SaveAs((fc.output_file + "_limits_" + it->first + ".C").c_str());
 
+/*
     // find median
     double xq[1] = {0.5};
     double yq[1];
@@ -622,6 +368,7 @@ int main(int argc, char* argv[]) {
               << " -" << lower_error
               << " +" << upper_error
               << std::endl;
+*/
   }
 
   return 0;

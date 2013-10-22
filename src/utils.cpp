@@ -1,5 +1,7 @@
+#include <iostream>
 #include <vector>
 #include <string>
+#include <assert.h>
 #include <TCanvas.h>
 #include <TLegend.h>
 #include <TH1.h>
@@ -11,6 +13,7 @@
 float get_ntuple_entry(TNtuple* nt, int i, std::string field) {
   float v;
   nt->SetBranchAddress(field.c_str(), &v);
+  assert(i < nt->GetEntries());
   nt->GetEvent(i);
   nt->ResetBranchAddresses();
   return v;
@@ -23,7 +26,11 @@ std::vector<float> get_correlation_matrix(TNtuple* nt) {
   // get list of branch names
   std::vector<std::string> names;
   for (int i=0; i<nt->GetListOfBranches()->GetEntries(); i++) {
-    names.push_back(nt->GetListOfBranches()->At(i)->GetName());
+    std::string name = nt->GetListOfBranches()->At(i)->GetName();
+    if (name == "likelihood") {
+      continue;
+    }
+    names.push_back(name);
   }
 
   std::vector<float> matrix(names.size() * names.size());
@@ -33,15 +40,15 @@ std::vector<float> get_correlation_matrix(TNtuple* nt) {
   std::vector<float> means(names.size(), 0);
   for (int i=0; i<nentries; i++) {
     for (size_t j=0; j<names.size(); j++) {
-      float v = get_ntuple_entry(nt, i, names[j]);
-      table[j + i * names.size()] = v;
-      means[j] += v;
+      float v = get_ntuple_entry(nt, i, names.at(j));
+      table.at(j + i * names.size()) = v;
+      means.at(j) += v;
     }
   }
 
   // sums to means
   for (size_t i=0; i<names.size(); i++) {
-    means[i] /= nentries;
+    means.at(i) /= nentries;
   }
 
   // compute correlations
@@ -51,13 +58,13 @@ std::vector<float> get_correlation_matrix(TNtuple* nt) {
       float dx2 = 0;
       float dy2 = 0;
       for (int k=0; k<nentries; k++) {
-        float x1 = table[k * names.size() + i] - means[i];
-        float x2 = table[k * names.size() + j] - means[j];
+        float x1 = table.at(i + k * names.size()) - means.at(i);
+        float x2 = table.at(j + k * names.size()) - means.at(j);
         t += x1 * x2;
         dx2 += x1 * x1;
         dy2 += x2 * x2;
       }
-      matrix[i * names.size() + j] = t / TMath::Sqrt(dx2 * dy2);
+      matrix.at(i * names.size() + j) = t / TMath::Sqrt(dx2 * dy2);
     }
   }
 
@@ -70,8 +77,9 @@ SpectralPlot::SpectralPlot(int _line_width, float _xmin, float _xmax,
                            std::string _title,
                            std::string _xtitle,
                            std::string _ytitle)
-  : logy(_logy), line_width(_line_width), xmin(_xmin), xmax(_xmax),
-    ymin(_ymin), ymax(_ymax), title(_title), xtitle(_xtitle), ytitle(_ytitle) {
+    : logy(_logy), line_width(_line_width),
+      xmin(_xmin), xmax(_xmax), ymin(_ymin), ymax(_ymax),
+      title(_title), xtitle(_xtitle), ytitle(_ytitle) {
   this->c = new TCanvas();
 
   if (this->logy) {

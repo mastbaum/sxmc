@@ -1,42 +1,85 @@
 {
   "fit": {
-    "mode": 0,  // 0=energy, 1=energy+radius
-    "experiments": 100,  // number in ensemble
-    "steps": 50000,  // mcmc steps
-    "burnin_fraction": 0.1,  // fraction of steps to toss
-    "signal_name": "0vbb",  // name of signal that is the signal
-    "energy_range": [1.5, 5.0],  // fit energy range (MeV)
-    "radius_range": [0.0, 3500.0],  // fit radius range (mm)
-    "rebin_e": 4,  // rebin factor for energy
-    "rebin_r": 10,  // rebin factor for radius
-    "output_file": "fit_spectrum",  // base name for output files
+    "experiments": 1,
+    "steps": 100000,
+    "burnin_fraction": 0.2,
+    "signal_name": "zeronu",
+    "output_file": "fit_example",
+    "debug_mode": false,
     "signals": [
-      "0vbb", "2vbb", "b8"  // list of signals to include
-    ]
+      "zeronu", "b8", "twonu"
+    ],
+    "observables": ["energy"],
+    "cuts": ["radius"],
+    "systematics": []
   },
 
   "experiment": {
-    "live_time": 1.0,  // live time in years
-    "confidence": 0.9  // confidence level for limits
+    "live_time": 1.0,
+    "confidence": 0.9
   },
 
-  "signals": {
-    "0vbb": {  // identifier name
-      "title": "0#nu#beta#beta",  // title for plots (ROOT LaTeX)
-      "filename": "/PATH/TO/zeronu_pdf.root",  // path to histogram file
-      "rate": 0.0  // event rate (per detector-year in domain of 2d pdfs)
+  "pdfs": {
+    "hdf5_fields": [
+      "x",    "y",    "z",    "r",    "e",
+      "mc_x", "mc_y", "mc_z", "mc_r", "mc_e",
+      "ut_d", "ut_s", "ut_ns"
+    ],
+    "observables": {
+      "energy": {
+        "title": "Reconstructed energy (MeV)",
+        "units": "MeV",
+        "field": "e",
+        "bins": 45,
+        "min": 1.4,
+        "max": 5.0
+      },
+      "radius": {
+        "title": "Reconstructed radius (mm)",
+        "units": "mm",
+        "field": "r",
+        "bins": 12,
+        "min": 0.0,
+        "max": 3500.0
+      }
     },
-    "2vbb": {
+    "systematics": {
+      "energy_resolution": {
+        "title": "Energy resolution (keV)",
+        "type": "scale",
+        "observable_field": "e",
+        "true_field": "e_mc",
+        "mean": 0.01,
+        "sigma": 0.01,
+        "fixed": false
+      },
+      "energy_shift": {
+        "title": "Energy shift (keV)",
+        "type": "shift",
+        "observable_field": "e",
+        "mean": 0.01,
+        "sigma": 0.0,
+        "fixed": false
+      }
+    }
+  },
+  "signals": {
+    "zeronu": {
+      "title": "0#nu#beta#beta",
+      "files": ["/path/to/zeronu.hdf5"],
+      "rate": 0.0
+    },
+    "twonu": {
       "title": "2#nu#beta#beta",
-      "filename": "/PATH/TO/twonu_pdf.root",
-      "rate": 123456.0,
-      "constraint": 0.12  // NEMO-3
+      "files": ["/path/to/twonu.hdf5"],
+      "rate": 3.7e6,  // NEMO-3
+      "constraint": 4.44e5  // 12% NEMO-3
     },
     "b8": {
       "title": "^{8}B #nu ES",
-      "filename": "/PATH/TO/b8_pdf.root",
-      "rate": 1234,
-      "constraint": 0.03  // SNO (flux)
+      "files": ["/path/to/b8.hdf5"],
+      "rate": 1236.7,  // SNO
+      "constraint": 37.1  // 3% SNO
     }
   }
 }
