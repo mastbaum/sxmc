@@ -10,10 +10,36 @@
 #include <vector>
 #include <string>
 
+#include <sxmc/errors.h>
+#include <sxmc/signals.h>
+
 class TCanvas;
 class TLegend;
 class TNtuple;
 class TH1;
+
+/** A ROOT color palette in which sequential colors look okay. */
+extern const int colors[28];
+
+
+/**
+ * Plot the results of a fit.
+ *
+ * \todo Don't hard-code plot types (int/ext/cosmogenic); extend config file.
+ *
+ * \param best_fit The best-fit point, used for normalizations
+ * \param live_time Live time in y, used for display only
+ * \param signals List of Signals, used for PDFs
+ * \param systematics List of Systematics, used for names
+ * \param observables List of Observables; 1D plots are created for each
+ * \param data Observed data set
+ */
+void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
+              std::vector<Signal> signals,
+              std::vector<Systematic> systematics,
+              std::vector<Observable> observables,
+              std::vector<float> data);
+
 
 /**
  * Convenience class for making 1D spectral plots.

@@ -25,22 +25,14 @@
 #include <TRandom.h>
 #include <TRandom2.h>
 #include <TMath.h>
+#include <TError.h>
 
 #include <sxmc/config.h>
 #include <sxmc/generator.h>
 #include <sxmc/mcmc.h>
 #include <sxmc/utils.h>
 #include <sxmc/likelihood.h>
-
-/** A ROOT color palette in which sequential colors look okay. */
-static const int color[28] = {kRed,      kGreen,    kBlue,      kMagenta,
-                              kCyan,     kYellow,   kOrange,    kViolet+2,
-                              kRed+2,    kGreen+2,  kBlue+2,    kMagenta+2,
-                              kCyan+2,   kYellow+2, kOrange+2,  kRed-7,
-                              kGreen-7,  kBlue-7,   kMagenta-7, kCyan-7,
-                              kYellow-7, kOrange-7, kRed-6,     kAzure+1,
-                              kTeal+1,   kSpring-9, kAzure-9};
-
+#include <sxmc/plots.h>
 
 /**
  * Run an ensemble of independent fake experiments
@@ -94,9 +86,6 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
     std::vector<float> data = \
       make_fake_dataset(signals, systematics, observables, params, true);
 
-    //size_t nevents = (int) 1.0 * data.size() / observables.size();
-    //hcounts.Fill(nevents);
-
     // Run MCMC
     MCMC mcmc(signals, systematics, observables);
     LikelihoodSpace* ls = mcmc(data, steps, burnin_fraction, debug_mode);
@@ -104,157 +93,13 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
     ls->print_best_fit();
     ls->print_correlations();
 
+    // Make spectral plots
+    plot_fit(ls->get_best_fit(), live_time, signals,
+             systematics, observables, data);
+
+    // Signal sensitivity
+
     delete ls;
-/*
-    // plot this fit
-    std::vector<SpectralPlot> plots_full;
-    std::vector<SpectralPlot> plots_external;
-    std::vector<SpectralPlot> plots_cosmogenic;
-    for (size_t j=0; j<observables.size(); j++) {
-      Observable* o = &observables[j];
-      std::stringstream ytitle;
-      ytitle << "Counts/" << std::setprecision(3)
-             << (o->upper - o->lower) / o->bins << " " << o->units
-             << "/" << live_time << " y";
-      plots_full.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 1e6,
-                           true, "", o->title, ytitle.str().c_str()));
-      plots_external.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 1e6,
-                               true, "", o->title, ytitle.str().c_str()));
-      plots_cosmogenic.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 1e6,
-                                 true, "", o->title, ytitle.str().c_str()));
-    }
-
-    std::vector<TH1D*> external_total(observables.size(), NULL);
-    std::vector<TH1D*> cosmogenic_total(observables.size(), NULL);
-    std::vector<TH1D*> fit_total(observables.size(), NULL);
-
-    hemi::Array<unsigned> norms_buffer(signals.size(), true);
-    norms_buffer.writeOnlyHostPtr();
-
-    hemi::Array<double> param_buffer(params.size(), true);
-    for (size_t j=0; j<params.size(); j++) {
-      param_buffer.writeOnlyHostPtr()[j] = params_fit[j];
-    }
-
-    for (size_t j=0; j<signals.size(); j++) {
-      pdfz::EvalHist* phist = \
-        dynamic_cast<pdfz::EvalHist*>(signals[j].histogram);
-      phist->SetParameterBuffer(&param_buffer, signals.size());
-      phist->SetNormalizationBuffer(&norms_buffer, j);
-
-      TH1* hpdf_nd = phist->CreateHistogram();
-      hpdf_nd->Scale(params_fit[j] / hpdf_nd->Integral());
-
-      std::vector<TH1D*> hpdf(observables.size(), NULL);
-      if (hpdf_nd->IsA() == TH1D::Class()) {
-        hpdf[0] = dynamic_cast<TH1D*>(hpdf_nd);
-      }
-      else if (hpdf_nd->IsA() == TH2D::Class()) {
-        hpdf[0] = dynamic_cast<TH2D*>(hpdf_nd)->ProjectionX("hpdf_x");
-        hpdf[1] = dynamic_cast<TH2D*>(hpdf_nd)->ProjectionY("hpdf_y");
-      }
-      else if (hpdf_nd->IsA() == TH3D::Class()) {
-        hpdf[0] = dynamic_cast<TH3D*>(hpdf_nd)->ProjectionX("hpdf_x");
-        hpdf[1] = dynamic_cast<TH3D*>(hpdf_nd)->ProjectionY("hpdf_y");
-        hpdf[2] = dynamic_cast<TH3D*>(hpdf_nd)->ProjectionZ("hpdf_y");
-      }
-
-      std::string n = signals[j].name;
-      for (size_t k=0; k<observables.size(); k++) {
-        hpdf[k]->SetLineColor(color[j]);
-        if (fit_total[k] == NULL) {
-          std::string hfname = "fit_total_" + signals[j].name;
-          fit_total[k] = (TH1D*) hpdf[k]->Clone(hfname.c_str());
-        }
-        else {
-          if (hpdf[k] && hpdf[k]->Integral() > 0) {
-            fit_total[k]->Add(hpdf[k]);
-          }
-        }
-
-        if (n == "av_tl208" || n == "av_bi214" ||
-            n == "water_tl208" || n == "water_bi214" ||
-            n == "int_ropes_tl208" || n == "int_ropes_bi214" ||
-            n == "hd_ropes_tl208" || n == "hd_ropes_bi214" ||
-            n == "pmt_bg") {
-          plots_external[k].add(hpdf[k], signals[j].title, "hist");
-          std::string hname = "et" + signals[j].name + observables[k].name;
-          if (external_total[k] == NULL) {
-            external_total[k] = (TH1D*) hpdf[k]->Clone(hname.c_str());
-          }
-          else {
-            if (hpdf[k] && hpdf[k]->Integral() > 0) {
-              external_total[k]->Add((TH1D*) hpdf[k]->Clone(hname.c_str()));
-            }
-          }
-        }
-        else if (n != "zeronu" && n != "twonu" && n != "int_tl208" &&
-                 n != "int_bi214" && n != "b8") {
-          plots_cosmogenic[k].add(hpdf[k], signals[j].title, "hist");
-          std::string hname = "ct" + signals[j].name + observables[k].name;
-          if (cosmogenic_total[k] == NULL) {
-            cosmogenic_total[k] = (TH1D*) hpdf[k]->Clone(hname.c_str());
-          }
-          else {
-            cosmogenic_total[k]->Add((TH1D*) hpdf[k]->Clone(hname.c_str()));
-          }
-        }
-        else {
-          if (hpdf[k] && hpdf[k]->Integral() > 0) {
-            plots_full[k].add(hpdf[k], signals[j].title, "hist");
-          }
-        }
-      }
-    }
-
-    TCanvas c2;
-    for (size_t j=0; j<observables.size(); j++) {
-      TH1D* hdata = \
-        (TH1D*) SpectralPlot::make_like(plots_full[j].histograms[0], "hdata");
-      hdata->SetMarkerStyle(20);
-      hdata->SetLineColor(kBlack);
-
-      for (size_t idata=0; idata<data.size() / observables.size(); idata++) {
-        // hack to include only radius ROI
-        if (j == 0 && data[idata * observables.size() + 1] > radius_cut) {
-          continue;
-        }
-        hdata->Fill(data[idata * observables.size() + j]);
-      }
-
-      if (external_total[j] != NULL) {
-        external_total[j]->SetLineColor(kOrange + 1);
-        TH1D* et = (TH1D*) external_total[j]->Clone("et");
-        et->SetLineStyle(2);
-        plots_external[j].add(et, "Total", "hist");
-        plots_full[j].add(external_total[j], "External", "hist");
-      }
-      if (cosmogenic_total[j] != NULL) {
-        cosmogenic_total[j]->SetLineColor(kAzure + 1);
-        TH1D* ct = (TH1D*) cosmogenic_total[j]->Clone("ct");
-        ct->SetLineStyle(2);
-        plots_cosmogenic[j].add(ct, "Total", "hist");
-        plots_full[j].add(cosmogenic_total[j], "Cosmogenic", "hist");
-      }
-      if (fit_total[j] != NULL) {
-        fit_total[j]->SetLineColor(kRed);
-        plots_full[j].add(fit_total[j], "Fit", "hist");
-      }
-
-      plots_full[j].add(hdata, "Fake Data");
-
-      plots_full[j].save(observables[j].name + "_spectrum_full.pdf");
-      plots_external[j].save(observables[j].name + "_spectrum_external.pdf");
-      plots_cosmogenic[j].save(observables[j].name +
-                               "_spectrum_cosmogenic.pdf");
-    }
-
-    delete lspace;
-    delete[] params_branch;
-    delete[] params_fit;
-*/
-    //ls_samples->Delete();
-
   }
 
   return limits;
@@ -274,13 +119,14 @@ int main(int argc, char* argv[]) {
     exit(1);
   }
 
-  // Replace gRandom with something a little faster
+  // ROOT environment tweaks, including a faster RNG
   delete gRandom;
   gRandom = new TRandom2(0);
   gRandom->SetSeed(0);
 
   gStyle->SetErrorX(0);
   gStyle->SetOptStat(0);
+  gErrorIgnoreLevel = kWarning;
 
   // Load configuration from JSON file
   std::string config_filename = std::string(argv[1]);
@@ -294,15 +140,17 @@ int main(int argc, char* argv[]) {
              fc.experiments, fc.live_time, fc.debug_mode);
 
   // Plot distribution of limits
+/*
   TCanvas c1;
   std::map<std::string, TH1F>::iterator it;
   for (it=limits.begin(); it!=limits.end(); it++) {
     it->second.DrawNormalized();
     c1.SaveAs((fc.output_file + "_limits_" + it->first + ".pdf").c_str());
     c1.SaveAs((fc.output_file + "_limits_" + it->first + ".C").c_str());
+*/
 
 /*
-    // find median
+    // Find median
     double xq[1] = {0.5};
     double yq[1];
     it->second.GetQuantiles(1, yq, xq);

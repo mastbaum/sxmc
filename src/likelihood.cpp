@@ -24,6 +24,60 @@ LikelihoodSpace::~LikelihoodSpace() {
 }
 
 
+std::map<std::string, Interval> LikelihoodSpace::get_best_fit() {
+  return ml_params;
+}
+
+
+void LikelihoodSpace::print_best_fit() {
+  std::cout << "-- Best fit --" << std::endl;
+  std::map<std::string, Interval>::iterator it;
+  for (it=this->ml_params.begin(); it!=ml_params.end(); ++it) {
+    if (it->first == "likelihood") {
+      continue;
+    }
+
+    Interval interval = it->second;
+    float lower_error = interval.point_estimate - interval.lower;
+    float upper_error = interval.upper - interval.point_estimate;
+
+    std::cout << " " << it->first << ": " << interval.point_estimate;
+    if (interval.one_sided) {
+      std::cout << " <" << interval.upper << " (" << 100 * interval.cl
+                << "\% CL)" << std::endl;
+    }
+    else {
+      std::cout << " -" << lower_error << " +" << upper_error << std::endl;
+    }
+  }
+}
+
+
+void LikelihoodSpace::print_correlations() {
+  std::cout << "-- Correlation matrix --" << std::endl;
+  std::vector<float> correlations = get_correlation_matrix(this->samples);
+
+  std::vector<std::string> names;
+  for (int i=0; i<this->samples->GetListOfBranches()->GetEntries(); i++) {
+    std::string name = this->samples->GetListOfBranches()->At(i)->GetName();
+    if (name == "likelihood") {
+      continue;
+    }
+    names.push_back(name);
+  }
+
+  for(size_t i=0; i<names.size(); i++) {
+    std::cout << std::setw(20) << names[i] << " ";
+    for (size_t j=0; j<names.size(); j++) {
+      std::cout << std::setiosflags(std::ios::fixed)
+                << std::setprecision(3) << std::setw(8)
+                << correlations.at(j + i * names.size());
+    }
+    std::cout << std::resetiosflags(std::ios::fixed) << std::endl;
+  }
+}
+
+
 TH1F* LikelihoodSpace::get_projection(std::string name) {
   int default_nbins = 100;
   gEnv->GetValue("Hist.Binning.1D.x", default_nbins);
@@ -92,54 +146,5 @@ LikelihoodSpace::extract_best_fit(ErrorType error_type) {
   delete[] params;
 
   return best_fit;
-}
-
-
-void LikelihoodSpace::print_best_fit() {
-  std::cout << "-- Best fit --" << std::endl;
-  std::map<std::string, Interval>::iterator it;
-  for (it=this->ml_params.begin(); it!=ml_params.end(); ++it) {
-    if (it->first == "likelihood") {
-      continue;
-    }
-
-    Interval interval = it->second;
-    float lower_error = interval.point_estimate - interval.lower;
-    float upper_error = interval.upper - interval.point_estimate;
-
-    std::cout << " " << it->first << ": " << interval.point_estimate;
-    if (interval.one_sided) {
-      std::cout << " <" << interval.upper << " (" << 100 * interval.cl
-                << "\% CL)" << std::endl;
-    }
-    else {
-      std::cout << " -" << lower_error << " +" << upper_error << std::endl;
-    }
-  }
-}
-
-
-void LikelihoodSpace::print_correlations() {
-  std::cout << "-- Correlation matrix --" << std::endl;
-  std::vector<float> correlations = get_correlation_matrix(this->samples);
-
-  std::vector<std::string> names;
-  for (int i=0; i<this->samples->GetListOfBranches()->GetEntries(); i++) {
-    std::string name = this->samples->GetListOfBranches()->At(i)->GetName();
-    if (name == "likelihood") {
-      continue;
-    }
-    names.push_back(name);
-  }
-
-  for(size_t i=0; i<names.size(); i++) {
-    std::cout << std::setw(20) << names[i] << " ";
-    for (size_t j=0; j<names.size(); j++) {
-      std::cout << std::setiosflags(std::ios::fixed)
-                << std::setprecision(3) << std::setw(8)
-                << correlations.at(j + i * names.size());
-    }
-    std::cout << std::resetiosflags(std::ios::fixed) << std::endl;
-  }
 }
 

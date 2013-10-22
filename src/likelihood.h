@@ -35,6 +35,9 @@ class LikelihoodSpace {
     /** Destructor. */
     virtual ~LikelihoodSpace();
 
+    /** Get the parameters and uncertainties for the maximum L point. */
+    std::map<std::string, Interval> get_best_fit();
+
     /** Print the parameters for the maximum-likelihood point. */
     void print_best_fit();
 
