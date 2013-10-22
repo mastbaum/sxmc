@@ -6,8 +6,9 @@
 #include <TH1D.h>
 #include <TH2D.h>
 #include <TH3D.h>
-#include "generator.h"
-#include "signals.h"
+
+#include <sxmc/generator.h>
+#include <sxmc/signals.h>
 
 std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
                                      std::vector<Systematic>& systematics,

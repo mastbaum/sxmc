@@ -12,7 +12,7 @@ endif
 JSONCPP_SRC = contrib/jsoncpp-src-0.6.0-rc2/src/lib_json
 JSONCPP_INC = contrib/jsoncpp-src-0.6.0-rc2/include
 
-INCLUDE = -Isrc -I$(RATROOT)/include -I$(ROOTSYS)/include -I$(RATROOT)/src/stlplus -Icontrib/hemi -I/usr/local/cuda/include -I/opt/local/include -I/opt/cuda-5.0/include -I$(JSONCPP_INC)
+INCLUDE = -Iinclude -I$(RATROOT)/include -I$(ROOTSYS)/include -I$(RATROOT)/src/stlplus -Icontrib/hemi -I/usr/local/cuda/include -I/opt/local/include -I/opt/cuda-5.0/include -I$(JSONCPP_INC)
 CFLAGS = -DVERBOSE=true $(OPT_CFLAGS) $(INCLUDE)
 GCCFLAGS = -Wall -Werror -Wno-unused-variable -ftrapv -fdiagnostics-show-option  # -Wunused-variable errors with HEMI macros
 NOT_NVCC_CFLAGS =
@@ -42,6 +42,9 @@ CUDACC = $(CC) -x cu
 CC += --compiler-options "$(GCCFLAGS) -Wno-unused-function"
 endif
 
+INCLUDES_SRC := $(wildcard src/*.h)
+INCLUDES_DST := $(addprefix ./include/sxmc/, $(notdir $(INCLUDES_SRC)))
+
 OBJ_DIR = build
 SOURCES = $(filter-out src/mcmc.cpp src/nll_kernels.cpp src/pdfz.cpp, $(wildcard src/*.cpp))
 OBJECTS = $(SOURCES:src/%.cpp=$(OBJ_DIR)/%.o)
@@ -63,15 +66,25 @@ ifndef ROOTSYS
 $(error ROOTSYS is not set)
 endif
 
-all: $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o $(OBJECTS) $(JSONCPP_OBJECTS) $(EXE)
+all: includes $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o $(OBJECTS) $(JSONCPP_OBJECTS) $(EXE)
 
-.PHONY: doc test
+.PHONY: doc test includes
 
 clean:
-	-$(RM) build/*.o build/test/*.o build/jsoncpp/*.o bin/*
+	-$(RM) build/*.o build/test/*.o build/jsoncpp/*.o bin/* include/sxmc/*
 
 doc:
 	cd src && doxygen Doxyfile
+
+includes: include_dir $(INCLUDES_DST)
+
+include_dir:
+	test -d include/sxmc || mkdir -p include/sxmc
+
+include/sxmc/%: %
+	cp $^ include/sxmc
+
+vpath %.h src
 
 $(OBJ_DIR)/jsoncpp/%.o: $(JSONCPP_SRC)/%.cpp
 	test -d build/jsoncpp || mkdir -p build/jsoncpp

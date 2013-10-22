@@ -1,6 +1,7 @@
-#include "hdf5_io.h"
 #include <hdf5.h>
 #include <hdf5_hl.h>
+
+#include <sxmc/hdf5_io.h>
 
 herr_t write_float_vector_hdf5(const std::string &filename,
                                const std::string &dataset,

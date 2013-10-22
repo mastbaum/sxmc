@@ -1,8 +1,9 @@
 #include <string>
 #include <TH1F.h>
 #include <assert.h>
-#include "likelihood.h"
-#include "errors.h"
+
+#include <sxmc/likelihood.h>
+#include <sxmc/errors.h>
 
 Interval ProjectionError::get_interval(std::string name,
                                        float point_estimate) { 
@@ -17,34 +18,31 @@ Interval ProjectionError::get_interval(std::string name,
   interval.cl = this->cl;
 
   float integrated_prob = 0;  // for coverage calculation
+  float alpha = (1.0 - cl) / 2;
 
-  // Find lower boundary
-  int lower_bin = 0;
-  for (int i=0; i<hp->GetNbinsX(); i++) {
-    if (hp->Integral(0, lower_bin) >= this->cl) {
-      lower_bin = i - 1;
-      break;
-    }
-  }
-  interval.lower = hp->GetBinLowEdge(lower_bin) + hp->GetBinWidth(lower_bin);
-
-  float upper_target = (1.0 - cl) / 2;
-
-  // If including the first bin overcovers, set a limit instead
-  if (lower_bin == -1) {
+  if (hp->GetMean() < 2 * hp->GetRMS()) {
     interval.lower = 0;
     interval.one_sided = true;
-    upper_target *= 2;
+    alpha *= 2;
   }
   else {
+    // Find the lower bound
+    int lower_bin = 0;
+    for (int i=0; i<hp->GetNbinsX(); i++) {
+      if (hp->Integral(0, i) / integral >= alpha) {
+        lower_bin = i;
+        break;
+      }
+    }
+    interval.lower = hp->GetBinLowEdge(lower_bin);
     integrated_prob += hp->Integral(0, lower_bin);
     interval.one_sided = false;
   }
 
-  // Find upper boundary
+  // Find the upper bound
   int upper_bin = hp->GetNbinsX();
   for (int i=hp->GetNbinsX(); i>0; i--) {
-    if (hp->Integral(i, hp->GetNbinsX()) > upper_target) {
+    if (hp->Integral(i, hp->GetNbinsX()) / integral > alpha) {
       upper_bin = i;
       break;
     }

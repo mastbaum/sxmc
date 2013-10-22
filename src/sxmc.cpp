@@ -13,7 +13,6 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
-#include <assert.h>
 #include <TStyle.h>
 #include <TLegend.h>
 #include <TFile.h>
@@ -26,12 +25,12 @@
 #include <TRandom.h>
 #include <TRandom2.h>
 #include <TMath.h>
-#include <TFeldmanCousins.h>
-#include "config.h"
-#include "generator.h"
-#include "mcmc.h"
-#include "utils.h"
-#include "likelihood.h"
+
+#include <sxmc/config.h>
+#include <sxmc/generator.h>
+#include <sxmc/mcmc.h>
+#include <sxmc/utils.h>
+#include <sxmc/likelihood.h>
 
 /** A ROOT color palette in which sequential colors look okay. */
 static const int color[28] = {kRed,      kGreen,    kBlue,      kMagenta,
@@ -72,73 +71,40 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
                                      float confidence, unsigned nexperiments,
                                      float live_time, const bool debug_mode) {
   std::map<std::string, TH1F> limits;
-  limits["counts"] = TH1F("limits_c", ";Counts in fit range;Fraction",
-                          10000, 0, 500);
-  limits["lifetime"] = TH1F("limits_l", ";T_{1/2} limit (y);Fraction",
-                            10000, 1e24, 1e27);
-  limits["mass"] = TH1F("limits_m", ";m_{#beta#beta} limit (meV);Fraction",
-                        1000, 0, 1000);
-  limits["fc_counts"] = TH1F("fc_limits_c", ";Counts in fit range;Fraction",
-                             1000, 0, 500);
-  limits["fc_lifetime"] = TH1F("fc_limits_l", ";T_{1/2} limit (y);Fraction",
-                               10000, 1e24, 1e27);
-  limits["fc_mass"] = TH1F("fc_limits_m",
-                           ";m_{#beta#beta} limit (meV);Fraction",
-                           10000, 0, 1000);
-  limits["contour_counts"] = TH1F("contour_limits_c",
-                                  ";Counts in fit range;Fraction",
-                                  10000, 0, 500);
-  limits["contour_lifetime"] = TH1F("contour_limits_l",
-                                    ";T_{1/2} limit (y);Fraction",
-                                    10000, 1e24, 1e27);
-  limits["contour_mass"] = TH1F("contour_limits_m",
-                                ";m_{#beta#beta} limit (meV);Fraction",
-                                1000, 0, 1000);
-
-  // coverage calculation
-  TH1F hfccoverage("hfccoverage", ";True N;Coverage", 50, 0, 50);
-  hfccoverage.Sumw2();
-  TH1F hcontcoverage("hcontcoverage", ";True N;Coverage", 50, 0, 50);
-  hcontcoverage.Sumw2();
-  TH1F hcounts("hcounts", ";True N;Event count;", 50, 0, 50);
-  hcounts.Sumw2();
+  limits["counts_proj"] = TH1F("counts_proj", ";Counts in fit range;Fraction",
+                               10000, 0, 500);
+  limits["counts_cont"] = TH1F("counts_cont", ";Counts in fit range;Fraction",
+                               10000, 0, 500);
 
   for (unsigned i=0; i<nexperiments; i++) {
     std::cout << "Experiment " << i + 1 << " / " << nexperiments << std::endl;
 
-    // make fake data
     std::vector<float> params;
     std::vector<std::string> param_names;
-    float nexpected = 0;
     for (size_t j=0; j<signals.size(); j++) {
       params.push_back(signals[j].nexpected);
       param_names.push_back(signals[j].name);
-      nexpected += signals[j].nexpected;
     }
     for (size_t j=0; j<systematics.size(); j++) {
       params.push_back(systematics[j].mean);
       param_names.push_back(systematics[j].name);
     }
+
+    // Make fake data
     std::vector<float> data = \
       make_fake_dataset(signals, systematics, observables, params, true);
 
-    size_t nevents = (int) 1.0 * data.size() / observables.size();
-    hcounts.Fill(nevents);
+    //size_t nevents = (int) 1.0 * data.size() / observables.size();
+    //hcounts.Fill(nevents);
 
-    // run mcmc
+    // Run MCMC
     MCMC mcmc(signals, systematics, observables);
-    TNtuple* ls_samples = mcmc(data, steps, burnin_fraction, debug_mode);
+    LikelihoodSpace* ls = mcmc(data, steps, burnin_fraction, debug_mode);
 
-    TFile f("lspace.root", "recreate");
-    TNtuple* lsclone = (TNtuple*) ls_samples->Clone("ls_samples");
-    lsclone->Write();
-    //lsclone->Delete();
-    f.Close();
+    ls->print_best_fit();
+    ls->print_correlations();
 
-    // calculate signal sensitivity
-    LikelihoodSpace lspace(ls_samples);
-    lspace.print_best_fit();
-    lspace.print_correlations();
+    delete ls;
 /*
     // plot this fit
     std::vector<SpectralPlot> plots_full;
@@ -291,21 +257,6 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
 
   }
 
-  hcontcoverage.Divide(&hcounts);
-  hfccoverage.Divide(&hcounts);
-
-  TCanvas ccov;
-  hcontcoverage.SetLineColor(kRed);
-  hcontcoverage.SetLineWidth(2);
-  hcontcoverage.Draw();
-  hcontcoverage.GetXaxis()->SetRangeUser(0, 20);
-  hfccoverage.SetLineColor(kBlue);
-  hfccoverage.SetLineWidth(2);
-  hfccoverage.SetLineStyle(2);
-  hfccoverage.Draw("same");
-  ccov.SaveAs("coverage.pdf");
-  ccov.SaveAs("coverage.C");
-
   return limits;
 }
 
@@ -323,7 +274,7 @@ int main(int argc, char* argv[]) {
     exit(1);
   }
 
-  // replace gRandom with something a little faster
+  // Replace gRandom with something a little faster
   delete gRandom;
   gRandom = new TRandom2(0);
   gRandom->SetSeed(0);
@@ -331,18 +282,18 @@ int main(int argc, char* argv[]) {
   gStyle->SetErrorX(0);
   gStyle->SetOptStat(0);
 
-  // load configuration from json file
+  // Load configuration from JSON file
   std::string config_filename = std::string(argv[1]);
   FitConfig fc(config_filename);
   fc.print();
 
-  // run ensemble
+  // Run ensemble
   std::map<std::string, TH1F> limits = \
     ensemble(fc.signals, fc.systematics, fc.observables, fc.cuts, fc.steps,
              fc.burnin_fraction, fc.signal_name, fc.signal_eff, fc.confidence,
              fc.experiments, fc.live_time, fc.debug_mode);
 
-  // plot distribution of limits
+  // Plot distribution of limits
   TCanvas c1;
   std::map<std::string, TH1F>::iterator it;
   for (it=limits.begin(); it!=limits.end(); it++) {

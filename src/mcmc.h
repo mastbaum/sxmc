@@ -1,3 +1,9 @@
+/**
+ * \file mcmc.h
+ *
+ * Utilities for Markov Chain Monte Carlo distribution sampling.
+ */
+
 #ifndef __MCMC_H__
 #define __MCMC_H__
 
@@ -6,9 +12,10 @@
 #include <string>
 #include <cuda.h>
 #include <hemi/hemi.h>
-#include "signals.h"
-#include "nll_kernels.h"
-#include "pdfz.h"
+
+#include <sxmc/signals.h>
+#include <sxmc/nll_kernels.h>
+#include <sxmc/pdfz.h>
 
 #ifdef __CUDACC__
 #include <curand_kernel.h>
@@ -20,6 +27,7 @@
 #endif
 
 class TNtuple;
+class LikelihoodSpace;
 
 /**
  * \class MCMC
@@ -55,11 +63,12 @@ class MCMC {
      * \param burnin_fraction Fraction of initial steps to throw out
      * \param debug_mode If true, accept and save all steps
      * \param sync_interval How often to copy accepted from GPU to storage
-     * \returns TNtuple containing accepted points and their likelihoods
+     * \returns LikelihoodSpace built from samples
      */
-    TNtuple* operator()(std::vector<float>& data, unsigned nsteps,
-                        float burnin_fraction, const bool debug_mode=false,
-                        unsigned sync_interval=10000);
+    LikelihoodSpace* operator()(std::vector<float>& data, unsigned nsteps,
+                                float burnin_fraction,
+                                const bool debug_mode=false,
+                                unsigned sync_interval=10000);
 
   protected:
     /**

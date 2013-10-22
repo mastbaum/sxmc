@@ -9,11 +9,14 @@
 #include <TH2F.h>
 #include <TF1.h>
 #include <TNtuple.h>
+#include <TFile.h>
 #include <TRandom.h>
 #include <TStopwatch.h>
 #include <TDirectory.h>
-#include "mcmc.h"
-#include "signals.h"
+
+#include <sxmc/mcmc.h>
+#include <sxmc/signals.h>
+#include <sxmc/likelihood.h>
 
 #ifndef __HEMI_ARRAY_H__
 #define __HEMI_ARRAY_H__
@@ -92,9 +95,9 @@ MCMC::~MCMC() {
 }
 
 
-TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
-                          float burnin_fraction, const bool debug_mode,
-                          unsigned sync_interval) {
+LikelihoodSpace* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
+                                  float burnin_fraction, const bool debug_mode,
+                                  unsigned sync_interval) {
   // cuda/hemi block sizes
   int bs = 128;
   int nb = this->nsignals / bs + 1;
@@ -282,9 +285,18 @@ TNtuple* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
 
   std::cout << "MCMC: Elapsed time: " << timer.RealTime() << std::endl;
 
+  // Write out samples for debugging
+  TFile f("lspace.root", "recreate");
+  TNtuple* lsclone = (TNtuple*) nt->Clone("ls");
+  lsclone->Write();
+  lsclone->Delete();
+  f.Close();
+
+  LikelihoodSpace* lspace = new LikelihoodSpace(nt);
+
   delete[] jump_vector;
 
-  return nt;
+  return lspace;
 }
 
 

@@ -1,3 +1,8 @@
+/**
+ * \file cuda_compat.h
+ *
+ * Definitions required for compatibility between CPU and GPU targets.
+ */
 #ifndef __CUDA_COMPAT_H__
 #define __CUDA_COMPAT_H__
 

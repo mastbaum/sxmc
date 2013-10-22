@@ -8,13 +8,19 @@
 #include <TEnv.h>
 #include <TH1F.h>
 #include <TDirectory.h>
-#include "likelihood.h"
-#include "errors.h"
-#include "utils.h"
+
+#include <sxmc/likelihood.h>
+#include <sxmc/errors.h>
+#include <sxmc/utils.h>
 
 LikelihoodSpace::LikelihoodSpace(TNtuple* _samples) {
   this->samples = _samples;
   this->ml_params = extract_best_fit();
+}
+
+
+LikelihoodSpace::~LikelihoodSpace() {
+  samples->Delete();
 }
 
 

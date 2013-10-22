@@ -1,5 +1,7 @@
 /**
- * Error estimation things.
+ * \file errors.h
+ *
+ * Error (uncertainty) calculation components.
  */
 
 #ifndef __ERRORS_H__
@@ -67,7 +69,7 @@ class ErrorEstimator {
  *
  * Error estimator which uses a 1D projection of the likelihood space to
  * determine uncertainties. Attempts to put a fraction (1-cl) in both the
- * upper and lower tails. If including the first bin overcovers, push up the
+ * upper and lower tails. If the mean is less than twice the RMS, push up the
  * upper limit as necessary to assure coverage and report an upper limit.
  */
 class ProjectionError : public ErrorEstimator {
@@ -78,9 +80,6 @@ class ProjectionError : public ErrorEstimator {
     virtual ~ProjectionError() {};
 
     virtual Interval get_interval(std::string name, float point_estimate);
-
-  private:
-    bool bounded;  //!< Assert a parameter boundary at zero
 };
 
 
@@ -103,6 +102,7 @@ class ContourError : public ErrorEstimator {
 
     virtual ~ContourError() {};
 
+    // FIXME
     virtual Interval get_interval(std::string name, float point_estimate) {
       return Interval();
     }

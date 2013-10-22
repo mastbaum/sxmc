@@ -1,4 +1,7 @@
-/** GPU/CPU-based PDF evaluation
+/**
+ * \file pdfz.h
+ *
+ * GPU/CPU-based PDF evaluation
  *
  * The subclasses of pdfz::Eval (EvalHist and EvalKernel) take an array of 
  * samples from an unknown multidimensional distribution and estimate the

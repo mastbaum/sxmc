@@ -1,9 +1,16 @@
+/**
+ * \file likelihood.h
+ *
+ * Utilities for working with likelihood functions.
+ */
+
 #ifndef __LIKELIHOOD_H__
 #define __LIKELIHOOD_H__
 
 #include <map>
 #include <string>
-#include "errors.h"
+
+#include <sxmc/errors.h>
 
 class TNtuple;
 class TH1F;
@@ -19,12 +26,14 @@ class LikelihoodSpace {
     /**
      * Constructor.
      *
+     * Note: The instance takes over ownership of the samples TNtuple!
+     *
      * \param samples A set of samples of the likelihood space
      */
     LikelihoodSpace(TNtuple* samples);
 
     /** Destructor. */
-    virtual ~LikelihoodSpace() {}
+    virtual ~LikelihoodSpace();
 
     /** Print the parameters for the maximum-likelihood point. */
     void print_best_fit();

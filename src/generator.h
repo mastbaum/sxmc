@@ -1,8 +1,15 @@
+/**
+ * \file generator.h
+ *
+ * Fake data generation.
+ */
+
 #ifndef __GENERATOR_H__
 #define __GENERATOR_H__
 
 #include <vector>
-#include "signals.h"
+
+#include <sxmc/signals.h>
 
 /**
  * Make a fake data set.

@@ -12,11 +12,12 @@
 #include <TH1D.h>
 #include <TH2F.h>
 #include <TMath.h>
-#include "signals.h"
-#include "config.h"
-#include "utils.h"
-#include "pdfz.h"
-#include "hdf5_io.h"
+
+#include <sxmc/signals.h>
+#include <sxmc/config.h>
+#include <sxmc/utils.h>
+#include <sxmc/pdfz.h>
+#include <sxmc/hdf5_io.h>
 
 template <class T>
 size_t get_index_with_append(std::vector<T>& v, T o) {

@@ -1,11 +1,17 @@
+/**
+ * \file config.h
+ *
+ * Configuration file parsing.
+ */
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
 #include <string>
 #include <vector>
-#include "utils.h"
-#include "signals.h"
-#include "pdfz.h"
+
+#include <sxmc/utils.h>
+#include <sxmc/signals.h>
+#include <sxmc/pdfz.h>
 
 class TH1D;
 class TH2F;

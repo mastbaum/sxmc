@@ -1,3 +1,9 @@
+/**
+ * \file hdf5_io.h
+ *
+ * HDF5 file input and output.
+ */
+
 #ifndef __HDF5_IO_H__
 #define __HDF5_IO_H__
 

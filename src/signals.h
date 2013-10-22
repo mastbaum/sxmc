@@ -1,13 +1,20 @@
+/**
+ * \file signals.h
+ *
+ * Signal-related data structures.
+ *
+ * (Not to be confused with signal.h, which defines UNIX signals.)
+ */
+
 #ifndef __SIGNALS_H__
 #define __SIGNALS_H__
 
-#include "pdfz.h"
+#include <sxmc/pdfz.h>
 
 /**
  * \struct Signal
- * \brief A container for signal metadata and PDFs
  *
- * (Not to be confused with signal.h, which defines UNIX signals.)
+ * A container for signal metadata and PDFs
  */
 struct Signal {
   std::string name;  //!< string identifier
@@ -21,7 +28,8 @@ struct Signal {
 
 /**
  * \struct Observable
- * \brief A container for observable metadata
+ *
+ * A container for observable metadata
  */
 struct Observable {
   std::string name;  //!< Name of the observable
@@ -40,7 +48,8 @@ struct Observable {
 
 /**
  * \struct Systematic
- * \brief A container for systematic parameter metadata
+ *
+ * A container for systematic parameter metadata
  */
 struct Systematic {
   std::string name;  //!< Name of the systematic parameter

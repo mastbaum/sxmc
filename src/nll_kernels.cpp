@@ -2,7 +2,8 @@
 #include <cmath>
 #include <hemi/hemi.h>
 #include <TRandom.h>
-#include "nll_kernels.h"
+
+#include <sxmc/nll_kernels.h>
 
 #ifdef __CUDACC__
 #include <curand_kernel.h>

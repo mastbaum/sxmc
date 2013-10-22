@@ -1,5 +1,4 @@
 #include <iostream>
-#include "pdfz.h"
 #include <math.h>
 #include <cuda.h>
 #include <math_constants.h> // CUDA header
@@ -8,7 +7,8 @@
 #include <TH2D.h>
 #include <TH3D.h>
 
-#include "cuda_compat.h"
+#include <sxmc/pdfz.h>
+#include <sxmc/cuda_compat.h>
 
 namespace pdfz {
     const int MAX_NFIELDS = 10;
