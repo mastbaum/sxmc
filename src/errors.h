@@ -9,6 +9,7 @@
 
 #include <string>
 
+class TNtuple;
 class LikelihoodSpace;
 
 /** Types of error estimators. */
@@ -17,6 +18,14 @@ typedef enum { ERROR_PROJECTION, ERROR_CONTOUR } ErrorType;
 
 /** A confidence interval. */
 struct Interval {
+  Interval() : one_sided(false), point_estimate(-1), lower(-1), upper(-1),
+               cl(-1), coverage(-1) {};
+
+  virtual ~Interval() {}
+
+  /** Get the interval value and uncertainty as a pretty string. */
+  std::string str();
+
   bool one_sided;  //!< True if this is a one-sided interval (limit)
   float point_estimate;  //!< Estimate of true value
   float lower;  //!< Lower bound on parameter, for two-sided intervals
@@ -97,15 +106,14 @@ class ProjectionError : public ErrorEstimator {
  */
 class ContourError : public ErrorEstimator {
   public:
-    ContourError(LikelihoodSpace* _lspace, float _cl=0.68)
-        : ErrorEstimator(_lspace, _cl) {}
+    ContourError(LikelihoodSpace* _lspace, float _cl=0.68);
 
-    virtual ~ContourError() {};
+    virtual ~ContourError();
 
-    // FIXME
-    virtual Interval get_interval(std::string name, float point_estimate) {
-      return Interval();
-    }
+    virtual Interval get_interval(std::string name, float point_estimate);
+
+  protected:
+    TNtuple* contour_points;  //!< Likelihood space samples within the contour
 };
 
 #endif  // __ERRORS_H__

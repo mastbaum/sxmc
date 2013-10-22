@@ -125,6 +125,7 @@ HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
  *
  * \param nparameters The number of parameters
  * \param pars Parameters, normalizations then systematics
+ * \param nsignals Number of signal parameters
  * \param means Expected rates and means of systematics
  * \param sigmas Gaussian constraint sigma, same units as means
  * \param events_total Sum of event term contribution

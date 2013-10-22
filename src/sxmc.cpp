@@ -51,6 +51,7 @@
  * \param signal_eff Efficiency for detecting signal
  * \param confidence Desired confidence level for limits
  * \param nexperiments Number of fake experiments to run
+ * \param live_time Experiment live time in years
  * \param debug_mode If true, accept and save all steps
  * \returns A (name, histogram limits from the experiments) map
  */
@@ -167,8 +168,8 @@ int main(int argc, char* argv[]) {
               << " -" << lower_error
               << " +" << upper_error
               << std::endl;
-*/
   }
+*/
 
   return 0;
 }

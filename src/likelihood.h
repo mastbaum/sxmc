@@ -53,17 +53,27 @@ class LikelihoodSpace {
     TH1F* get_projection(std::string name);
 
     /**
+     * Get points within a given distance of the maximum.
+     *
+     * \param delta Number of likelihood units from max to include
+     * \returns TNtuple with requested samples
+     */
+    TNtuple* get_contour(float delta);
+
+    /**
      * Extract the best-fit parameters and uncertainties.
      *
+     * \param[out] ml The likelihood at the maximum (negative for NLL)
      * \param error_type Type of uncertainty calculation to use
      * \returns A map from parameter names to Intervals
      */
     std::map<std::string, Interval>
-    extract_best_fit(ErrorType error_type=ERROR_PROJECTION);
+    extract_best_fit(float& ml, ErrorType error_type=ERROR_PROJECTION);
 
   private:
     TNtuple* samples;  //!< Samples of the likelihood function
     std::map<std::string, Interval> ml_params;  //!< Likelihood-maximizing pars
+    float ml;  //!< The maximum likelihood (negative for NLL)
 };
 
 #endif  // __LIKELIHOOD_H__

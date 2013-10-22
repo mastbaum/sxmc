@@ -66,7 +66,7 @@ ifndef ROOTSYS
 $(error ROOTSYS is not set)
 endif
 
-all: includes $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o $(OBJECTS) $(JSONCPP_OBJECTS) $(EXE)
+all: build_dirs includes $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o $(OBJECTS) $(JSONCPP_OBJECTS) $(EXE)
 
 .PHONY: doc test includes
 
@@ -75,6 +75,12 @@ clean:
 
 doc:
 	cd src && doxygen Doxyfile
+
+build_dirs:
+	test -d include/sxmc || mkdir -p include/sxmc
+	test -d build || mkdir build
+	test -d build/jsoncpp || mkdir -p build/jsoncpp
+	test -d bin || mkdir bin
 
 includes: include_dir $(INCLUDES_DST)
 
@@ -87,27 +93,21 @@ include/sxmc/%: %
 vpath %.h src
 
 $(OBJ_DIR)/jsoncpp/%.o: $(JSONCPP_SRC)/%.cpp
-	test -d build/jsoncpp || mkdir -p build/jsoncpp
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 $(OBJ_DIR)/%.o: src/%.cpp
-	test -d build || mkdir build
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 $(OBJ_DIR)/mcmc.o: src/mcmc.cpp
-	test -d build || mkdir build
 	$(CUDACC) -c -o $@ $< $(CFLAGS)
 
 $(OBJ_DIR)/nll_kernels.o: src/nll_kernels.cpp
-	test -d build || mkdir build
 	$(CUDACC) -c -o $@ $< $(CFLAGS)
 
 $(OBJ_DIR)/pdfz.o: src/pdfz.cpp
-	test -d build || mkdir build
 	$(CUDACC) -c -o $@ $< $(CFLAGS)
 
 $(EXE): $(OBJECTS) $(JSONCPP_OBJECTS) $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o
-	test -d bin || mkdir bin
 	$(GCC) -o $@ $^ $(CFLAGS) $(LFLAGS) $(CUDA_LFLAGS)
 
 

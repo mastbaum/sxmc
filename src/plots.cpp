@@ -199,7 +199,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
     std::string n = signals[i].name;
 
     for (size_t j=0; j<observables.size(); j++) {
-      hpdf[j]->SetLineColor(colors[i]);
+      hpdf[j]->SetLineColor(colors[i % 28]);
       if (fit_total[j] == NULL) {
         std::string hfname = "fit_total_" + signals[i].name;
         fit_total[j] = (TH1D*) hpdf[j]->Clone(hfname.c_str());

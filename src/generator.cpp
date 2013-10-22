@@ -18,7 +18,7 @@ std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
 
   assert(observables.size() <= 3);
 
-  // extract TH1 histogram from pdfz::Eval
+  // Extract TH1 histogram from pdfz::Eval
   hemi::Array<double> param_buffer(signals.size() + systematics.size(), true);
   for (size_t i=0; i<signals.size() + systematics.size(); i++) {
     param_buffer.writeOnlyHostPtr()[i] = params[i];
@@ -50,7 +50,7 @@ std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
     nevents += observed[i];
   }
 
-  // generate event array by sampling ROOT histograms, including only events
+  // Generate event array by sampling ROOT histograms, including only events
   // that pass cuts
   size_t obs_id = 0;
   std::vector<float> events(nevents * observables.size());

@@ -15,7 +15,7 @@
 
 LikelihoodSpace::LikelihoodSpace(TNtuple* _samples) {
   this->samples = _samples;
-  this->ml_params = extract_best_fit();
+  this->ml_params = extract_best_fit(this->ml);
 }
 
 
@@ -37,18 +37,7 @@ void LikelihoodSpace::print_best_fit() {
       continue;
     }
 
-    Interval interval = it->second;
-    float lower_error = interval.point_estimate - interval.lower;
-    float upper_error = interval.upper - interval.point_estimate;
-
-    std::cout << " " << it->first << ": " << interval.point_estimate;
-    if (interval.one_sided) {
-      std::cout << " <" << interval.upper << " (" << 100 * interval.cl
-                << "\% CL)" << std::endl;
-    }
-    else {
-      std::cout << " -" << lower_error << " +" << upper_error << std::endl;
-    }
+    std::cout << " " << it->first << ": " << it->second.str() << std::endl;
   }
 }
 
@@ -92,12 +81,58 @@ TH1F* LikelihoodSpace::get_projection(std::string name) {
 }
 
 
-std::map<std::string, Interval>
-LikelihoodSpace::extract_best_fit(ErrorType error_type) {
+TNtuple* LikelihoodSpace::get_contour(float delta) {
+  TNtuple* contour = (TNtuple*) this->samples->Clone("lscontour");
+  contour->Reset();
+
   // Get list of branch names
   std::vector<std::string> names;
   for (int i=0; i<this->samples->GetListOfBranches()->GetEntries(); i++) {
-    names.push_back(this->samples->GetListOfBranches()->At(i)->GetName());
+    std::string name = this->samples->GetListOfBranches()->At(i)->GetName();
+    if (name == "likelihood") {
+      continue;
+    }
+    names.push_back(name);
+  }
+
+  float* params_branch = new float[names.size() + 1];
+  for (size_t i=0; i<names.size(); i++) {
+    this->samples->SetBranchAddress(names[i].c_str(), &params_branch[i]);
+  }
+
+  float ml_branch;
+  this->samples->SetBranchAddress("likelihood", &ml_branch);
+
+  // Build a new TNtuple with samples inside the contour
+  float* v = new float[names.size()];
+  for (int i=0; i<this->samples->GetEntries(); i++) {
+    this->samples->GetEntry(i);
+    if (ml_branch < this->ml + delta) {
+      for (size_t j=0; j<names.size(); j++) {
+        v[j] = params_branch[j];
+      }
+      v[names.size()] = ml_branch;
+      contour->Fill(v);
+    }
+  }
+
+  this->samples->ResetBranchAddresses();
+  delete[] v;
+
+  return contour;
+}
+
+
+std::map<std::string, Interval>
+LikelihoodSpace::extract_best_fit(float& ml, ErrorType error_type) {
+  // Get list of branch names
+  std::vector<std::string> names;
+  for (int i=0; i<this->samples->GetListOfBranches()->GetEntries(); i++) {
+    std::string name = this->samples->GetListOfBranches()->At(i)->GetName();
+    if (name == "likelihood") {
+      continue;
+    }
+    names.push_back(name);
   }
 
   // Extract likelihood-maximizing parameters
@@ -110,7 +145,7 @@ LikelihoodSpace::extract_best_fit(ErrorType error_type) {
   this->samples->SetBranchAddress("likelihood", &ml_branch);
 
   float* params = new float[names.size()];
-  float ml = 1e9;
+  ml = 1e9;
   for (int j=0; j<this->samples->GetEntries(); j++) {
     this->samples->GetEntry(j);
     if (ml_branch < ml) {
