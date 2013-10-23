@@ -322,6 +322,16 @@ namespace pdfz {
         virtual void EvalAsync(bool do_eval_pdf=true);
         virtual void EvalFinished();
 
+
+        int RandomSample(std::vector<float> &events, float nexpected, std::vector<float> &syst_vals, std::vector<float> &uppers, std::vector<float> &lowers, bool poisson=false);
+
+        int RandomSample(std::vector<float> &events, float nexpected, bool poisson=false){
+          std::vector<float> syst_vals(syst->size(),0);
+          std::vector<float> _upper;
+          std::vector<float> _lower;
+          return RandomSample(events, nexpected,syst_vals,_upper,_lower, poisson);
+        };
+
     protected:
         hemi::Array<float> samples;
         hemi::Array<int> *read_bins;

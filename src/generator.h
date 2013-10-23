@@ -38,5 +38,10 @@ std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
                                      std::vector<float> params,
                                      bool poisson=true);
 
+
+// Is just TMath::Nint redefined here to get away with bug
+// compiling the TMath header anywhere you have cuda headers
+unsigned nint(float nexpected);
+
 #endif  // __GENERATOR_H__
 

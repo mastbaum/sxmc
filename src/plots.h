@@ -33,12 +33,14 @@ extern const int colors[28];
  * \param systematics List of Systematics, used for names
  * \param observables List of Observables; 1D plots are created for each
  * \param data Observed data set
+ * \param output_path Directory to write plots to
  */
 void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
               std::vector<Signal> signals,
               std::vector<Systematic> systematics,
               std::vector<Observable> observables,
-              std::vector<float> data);
+              std::vector<float> data,
+              std::string output_path);
 
 
 /**

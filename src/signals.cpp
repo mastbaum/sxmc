@@ -136,8 +136,8 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
 
     // perhaps we skipped some events due to cuts
     if (sample_index != this->nevents) {
-      std::cout << "Signal::Signal: " << this->nevents - sample_index
-                << " events cut" << std::endl;
+      std::cout << "Signal::Signal: " << this->nevents - sample_index <<
+                " of " << this->nevents << " events cut" << std::endl;
       samples.resize(sample_index * sample_fields.size());
       this->nexpected *= (1.0 * sample_index / this->nevents);
       this->sigma *= (1.0 * sample_index / this->nevents);
@@ -187,4 +187,31 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
         assert(false);
       }
     }
+
+  // rescale expectations using fractions falling inside the pdfs
+  hemi::Array<double> param_buffer(systematics.size(), true);
+  param_buffer.writeOnlyHostPtr();
+  for (size_t i=0; i<systematics.size(); i++) {
+    param_buffer.writeOnlyHostPtr()[i] = systematics[i].mean;                             
+  }
+
+  hemi::Array<unsigned> norms_buffer(1, true);
+  norms_buffer.writeOnlyHostPtr();
+
+  this->histogram->SetNormalizationBuffer(&norms_buffer);
+  this->histogram->SetParameterBuffer(&param_buffer);
+  dynamic_cast<pdfz::EvalHist*>(this->histogram)->CreateHistogram();
+  if (this->nevents > 0) {
+    float rescale = (1.0 * norms_buffer.readOnlyHostPtr()[0] / this->nevents);
+    this->nexpected *= rescale;
+    this->sigma *= rescale;
+    std::cout << "Signal::Signal: Rescaled by " << rescale << " to " << this->nexpected << std::endl;
+    /*
+       if (this->signals[i].name == this->signal_name) {
+         this->signal_eff *= rescale;
+         std::cout << "FitConfig::FitConfig: Signal efficiency: "
+           << this->signal_eff << std::endl;
+       }
+    */
+  }
 }

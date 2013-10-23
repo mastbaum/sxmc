@@ -3,10 +3,12 @@
 #include <cuda.h>
 #include <math_constants.h> // CUDA header
 #include <TStopwatch.h>
+#include <TRandom.h>
 #include <TH1D.h>
 #include <TH2D.h>
 #include <TH3D.h>
 
+#include <sxmc/generator.h>
 #include <sxmc/pdfz.h>
 #include <sxmc/cuda_compat.h>
 
@@ -629,6 +631,95 @@ namespace pdfz {
         //#endif
    
         #endif
+    }
+    
+    int EvalHist::RandomSample(std::vector<float> &events, float nexpected, std::vector<float> &syst_vals, std::vector<float> &uppers, std::vector<float> &lowers, bool poisson)
+    {
+      hemi::Array<double> params_buffer(syst_vals.size(), true);
+      for (size_t i=0;i<syst_vals.size();i++){
+        params_buffer.writeOnlyHostPtr()[i] = syst_vals[i];
+      }
+      params_buffer.writeOnlyHostPtr();
+      hemi::Array<unsigned> norms_buffer(1, true);
+      norms_buffer.writeOnlyHostPtr();
+      this->SetNormalizationBuffer(&norms_buffer);
+      this->SetParameterBuffer(&params_buffer);
+      TH1* hist = this->CreateHistogram();
+
+      unsigned observed;
+      if (poisson)
+        observed = gRandom->Poisson(nexpected);
+      else
+        observed = nint(nexpected);
+
+      // Generate event array by sampling ROOT histograms, including only events
+      // that pass cuts
+      size_t obs_id = 0;
+      events.resize(events.size() + observed * this->nobservables);
+      if (hist->IsA() == TH1D::Class()) {
+        TH1D* ht = dynamic_cast<TH1D*>(hist);
+
+        double obs;
+        for (unsigned j=0; j<observed; j++) {
+          if (uppers.size() > 0){
+            do {
+              obs = ht->GetRandom();
+            } while(obs > uppers[0] || obs < lowers[0]);
+          }else{
+            obs = ht->GetRandom();
+          }
+
+          events[obs_id++] = obs;
+        }
+      }
+      else if (hist->IsA() == TH2D::Class()) {
+        TH2D* ht = dynamic_cast<TH2D*>(hist);
+
+        double obs0;
+        double obs1;
+        for (unsigned j=0; j<observed; j++) {
+          if (uppers.size() > 0){
+            do {
+              ht->GetRandom2(obs0, obs1);
+            } while(obs0 > uppers[0] || obs0 < lowers[0] ||
+                obs1 > uppers[1] || obs1 < lowers[1]);
+          }else{
+            ht->GetRandom2(obs0, obs1);
+          }
+
+          events[obs_id++] = obs0;
+          events[obs_id++] = obs1;
+        }
+      }
+      else if (hist->IsA() == TH3D::Class()) {
+        TH3D* ht = dynamic_cast<TH3D*>(hist);
+
+        double obs0;
+        double obs1;
+        double obs2;
+        for (unsigned j=0; j<observed; j++) {
+          if (uppers.size() > 0){
+            do {
+              ht->GetRandom3(obs0, obs1, obs2);
+            } while(obs0 > uppers[0] || obs0 < lowers[0] ||
+                obs1 > uppers[1] || obs1 < lowers[1] ||
+                obs2 > uppers[2] || obs2 < lowers[2]);
+          }else{
+            ht->GetRandom3(obs0, obs1, obs2);
+          }
+
+          events[obs_id++] = obs0;
+          events[obs_id++] = obs1;
+          events[obs_id++] = obs2;
+        }
+      }
+      else {
+        std::cerr << "sample_pdfz: Unknown histogram class: "
+          << hist->ClassName() << std::endl;
+        assert(false);
+      }
+      return observed;
+
     }
 
     ///////////////////// EvalKernel ///////////////////////

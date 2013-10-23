@@ -131,7 +131,8 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
               std::vector<Signal> signals,
               std::vector<Systematic> systematics,
               std::vector<Observable> observables,
-              std::vector<float> data) {
+              std::vector<float> data,
+              std::string output_path) {
   std::vector<SpectralPlot> plots_full;
   std::vector<SpectralPlot> plots_external;
   std::vector<SpectralPlot> plots_cosmogenic;
@@ -277,9 +278,9 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
 
     plots_full[i].add(hdata, "Fake Data");
 
-    plots_full[i].save(observables[i].name + "_spectrum_full.pdf");
-    plots_external[i].save(observables[i].name + "_spectrum_external.pdf");
-    plots_cosmogenic[i].save(observables[i].name +
+    plots_full[i].save(output_path + observables[i].name + "_spectrum_full.pdf");
+    plots_external[i].save(output_path + observables[i].name + "_spectrum_external.pdf");
+    plots_cosmogenic[i].save(output_path + observables[i].name +
                              "_spectrum_cosmogenic.pdf");
   }
 }

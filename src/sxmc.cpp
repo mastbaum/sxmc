@@ -62,7 +62,8 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
                                      unsigned steps, float burnin_fraction,
                                      std::string signal_name, float signal_eff,
                                      float confidence, unsigned nexperiments,
-                                     float live_time, const bool debug_mode) {
+                                     float live_time, const bool debug_mode,
+                                     std::string output_path) {
   std::map<std::string, TH1F> limits;
   //limits["counts_proj"] = TH1F("counts_proj", ";Counts in fit range;Fraction",
   //                             10000, 0, 500);
@@ -96,7 +97,7 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
 
     // Make spectral plots
     plot_fit(ls->get_best_fit(), live_time, signals,
-             systematics, observables, data);
+             systematics, observables, data,output_path);
 
     // Signal sensitivity
 
@@ -129,6 +130,11 @@ int main(int argc, char* argv[]) {
   gStyle->SetOptStat(0);
   gErrorIgnoreLevel = kWarning;
 
+  std::string output_path = std::string(argv[2]);
+  if (output_path.at( output_path.length() - 1 ) != '/'){
+    output_path = output_path + "/";
+  }
+
   // Load configuration from JSON file
   std::string config_filename = std::string(argv[1]);
   FitConfig fc(config_filename);
@@ -138,9 +144,8 @@ int main(int argc, char* argv[]) {
   std::map<std::string, TH1F> limits = \
     ensemble(fc.signals, fc.systematics, fc.observables, fc.cuts, fc.steps,
              fc.burnin_fraction, fc.signal_name, fc.signal_eff, fc.confidence,
-             fc.experiments, fc.live_time, fc.debug_mode);
+             fc.experiments, fc.live_time, fc.debug_mode, output_path);
 
-  std::string output_path = std::string(argv[2]);
 
   // Plot distribution of limits
 /*

@@ -234,34 +234,6 @@ FitConfig::FitConfig(std::string filename) {
 
     this->signals.push_back(s);
   }
-
-  // rescale expectations using fractions falling inside the pdfs
-  hemi::Array<double> param_buffer(this->systematics.size(), true);
-  param_buffer.writeOnlyHostPtr();
-  for (size_t i=0; i<this->systematics.size(); i++) {
-    param_buffer.writeOnlyHostPtr()[i] = this->systematics[i].mean;                             
-  }
-
-  hemi::Array<unsigned> norms_buffer(signals.size(), true);
-  norms_buffer.writeOnlyHostPtr();
-
-  for (size_t i=0; i<this->signals.size(); i++) {
-    pdfz::Eval* p = this->signals[i].histogram;
-    p->SetNormalizationBuffer(&norms_buffer, i);
-    p->SetParameterBuffer(&param_buffer);
-    dynamic_cast<pdfz::EvalHist*>(p)->CreateHistogram();
-    if (this->signals[i].nevents > 0) {
-      float rescale = \
-        (1.0 * norms_buffer.readOnlyHostPtr()[i] / this->signals[i].nevents);
-      this->signals[i].nexpected *= rescale;
-      this->signals[i].sigma *= rescale;
-      if (this->signals[i].name == this->signal_name) {
-        this->signal_eff *= rescale;
-        std::cout << "FitConfig::FitConfig: Signal efficiency: "
-                  << this->signal_eff << std::endl;
-      }
-    }
-  }
 }
 
 
