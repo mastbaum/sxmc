@@ -16,8 +16,6 @@
 #include <sxmc/signals.h>
 #include <sxmc/config.h>
 #include <sxmc/utils.h>
-#include <sxmc/pdfz.h>
-#include <sxmc/hdf5_io.h>
 
 template <class T>
 size_t get_index_with_append(std::vector<T>& v, T o) {
@@ -54,12 +52,12 @@ FitConfig::FitConfig(std::string filename) {
 
   // pdf parameters
   const Json::Value pdf_params = root["pdfs"];
-  std::vector<std::string> hdf5_fields;
   for (Json::Value::const_iterator it=pdf_params["hdf5_fields"].begin();
        it!=pdf_params["hdf5_fields"].end(); ++it) {
-    hdf5_fields.push_back((*it).asString());
+    this->hdf5_fields.push_back((*it).asString());
   }
 
+  // create list of possible observables
   std::map<std::string, Observable> all_observables;
   for (Json::Value::const_iterator it=pdf_params["observables"].begin();
        it!=pdf_params["observables"].end(); ++it) {
@@ -83,6 +81,7 @@ FitConfig::FitConfig(std::string filename) {
     all_observables[it.key().asString()] = o;
   }
 
+  // create list of possible systematics
   std::map<std::string, Systematic> all_systematics;
   for (Json::Value::const_iterator it=pdf_params["systematics"].begin();
        it!=pdf_params["systematics"].end(); ++it) {
@@ -125,19 +124,66 @@ FitConfig::FitConfig(std::string filename) {
   this->output_file = fit_params.get("output_file", "fit_spectrum").asString();
   this->debug_mode = fit_params.get("debug_mode", false).asBool();
 
+  // find observables we want to fit for
   for (Json::Value::const_iterator it=fit_params["observables"].begin();
        it!=fit_params["observables"].end(); ++it) {
     this->observables.push_back(all_observables[(*it).asString()]);
   }
 
+  // find observables we want to cut on
   for (Json::Value::const_iterator it=fit_params["cuts"].begin();
        it!=fit_params["cuts"].end(); ++it) {
     this->cuts.push_back(all_observables[(*it).asString()]);
   }
 
+  // find systematics we want to use
   for (Json::Value::const_iterator it=fit_params["systematics"].begin();
        it!=fit_params["systematics"].end(); ++it) {
     this->systematics.push_back(all_systematics[(*it).asString()]);
+  }
+
+  // we are now going to determine the order of data fields in our
+  // sampled data. sample_fields will map it to the hdf5 fields,
+  // and field_index will map each observable/syst to the data field
+  for (size_t i=0; i<this->observables.size(); i++) {
+    std::string field_name = this->observables[i].field;
+    size_t field = (std::find(this->hdf5_fields.begin(), this->hdf5_fields.end(),
+          field_name) -
+        this->hdf5_fields.begin());
+    assert(field < this->hdf5_fields.size());
+
+    size_t index = get_index_with_append<size_t>(this->sample_fields, field);
+    this->observables[i].field_index = index;
+  }
+
+  // Add any additional observables used for systematics
+  for (size_t i=0; i<this->systematics.size(); i++) {
+    std::string field_name = this->systematics[i].observable_field;
+    size_t field = (std::find(this->hdf5_fields.begin(), this->hdf5_fields.end(),
+          field_name) -
+        this->hdf5_fields.begin());
+    assert(field < this->hdf5_fields.size());
+
+    // systematic observable must be an observable
+    size_t index = (std::find(this->sample_fields.begin(), this->sample_fields.end(),
+          field) -
+        this->sample_fields.begin());
+    assert(index < this->sample_fields.size());
+
+    this->systematics[i].observable_field_index = index;
+
+    // add non-observable parameters
+    if (this->systematics[i].type != pdfz::Systematic::RESOLUTION_SCALE) {
+      continue;
+    }
+
+    field_name = this->systematics[i].truth_field;
+    field = (std::find(this->hdf5_fields.begin(), this->hdf5_fields.end(), field_name) -
+        this->hdf5_fields.begin());
+    assert(field < this->hdf5_fields.size());
+
+    index = get_index_with_append<size_t>(this->sample_fields, field);
+    this->systematics[i].truth_field_index = index;
   }
 
   // signal parameters
@@ -147,6 +193,7 @@ FitConfig::FitConfig(std::string filename) {
     signal_names.push_back((*it).asString());
   }
 
+  // loop over all possible signals
   const Json::Value all_signals = root["signals"];
   for (Json::Value::const_iterator it=all_signals.begin();
        it!=all_signals.end(); ++it) {
@@ -155,255 +202,35 @@ FitConfig::FitConfig(std::string filename) {
       continue;
     }
 
+    // if it is one we want to use in our fit, add it
     const Json::Value signal_params = all_signals[it.key().asString()];
-
-    Signal s;
-    s.name = it.key().asString();
-    s.title = signal_params.get("title", s.name).asString();
-    s.sigma = \
-      signal_params.get("constraint", 0.0).asFloat() *
-      this->live_time * this->efficiency;
-    s.nexpected = \
-      signal_params["rate"].asFloat() * this->live_time * this->efficiency;
+    std::string name = it.key().asString(); 
+    std::string title = signal_params.get("title", name).asString();
+    float sigma = signal_params.get("constraint", 0.0).asFloat()
+      * this->live_time * this->efficiency;
+    float nexpected = signal_params["rate"].asFloat()
+      * this->live_time * this->efficiency;
 
     // load data
     std::cout << "FitConfig::FitConfig: Loading data for "
-              << s.name << std::endl;
+              << name << std::endl;
     std::vector<std::string> filenames;
-    for (Json::Value::const_iterator it=signal_params["files"].begin();
-         it!=signal_params["files"].end(); ++it) {
-      filenames.push_back((*it).asString());
+    for (Json::Value::const_iterator jt=signal_params["files"].begin();
+         jt!=signal_params["files"].end(); ++jt) {
+      filenames.push_back((*jt).asString());
     }
 
-    // FIXME add offset and rank check to to read_float_vector_hdf5, to enable
-    // chaining of multiple files
-    std::vector<float> dataset;
-    std::vector<unsigned> rank;
-    for (size_t i=0; i<filenames.size(); i++) {
-      int code = read_float_vector_hdf5(filenames[i], s.name,
-                                        dataset, rank);
-      assert(code >= 0);
-    }
-
-    // build sample dataset with the correct fields and ordering.
-    // 1. build a unique list of fields
-    // observables
-    std::vector<size_t> sample_fields;
-    for (size_t i=0; i<this->observables.size(); i++) {
-      std::string field_name = this->observables[i].field;
-      size_t field = (std::find(hdf5_fields.begin(), hdf5_fields.end(),
-                                field_name) -
-                      hdf5_fields.begin());
-      assert(field < hdf5_fields.size());
-
-      size_t index = get_index_with_append<size_t>(sample_fields, field);
-      this->observables[i].field_index = index;
-    }
-
-    // systematics
-    for (size_t i=0; i<this->systematics.size(); i++) {
-      std::string field_name = this->systematics[i].observable_field;
-      size_t field = (std::find(hdf5_fields.begin(), hdf5_fields.end(),
-                                field_name) -
-                      hdf5_fields.begin());
-      assert(field < hdf5_fields.size());
-
-      // systematic observable must be an observable
-      size_t index = (std::find(sample_fields.begin(), sample_fields.end(),
-                                field) -
-                      sample_fields.begin());
-      assert(index < sample_fields.size());
-
-      this->systematics[i].observable_field_index = index;
-
-      // add non-observable parameters
-      if (this->systematics[i].type != pdfz::Systematic::RESOLUTION_SCALE) {
-        continue;
-      }
-
-      field_name = this->systematics[i].truth_field;
-      field = (std::find(hdf5_fields.begin(), hdf5_fields.end(), field_name) -
-               hdf5_fields.begin());
-      assert(field < hdf5_fields.size());
-
-      index = get_index_with_append<size_t>(sample_fields, field);
-      this->systematics[i].truth_field_index = index;
-    }
-
-    // 2. copy over the relevant data into sample array
-    s.nevents = rank[0];
-    std::vector<float> samples(s.nevents * sample_fields.size());
-
-    for (size_t i=0; i<this->cuts.size(); i++) {
-      std::string field_name = this->cuts[i].field;
-      size_t index = (std::find(hdf5_fields.begin(), hdf5_fields.end(),
-                                field_name) -
-                      hdf5_fields.begin());
-
-      this->cuts[i].field_index = index;  // index in hdf5 file
-    }
-
-    std::vector<bool> field_has_cut(hdf5_fields.size(), false);
-    std::vector<double> field_cut_lower(hdf5_fields.size());
-    std::vector<double> field_cut_upper(hdf5_fields.size());
-    for (size_t i=0; i<hdf5_fields.size(); i++) {
-      for (size_t j=0; j<this->cuts.size(); j++) {
-        if (this->cuts[j].field_index == i) {
-          field_has_cut[i] = true;
-          field_cut_lower[i] = this->cuts[j].lower;
-          field_cut_upper[i] = this->cuts[j].upper;
-        }
-      }
-    }
-
-    std::vector<bool> field_has_exclude(hdf5_fields.size(), false);
-    std::vector<double> field_exclude_lower(hdf5_fields.size());
-    std::vector<double> field_exclude_upper(hdf5_fields.size());
-    for (size_t i=0; i<hdf5_fields.size(); i++) {
-      for (size_t j=0; j<this->observables.size(); j++) {
-        std::string field_name = this->observables[j].field;
-        size_t index = (std::find(hdf5_fields.begin(), hdf5_fields.end(),
-                                  field_name) -
-                        hdf5_fields.begin());
-
-        if (this->observables[j].field == hdf5_fields[i] &&
-            this->observables[j].exclude) {
-          field_has_exclude[i] = true;
-          field_exclude_lower[i] = this->observables[j].exclude_min;
-          field_exclude_upper[i] = this->observables[j].exclude_max;
-        }
-      }
-    }
-
-    // hack to do (r/r_av)^3 since it's not in the hdf5 files yet
-    std::vector<bool> do_r3_transform(sample_fields.size(), false);
-    for (size_t i=0; i<this->observables.size(); i++) {
-      if (this->observables[i].name != "R_CUBED") {
-        continue;
-      }
-
-      std::string field_name = this->observables[i].field;
-      size_t field = (std::find(hdf5_fields.begin(), hdf5_fields.end(),
-                                field_name) -
-                      hdf5_fields.begin());
-      assert(field < hdf5_fields.size());
-
-      for (size_t j=0; j<sample_fields.size(); j++) {
-        if (field == sample_fields[j]) {
-          do_r3_transform[j] = true;
-          std::cout << "FitConfig::FitConfig: Doing R^3 transformation on "
-                    << sample_fields[j] << std::endl;
-        }
-      }
-    }
-
-    assert(rank[1] == hdf5_fields.size());
-    size_t sample_index = 0;
-    for (size_t i=0; i<s.nevents; i++) {
-      // apply cuts
-      bool event_valid = true;
-      size_t excludes_total = 0;
-      size_t excludes_cut = 0;
-
-      for (size_t j=0; j<hdf5_fields.size(); j++) {
-        float v = dataset[i * rank[1] + j];
-
-        // cut on unobserved observables
-        if (field_has_cut[j] &&
-            (v < field_cut_lower[j] || v > field_cut_upper[j])) {
-          event_valid = false;
-          break;
-        }
-
-        // union of excluded regions in observable ranges
-        if (field_has_exclude[j]) {
-          excludes_total++;
-          if (v >= field_exclude_lower[j] && v <= field_exclude_upper[j]) {
-            excludes_cut++;
-          }
-        }
-      }
-
-      if (!event_valid ||
-          (excludes_total > 0 && excludes_cut == excludes_total)) {
-        continue;
-      }
-
-      for (size_t j=0; j<sample_fields.size(); j++) {
-        float data = dataset[i * rank[1] + sample_fields[j]];
-        if (do_r3_transform[j]) {
-          data = TMath::Power(data / 6005.0, 3);
-        }
-        samples[sample_index * sample_fields.size() + j] = data;
-          
-      }
-      sample_index++;
-    }
+    Signal s(name,title,nexpected,sigma,this->hdf5_fields,
+        this->sample_fields,this->observables,this->cuts,this->systematics,
+        filenames);
 
     float years = 1.0 * s.nevents / (s.nexpected / this->live_time /
                   this->efficiency);
 
-    std::cout << "FitConfig::FitConfig: Initializing PDF for " << s.name
+    std::cout << "FitConfig::FitConfig: Initialized PDF for " << s.name
               << " using " << s.nevents << " events (" << years << " y)"
               << std::endl;
 
-    if (s.name == this->signal_name) {
-      this->signal_eff = 1.0 * sample_index / s.nevents;
-    }
-
-    // perhaps we skipped some events due to cuts
-    if (sample_index != s.nevents) {
-      std::cout << "FitConfig::FitConfig: " << s.nevents - sample_index
-                << " events cut" << std::endl;
-      samples.resize(sample_index * sample_fields.size());
-      s.nexpected *= (1.0 * sample_index / s.nevents);
-      s.sigma *= (1.0 * sample_index / s.nevents);
-      s.nevents = sample_index;
-    }
-
-    // build bin and limit arrays
-    std::vector<double> lower(this->observables.size());
-    std::vector<double> upper(this->observables.size());
-    std::vector<int> nbins(this->observables.size());
-    for (size_t i=0; i<sample_fields.size(); i++) {
-      for (size_t j=0; j<this->observables.size(); j++) {
-        if (this->observables[j].field_index == i) {
-          lower[i] = this->observables[j].lower;
-          upper[i] = this->observables[j].upper;
-          nbins[i] = this->observables[j].bins;
-          break;
-        }
-      }
-    }
-
-    // build the histogram evaluator
-    s.histogram = new pdfz::EvalHist(samples, sample_fields.size(),
-                                     this->observables.size(),
-                                     lower, upper, nbins);
-
-    for (size_t i=0; i<this->systematics.size(); i++) {
-      Systematic* syst = &this->systematics[i];
-
-      size_t o_field = syst->observable_field_index;
-      size_t t_field = syst->truth_field_index;
-
-      if (syst->type == pdfz::Systematic::SHIFT) {
-        s.histogram->AddSystematic(pdfz::ShiftSystematic(o_field, i));
-      }
-      else if (syst->type == pdfz::Systematic::SCALE) {
-        s.histogram->AddSystematic(pdfz::ScaleSystematic(o_field, i));
-      }
-      else if (syst->type == pdfz::Systematic::RESOLUTION_SCALE) {
-        s.histogram->AddSystematic(pdfz::ResolutionScaleSystematic(o_field,
-                                                                   t_field,
-                                                                   i));
-      }
-      else {
-        std::cerr << "FitConfig::FitConfig: Unknown systematic ID "
-                  << (int)syst->type << std::endl;
-        assert(false);
-      }
-    }
 
     this->signals.push_back(s);
   }

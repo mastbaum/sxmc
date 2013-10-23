@@ -8,6 +8,7 @@
 
 #include <string>
 #include <vector>
+#include <json/value.h>
 
 #include <sxmc/utils.h>
 #include <sxmc/signals.h>
@@ -65,6 +66,9 @@ class FitConfig {
     std::vector<Systematic> systematics;  //!< Systematics used in PDFs
     std::vector<Observable> observables;  //!< Observables used in PDFs
     std::vector<Observable> cuts;  //!< Cuts applied before fit
+
+    std::vector<std::string> hdf5_fields; //!< Name and order of fields in hdf5 files
+    std::vector<size_t> sample_fields; //!< sample_fields[i] = j means samples[i] <=> hdf5_fields[j]
 };
 
 #endif  // __CONFIG_H__

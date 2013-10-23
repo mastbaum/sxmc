@@ -64,10 +64,10 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
                                      float confidence, unsigned nexperiments,
                                      float live_time, const bool debug_mode) {
   std::map<std::string, TH1F> limits;
-  limits["counts_proj"] = TH1F("counts_proj", ";Counts in fit range;Fraction",
-                               10000, 0, 500);
-  limits["counts_cont"] = TH1F("counts_cont", ";Counts in fit range;Fraction",
-                               10000, 0, 500);
+  //limits["counts_proj"] = TH1F("counts_proj", ";Counts in fit range;Fraction",
+  //                             10000, 0, 500);
+  //limits["counts_cont"] = TH1F("counts_cont", ";Counts in fit range;Fraction",
+  //                             10000, 0, 500);
 
   for (unsigned i=0; i<nexperiments; i++) {
     std::cout << "Experiment " << i + 1 << " / " << nexperiments << std::endl;
@@ -115,8 +115,8 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
  * \returns 0 on success, non-zero on failure
  */
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    std::cerr << "Usage: " << argv[0] << " fit_configuration.json" << std::endl;
+  if (argc != 3) {
+    std::cerr << "Usage: " << argv[0] << " fit_configuration.json output_path" << std::endl;
     exit(1);
   }
 
@@ -139,6 +139,8 @@ int main(int argc, char* argv[]) {
     ensemble(fc.signals, fc.systematics, fc.observables, fc.cuts, fc.steps,
              fc.burnin_fraction, fc.signal_name, fc.signal_eff, fc.confidence,
              fc.experiments, fc.live_time, fc.debug_mode);
+
+  std::string output_path = std::string(argv[2]);
 
   // Plot distribution of limits
 /*

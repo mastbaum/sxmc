@@ -9,22 +9,9 @@
 #ifndef __SIGNALS_H__
 #define __SIGNALS_H__
 
+#include <string>
+#include <vector>
 #include <sxmc/pdfz.h>
-
-/**
- * \struct Signal
- *
- * A container for signal metadata and PDFs
- */
-struct Signal {
-  std::string name;  //!< string identifier
-  std::string title;  //!< histogram title in ROOT-LaTeX format
-  double nexpected;  //!< events expected in this fit
-  double sigma;  //!< fractional uncertainty
-  size_t nevents;  //!< number of events in PDF
-  pdfz::Eval* histogram;  //!< PDF
-};
-
 
 /**
  * \struct Observable
@@ -36,7 +23,7 @@ struct Observable {
   std::string title;  //!< Title in ROOT LaTeX format, for display
   std::string field;  //!< Name of the field (e.g. "energy")
   std::string units;  //!< Units as string, used in plotting
-  size_t field_index;  //!< Index of data field in the HDF5 table
+  size_t field_index;  //!< Index in the sampled data for this filed
   size_t bins;  //!< Number of bins
   float lower;  //!< Lower physical bound
   float upper;  //!< Upper physical bound
@@ -56,13 +43,33 @@ struct Systematic {
   std::string title;  //!< Title in ROOT LaTeX format, for display
   std::string observable_field;  //!< Name of the field of the observable
   std::string truth_field;  //! Name of the field of the truth value
-  size_t observable_field_index;  //!< Index of the observable field in HDF5
-  size_t truth_field_index;  //!< Index of the truth field in HDF5
+  size_t observable_field_index;  //!< Index of the observable field in the data
+  size_t truth_field_index;  //!< Index of the truth field in the data
   pdfz::Systematic::Type type;  //!< The type of systematic
   double mean;  //!< Mean value
   double sigma;  //!< Standard deviation (constraint)
   bool fixed;  //! Fix the value of the parameter to the mean
 };
+
+
+
+/**
+ * \class Signal
+ *
+ * A container for signal metadata and PDFs
+ */
+class Signal {
+  public:
+    Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::vector<std::string> hdf5_fields, std::vector<size_t> sample_fields, std::vector<Observable> observables, std::vector<Observable> cuts, std::vector<Systematic> systematics, std::vector<std::string> filenames);
+
+    std::string name;  //!< string identifier
+    std::string title;  //!< histogram title in ROOT-LaTeX format
+    double nexpected;  //!< events expected in this fit
+    double sigma;  //!< fractional uncertainty
+    size_t nevents;  //!< number of events in PDF
+    pdfz::Eval* histogram;  //!< PDF
+};
+
 
 #endif  // __SIGNALS_H__
 
