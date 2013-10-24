@@ -77,9 +77,21 @@
     },
     "b8": {
       "title": "^{8}B #nu ES",
-      "files": ["/path/to/b8.hdf5"],
-      "rate": 1236.7,  // SNO
-      "constraint": 37.1  // 3% SNO
+      "rate": 1536.7,  // SNO,
+      "chain": true,
+      "pdfs": {
+        "b8_scintillator": {
+          "title": "^{8}B #nu ES in scintillator",
+          "files": ["/path/to/b8_scintillator.hdf5"],
+          "rate": 1236.7,  // SNO,
+          "constraint": 37.1  // 3% SNO
+        },
+        "b8_lightwater": {
+          "title": "^{8}B #nu ES in light water",
+          "files": ["/path/to/b8_lightwater.hdf5"],
+          "rate": 300,  // SNO
+        }
+      }
     }
   }
 }

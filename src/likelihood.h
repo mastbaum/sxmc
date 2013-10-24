@@ -70,6 +70,8 @@ class LikelihoodSpace {
     std::map<std::string, Interval>
     extract_best_fit(float& ml, ErrorType error_type=ERROR_PROJECTION);
 
+    TNtuple* GetSamples(){return samples;};
+
   private:
     TNtuple* samples;  //!< Samples of the likelihood function
     std::map<std::string, Interval> ml_params;  //!< Likelihood-maximizing pars

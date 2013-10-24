@@ -9,7 +9,6 @@
 #include <TH2F.h>
 #include <TF1.h>
 #include <TNtuple.h>
-#include <TFile.h>
 #include <TRandom.h>
 #include <TStopwatch.h>
 #include <TDirectory.h>
@@ -285,12 +284,6 @@ LikelihoodSpace* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
 
   std::cout << "MCMC: Elapsed time: " << timer.RealTime() << std::endl;
 
-  // Write out samples for debugging
-  TFile f("lspace.root", "recreate");
-  TNtuple* lsclone = (TNtuple*) nt->Clone("ls");
-  lsclone->Write();
-  lsclone->Delete();
-  f.Close();
 
   LikelihoodSpace* lspace = new LikelihoodSpace(nt);
 

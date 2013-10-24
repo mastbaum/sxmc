@@ -21,6 +21,7 @@
 #include <TH3D.h>
 #include <TNtuple.h>
 #include <TCanvas.h>
+#include <TFile.h>
 #include <TH1F.h>
 #include <TRandom.h>
 #include <TRandom2.h>
@@ -91,6 +92,13 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
     // Run MCMC
     MCMC mcmc(signals, systematics, observables);
     LikelihoodSpace* ls = mcmc(data, steps, burnin_fraction, debug_mode);
+
+    // Write out samples for debugging
+    TFile f((output_path+"lspace.root").c_str(), "recreate");
+    TNtuple* lsclone = (TNtuple*) ls->GetSamples()->Clone("ls");
+    lsclone->Write();
+    lsclone->Delete();
+    f.Close();
 
     ls->print_best_fit();
     ls->print_correlations();
