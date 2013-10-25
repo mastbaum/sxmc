@@ -48,8 +48,6 @@
  * \param cuts List of cuts applied to data set
  * \param steps Number of MCMC random walk steps to take
  * \param burnin_fraction Fraction of initial MCMC steps to throw out
- * \param signal_name The name of the Signal that is the signal
- * \param signal_eff Efficiency for detecting signal
  * \param confidence Desired confidence level for limits
  * \param nexperiments Number of fake experiments to run
  * \param live_time Experiment live time in years
@@ -61,7 +59,6 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
                                      std::vector<Observable>& observables,
                                      std::vector<Observable>& cuts,
                                      unsigned steps, float burnin_fraction,
-                                     std::string signal_name, float signal_eff,
                                      float confidence, unsigned nexperiments,
                                      float live_time, const bool debug_mode,
                                      std::string output_path)
@@ -160,7 +157,7 @@ int main(int argc, char* argv[]) {
   // Run ensemble
   std::map<std::string, TH1F> limits = \
     ensemble(fc.signals, fc.systematics, fc.observables, fc.cuts, fc.steps,
-             fc.burnin_fraction, fc.signal_name, fc.signal_eff, fc.confidence,
+             fc.burnin_fraction, fc.confidence,
              fc.experiments, fc.live_time, fc.debug_mode, output_path);
 
 

@@ -18,10 +18,11 @@
 class PartialFill {
   public:
     PartialFill(double _start_fill, double _end_fill,
-        double _live_time, double _detector_radius, int _time_bins);
+        double _live_time, double _detector_radius, int _time_bins, double _scint_leaching_rate, double _water_leaching_rate);
 
     double GetVolumeAtFill(double fill);
     double GetTimeAtFill(double fill);
+    double GetSurfaceAreaAtFill(double fill);
 
     LinearInterpolator GetFillAtTime;
 
@@ -34,6 +35,8 @@ class PartialFill {
     double fill_rate;
     double detector_radius;
     int time_bins;
+    double scint_leaching_rate;
+    double water_leaching_rate;
     std::map<std::string, TH1D*> time_profiles;
 };
 

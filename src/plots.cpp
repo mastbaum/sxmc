@@ -1,5 +1,6 @@
 #include <vector>
 #include <map>
+#include <algorithm>
 #include <string>
 #include <sstream>
 #include <iomanip>
@@ -133,28 +134,41 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
               std::vector<Observable> observables,
               std::vector<float> data,
               std::string output_path) {
-  std::vector<SpectralPlot> plots_full;
-  std::vector<SpectralPlot> plots_external;
-  std::vector<SpectralPlot> plots_cosmogenic;
 
-  // Set up plots for each observable
-  for (size_t i=0; i<observables.size(); i++) {
-    Observable* o = &observables[i];
-    std::stringstream ytitle;
-    ytitle << "Counts/" << std::setprecision(3)
-           << (o->upper - o->lower) / o->bins << " " << o->units
-           << "/" << live_time << " y";
-    plots_full.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 1e6,
-                         true, "", o->title, ytitle.str().c_str()));
-    plots_external.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 1e6,
-                             true, "", o->title, ytitle.str().c_str()));
-    plots_cosmogenic.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 1e6,
-                               true, "", o->title, ytitle.str().c_str()));
+  std::vector<std::string> categories;
+  categories.push_back("full");
+  for (size_t i=0;i<signals.size();i++){
+    if (signals[i].category.size() > 0){
+      if (std::find(categories.begin(),categories.end(),signals[i].category) == categories.end())
+        categories.push_back(signals[i].category);
+    }
   }
 
-  std::vector<TH1D*> external_total(observables.size(), NULL);
-  std::vector<TH1D*> cosmogenic_total(observables.size(), NULL);
-  std::vector<TH1D*> fit_total(observables.size(), NULL);
+  std::map<std::string, std::vector<SpectralPlot> > all_plots;
+  std::map<std::string, std::vector<TH1D*> > all_totals;
+
+  for (size_t j=0;j<categories.size();j++){
+    std::vector<SpectralPlot> plots;
+
+    // Set up plots for each observable
+    for (size_t i=0; i<observables.size(); i++) {
+      Observable* o = &observables[i];
+      std::stringstream ytitle;
+      ytitle << "Counts/" << std::setprecision(3)
+        << (o->upper - o->lower) / o->bins << " " << o->units
+        << "/" << live_time << " y";
+      plots.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 1e6,
+            true, "", o->title, ytitle.str().c_str()));
+    }
+    all_plots[categories[j]] = plots;
+
+    std::vector<TH1D*> totals(observables.size(), NULL);
+    all_totals[categories[j]] = totals;
+  }
+
+//  std::vector<TH1D*> external_total(observables.size(), NULL);
+//  std::vector<TH1D*> cosmogenic_total(observables.size(), NULL);
+//  std::vector<TH1D*> fit_total(observables.size(), NULL);
 
   // Extract best-fit parameter values
   std::vector<float> params;
@@ -201,25 +215,40 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
 
     for (size_t j=0; j<observables.size(); j++) {
       hpdf[j]->SetLineColor(colors[i % 28]);
-      if (fit_total[j] == NULL) {
+      if (all_totals["full"][j] == NULL) {
         std::string hfname = "fit_total_" + signals[i].name;
-        fit_total[j] = (TH1D*) hpdf[j]->Clone(hfname.c_str());
-      }
-      else {
+        all_totals["full"][j] = (TH1D*) hpdf[j]->Clone(hfname.c_str());
+      } else {
         if (hpdf[j] && hpdf[j]->Integral() > 0) {
-          fit_total[j]->Add(hpdf[j]);
+          all_totals["full"][j]->Add(hpdf[j]);
         }
       }
 
-      if (hpdf[j] && hpdf[j]->Integral() > 0) {
-        plots_full[j].add(hpdf[j], signals[i].title, "hist");
+      if (signals[i].category.size() == 0){
+        if (hpdf[j] && hpdf[j]->Integral() > 0) {
+          all_plots["full"][j].add(hpdf[j], signals[i].title, "hist");
+        }
+      }else{
+        for (size_t k=0;k<categories.size();k++){
+          if (signals[i].category == categories[k]){
+            all_plots[categories[k]][j].add(hpdf[j], signals[i].title, "hist");
+            std::string hname = "et" + signals[i].name + observables[j].name;
+            if (all_totals[categories[k]][j] == NULL) {
+              all_totals[categories[k]][j] = (TH1D*) hpdf[j]->Clone(hname.c_str());
+            } else {
+              if (hpdf[j] && hpdf[j]->Integral() > 0) {
+                all_totals[categories[k]][j]->Add((TH1D*) hpdf[j]->Clone(hname.c_str()));
+              }
+            }
+          }
+        } // end loop over categories
       }
-    }
-  }
+    } // end loop over observables
+  } // end loop over signals
 
   for (size_t i=0; i<observables.size(); i++) {
     TH1D* hdata = \
-      (TH1D*) SpectralPlot::make_like(plots_full[i].histograms[0], "hdata");
+      (TH1D*) SpectralPlot::make_like(all_plots["full"][i].histograms[0], "hdata");
 
     hdata->SetMarkerStyle(20);
     hdata->SetLineColor(kBlack);
@@ -228,31 +257,31 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
       hdata->Fill(data[idata * observables.size() + i]);
     }
 
-    if (external_total[i] != NULL) {
-      external_total[i]->SetLineColor(kOrange + 1);
-      TH1D* et = (TH1D*) external_total[i]->Clone("et");
-      et->SetLineStyle(2);
-      plots_external[i].add(et, "Total", "hist");
-      plots_full[i].add(external_total[i], "External", "hist");
-    }
-    if (cosmogenic_total[i] != NULL) {
-      cosmogenic_total[i]->SetLineColor(kAzure + 1);
-      TH1D* ct = (TH1D*) cosmogenic_total[i]->Clone("ct");
-      ct->SetLineStyle(2);
-      plots_cosmogenic[i].add(ct, "Total", "hist");
-      plots_full[i].add(cosmogenic_total[i], "Cosmogenic", "hist");
-    }
-    if (fit_total[i] != NULL) {
-      fit_total[i]->SetLineColor(kRed);
-      plots_full[i].add(fit_total[i], "Fit", "hist");
+    for (size_t j=0;j<categories.size();j++){
+      if (categories[j] == "full")
+        continue;
+      if (all_totals[categories[j]][i] != NULL){
+        all_totals[categories[j]][i]->SetLineColor(colors[j+1]);
+        TH1D* t = (TH1D*) all_totals[categories[j]][i]->Clone(categories[j].c_str());
+        t->SetLineStyle(2);
+        all_plots[categories[j]][i].add(t,"Total", "hist");
+        all_plots["full"][i].add(all_totals[categories[j]][i],categories[j],"hist");
+      }
     }
 
-    plots_full[i].add(hdata, "Fake Data");
+    if (all_totals["full"][i] != NULL) {
+      all_totals["full"][i]->SetLineColor(kRed);
+      all_plots["full"][i].add(all_totals["full"][i], "Fit", "hist");
+    }
 
-    plots_full[i].save(output_path + observables[i].name + "_spectrum_full.pdf");
-    plots_external[i].save(output_path + observables[i].name + "_spectrum_external.pdf");
-    plots_cosmogenic[i].save(output_path + observables[i].name +
-                             "_spectrum_cosmogenic.pdf");
+    all_plots["full"][i].add(hdata, "Fake Data");
+
+    all_plots["full"][i].save(output_path + observables[i].name + "_spectrum_full.pdf");
+    for (size_t j=0;j<categories.size();j++){
+      if (categories[j] == "full")
+        continue;
+      all_plots[categories[j]][i].save(output_path + observables[i].name + "_spectrum_" + categories[j] + ".pdf");
+    }
   }
 }
 

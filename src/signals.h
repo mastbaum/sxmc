@@ -60,11 +60,21 @@ struct Systematic {
  */
 class Signal {
   public:
-    Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::vector<std::string>& hdf5_fields, std::vector<size_t>& sample_fields, std::vector<Observable>& observables, std::vector<Observable>& cuts, std::vector<Systematic>& systematics, std::vector<std::string>& filenames);
-    Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::vector<Observable>& observables, std::vector<Systematic>& systematics, std::vector<float>& _samples);
+    Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
+        std::vector<std::string>& hdf5_fields,
+        std::vector<size_t>& sample_fields,
+        std::vector<Observable>& observables,
+        std::vector<Observable>& cuts,
+        std::vector<Systematic>& systematics,
+        std::vector<std::string>& filenames);
+    Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
+        std::vector<Observable>& observables,
+        std::vector<Systematic>& systematics,
+        std::vector<float>& _samples);
 
     std::string name;  //!< string identifier
     std::string title;  //!< histogram title in ROOT-LaTeX format
+    std::string category; //!< category like external, cosmogenic, etc for plotting purposes
     double nexpected;  //!< events expected in this fit
     double sigma;  //!< fractional uncertainty
     double efficiency; //!< Fraction of generated events that make it past cuts (not counting the efficiency correction)

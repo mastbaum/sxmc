@@ -57,7 +57,9 @@ FitConfig::FitConfig(std::string filename) {
   double sfill = experiment_params["start_fill"].asFloat();
   double efill = experiment_params["end_fill"].asFloat();
   int tbins = experiment_params["time_bins"].asInt();
-  this->pf = new PartialFill(sfill,efill,this->live_time,det_rad,tbins);
+  double slrate = experiment_params["scint_leaching_rate"].asFloat();
+  double wlrate = experiment_params["water_leaching_rate"].asFloat();
+  this->pf = new PartialFill(sfill,efill,this->live_time,det_rad,tbins,slrate,wlrate);
 
   // pdf parameters
   const Json::Value pdf_params = root["pdfs"];
@@ -129,7 +131,6 @@ FitConfig::FitConfig(std::string filename) {
   this->experiments = fit_params["experiments"].asInt();
   this->steps = fit_params["steps"].asInt();
   this->burnin_fraction = fit_params.get("burnin_fraction", 0.1).asFloat();
-  this->signal_name = fit_params["signal_name"].asString();
   this->output_file = fit_params.get("output_file", "fit_spectrum").asString();
   this->debug_mode = fit_params.get("debug_mode", false).asBool();
 
@@ -264,8 +265,10 @@ FitConfig::FitConfig(std::string filename) {
 Signal FitConfig::CreateSinglePDFSignal(const Json::Value signal_params, std::string name)
 {
   std::string title = signal_params.get("title", name).asString();
+  std::string category = signal_params.get("category","").asString();
   float sigma = signal_params.get("constraint", 0.0).asFloat() * this->live_time * this->efficiency_corr;
   float nexpected = signal_params["rate"].asFloat() * this->live_time * this->efficiency_corr;
+  std::string scaling = signal_params.get("scaling","scintillator").asString();
   
   std::cout << "FitConfig::CreateSinglePDFSignal: Loading data for "
     << name << std::endl;
@@ -291,7 +294,7 @@ Signal FitConfig::CreateSinglePDFSignal(const Json::Value signal_params, std::st
     }
     try{
       //FIXME
-    Signal s(name,"",nexpected,fill_fraction,this->hdf5_fields,
+    Signal s(name,"",nexpected,0,"",this->hdf5_fields,
         sample_fields_notime,observables_notime,this->cuts,this->systematics,
         filenames);
 
@@ -317,7 +320,7 @@ Signal FitConfig::CreateSinglePDFSignal(const Json::Value signal_params, std::st
   // STEP 2:
   // Create Time TH1 which gives event rate as a function of time as a fraction of
   // the event rate for full scintillator fill (first without considering efficiency)
-  TH1D* timeh1 = (TH1D*) this->pf->GetTimeProfile("scintillator")->Clone();
+  TH1D* timeh1 = (TH1D*) this->pf->GetTimeProfile(scaling)->Clone();
 
   // STEP 3:
   // Scale by real efficiency
@@ -357,11 +360,15 @@ Signal FitConfig::CreateSinglePDFSignal(const Json::Value signal_params, std::st
 
   // STEP 5:
   // Randomly sample this TH2D to create a list of samples to feed into a new Signal
-  int num_samples;
+  long int num_samples;
   if (nexpected > 0){
     num_samples = nexpected*totalh2->Integral()*10.0;
   }else{
     num_samples = nevents_total; 
+  }
+  
+  if (num_samples > 1e8){
+    num_samples = 1e8;
   }
   std::cout << "FitConfig::CreateSinglePDFSignal: Generating " << num_samples << " samples." << std::endl;
   std::vector<float> samples = sample_pdf(totalh2,num_samples);
@@ -370,7 +377,7 @@ Signal FitConfig::CreateSinglePDFSignal(const Json::Value signal_params, std::st
   // Make a new Signal from these samples
   double effective_live_time_corr = totalh2->Integral()/this->live_time;
   Signal s(name,title,nexpected*effective_live_time_corr,sigma*effective_live_time_corr,
-      this->observables,this->systematics,samples);
+      category,this->observables,this->systematics,samples);
 
   std::cout << "FitConfig::CreateSinglePDFSignal: Initialized PDF for " << s.name << std::endl;
 
@@ -401,9 +408,10 @@ Signal FitConfig::CreateMultiPDFSignal(const Json::Value signal_params, std::str
 
   // Now create a new pdf from these samples
   std::string title = signal_params.get("title", name).asString();
+  std::string category = signal_params.get("category","").asString();
   float sigma = signal_params.get("constraint", 0.0).asFloat() * this->live_time * this->efficiency_corr;
   float nexpected = signal_params.get("rate",nexpected_total).asFloat() * this->live_time * this->efficiency_corr;
-  Signal s(name,title,nexpected,sigma,this->observables,this->systematics,samples);
+  Signal s(name,title,nexpected,sigma,category,this->observables,this->systematics,samples);
 
   float years = 1.0 * s.nevents / (s.nexpected / this->live_time /
       this->efficiency_corr);
@@ -421,7 +429,6 @@ void FitConfig::print() const {
             << "  Fake experiments: " << this->experiments << std::endl
             << "  MCMC steps: " << this->steps << std::endl
             << "  Burn-in fraction: " << this->burnin_fraction << std::endl
-            << "  Signal name: " << this->signal_name << std::endl
             << "  Output plot: " << this->output_file << std::endl;
 
   std::cout << "Experiment:" << std::endl

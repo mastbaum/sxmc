@@ -62,10 +62,8 @@ class FitConfig {
     float live_time;  //!< experiment live time in years
     float efficiency_corr;  //!< overall efficiency correction
     float burnin_fraction;  //!< fraction of steps to use for burn-in period
-    float signal_eff;  //!< signal efficiency, i.e. fraction of signal in fit
     bool debug_mode;  //!< enable/disable debugging mode (accept/save all)
     std::string output_file;  //!< base filename for output
-    std::string signal_name;  //!< name of the signal that is the signal
     std::vector<Signal> signals;  //!< signal histograms and metadata
     std::vector<Systematic> systematics;  //!< Systematics used in PDFs
     std::vector<Observable> observables;  //!< Observables used in PDFs

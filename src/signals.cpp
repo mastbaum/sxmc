@@ -7,10 +7,10 @@
 #include <sxmc/hdf5_io.h>
 
 //FIXME do we need to include non observed fields so they can be used for systematic effects?
-Signal::Signal(std::string _name, std::string _title, float _nexpected, float _sigma,
+Signal::Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
     std::vector<Observable>& observables,
     std::vector<Systematic>& systematics,
-    std::vector<float>& _samples) : name(_name), title(_title), nexpected(_nexpected),
+    std::vector<float>& _samples) : name(_name), title(_title), category(_category), nexpected(_nexpected),
   sigma(_sigma), efficiency(1)
 {
 
@@ -61,7 +61,7 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
   // perhaps we skipped some events due to cuts
   if (sample_index != this->nevents) {
     std::cout << "Signal::Signal: " << this->nevents - sample_index <<
-      " of " << this->nevents << " events cut" << std::endl;
+      " of " << this->nevents << " events cut (" << 1.0*sample_index/this->nevents << ")" << std::endl;
     samples.resize(sample_index * observables.size());
     this->efficiency *= (1.0 * sample_index / this->nevents);
     this->nexpected *= (1.0 * sample_index / this->nevents);
@@ -126,7 +126,8 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
     this->efficiency *= rescale;
     this->nexpected *= rescale;
     this->sigma *= rescale;
-    std::cout << "Signal::Signal: Rescaled by " << rescale << " to " << this->nexpected << std::endl;
+    std::cout << "Signal::Signal: " << this->nevents - norms_buffer.readOnlyHostPtr()[0] <<
+      " of " << this->nevents << " events outside limits (" << rescale << "). Total efficiency: " << this->efficiency << std::endl;
     /*
        if (this->signals[i].name == this->signal_name) {
        this->signal_eff *= rescale;
@@ -139,13 +140,13 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
 
 
 
-Signal::Signal(std::string _name, std::string _title, float _nexpected, float _sigma,
+Signal::Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
     std::vector<std::string>& hdf5_fields,
     std::vector<size_t>& sample_fields,
     std::vector<Observable>& observables,
     std::vector<Observable>& cuts,
     std::vector<Systematic>& systematics,
-    std::vector<std::string>& filenames) : name(_name), title(_title), nexpected(_nexpected),
+    std::vector<std::string>& filenames) : name(_name), title(_title), category(_category), nexpected(_nexpected),
   sigma(_sigma), efficiency(1)
 {
   // FIXME add offset and rank check to to read_float_vector_hdf5, to enable
@@ -234,36 +235,6 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
     size_t excludes_total = 0;
     size_t excludes_cut = 0;
 
-    if (this->name == "pep"){
-      dataset[i*rank[1] + 0] = 100.; 
-      dataset[i*rank[1] + 1] = 0.; 
-      dataset[i*rank[1] + 2] = 0.; 
-      dataset[i*rank[1] + 3] = 100.; 
-      dataset[i*rank[1] + 4] = 1.*sigma; 
-      dataset[i*rank[1] + 5] = 100.; 
-      dataset[i*rank[1] + 6] = 0.; 
-      dataset[i*rank[1] + 7] = 0.; 
-      dataset[i*rank[1] + 8] = 100.; 
-      dataset[i*rank[1] + 9] = 1.*sigma; 
-      dataset[i*rank[1] + 10] = 0.; 
-      dataset[i*rank[1] + 11] = 0.; 
-      dataset[i*rank[1] + 12] = 0.; 
-    }else{
-      dataset[i*rank[1] + 0] = 100.; 
-      dataset[i*rank[1] + 1] = 0.; 
-      dataset[i*rank[1] + 2] = 0.; 
-      dataset[i*rank[1] + 3] = 100.; 
-      dataset[i*rank[1] + 4] = 2./sigma; 
-      dataset[i*rank[1] + 5] = 100.; 
-      dataset[i*rank[1] + 6] = 0.; 
-      dataset[i*rank[1] + 7] = 0.; 
-      dataset[i*rank[1] + 8] = 100.; 
-      dataset[i*rank[1] + 9] = 2./sigma; 
-      dataset[i*rank[1] + 10] = 0.; 
-      dataset[i*rank[1] + 11] = 0.; 
-      dataset[i*rank[1] + 12] = 0.; 
-    }
-
     for (size_t j=0; j<hdf5_fields.size(); j++) {
       float v = dataset[i * rank[1] + j];
 
@@ -302,7 +273,7 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
   // perhaps we skipped some events due to cuts
   if (sample_index != this->nevents) {
     std::cout << "Signal::Signal: " << this->nevents - sample_index <<
-      " of " << this->nevents << " events cut" << std::endl;
+      " of " << this->nevents << " events cut (" << 1.0*sample_index/this->nevents << ")" << std::endl;
     samples.resize(sample_index * sample_fields.size());
     this->efficiency *= (1.0 * sample_index / this->nevents);
     this->nexpected *= (1.0 * sample_index / this->nevents);
@@ -372,7 +343,11 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
     this->efficiency *= rescale;
     this->nexpected *= rescale;
     this->sigma *= rescale;
-    std::cout << "Signal::Signal: Rescaled by " << rescale << " to " << this->nexpected << std::endl;
+
+    std::cout << "Signal::Signal: " << this->nevents - norms_buffer.readOnlyHostPtr()[0] <<
+      " of " << this->nevents << " events outside limits (" << rescale << "). Total efficiency: " << this->efficiency << std::endl;
+    samples.resize(sample_index * observables.size());
+    this->efficiency *= (1.0 * sample_index / this->nevents);
     /*
        if (this->signals[i].name == this->signal_name) {
        this->signal_eff *= rescale;
