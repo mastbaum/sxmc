@@ -3,6 +3,7 @@
 #include <streambuf>
 #include <string>
 #include <algorithm>
+#include <stdlib.h>
 #include <vector>
 #include <assert.h>
 #include <json/value.h>
@@ -13,6 +14,7 @@
 #include <TH2F.h>
 #include <TMath.h>
 
+#include <sxmc/partialfill.h>
 #include <sxmc/signals.h>
 #include <sxmc/config.h>
 #include <sxmc/utils.h>
@@ -49,7 +51,13 @@ FitConfig::FitConfig(std::string filename) {
   assert(experiment_params.isMember("live_time"));
   this->live_time = experiment_params["live_time"].asFloat();
   this->confidence = experiment_params["confidence"].asFloat();
-  this->efficiency = experiment_params.get("efficiency", 1.0).asFloat();
+  this->efficiency_corr = experiment_params.get("efficiency_corr", 1.0).asFloat();
+
+  double det_rad = experiment_params["detector_radius"].asFloat();
+  double sfill = experiment_params["start_fill"].asFloat();
+  double efill = experiment_params["end_fill"].asFloat();
+  int tbins = experiment_params["time_bins"].asInt();
+  this->pf = new PartialFill(sfill,efill,this->live_time,det_rad,tbins);
 
   // pdf parameters
   const Json::Value pdf_params = root["pdfs"];
@@ -158,6 +166,7 @@ FitConfig::FitConfig(std::string filename) {
   }
 
   // Add any additional observables used for systematics
+  // //FIXME allow time to work here
   for (size_t i=0; i<this->systematics.size(); i++) {
     std::string field_name = this->systematics[i].observable_field;
     size_t field = (std::find(this->hdf5_fields.begin(), this->hdf5_fields.end(),
@@ -187,6 +196,21 @@ FitConfig::FitConfig(std::string filename) {
     this->systematics[i].truth_field_index = index;
   }
 
+  // add in time which is different since it is analytical and not from the hdf5s
+  size_t index = get_index_with_append<size_t>(this->sample_fields,999);
+  Observable otime;
+  otime.name = "time";
+  otime.title = "Time (years)";
+  otime.field = "";
+  otime.bins = this->pf->GetTimeBins();
+  otime.lower = 0;
+  otime.upper = this->live_time;
+  otime.units = "year";
+  otime.exclude = false;
+  otime.field_index = index;
+  this->observables.push_back(otime);
+
+
   // signal parameters
   std::vector<std::string> signal_names;
   for (Json::Value::iterator it=fit_params["signals"].begin();
@@ -199,12 +223,19 @@ FitConfig::FitConfig(std::string filename) {
   for (Json::Value::const_iterator it=all_signals.begin();
        it!=all_signals.end(); ++it) {
 
+    std::cout << std::endl;
+    std::cout << std::endl;
+    std::cout << std::endl;
+    std::cout << std::endl;
+    std::cout << std::endl;
+    std::cout << "NEW SIGNAL: " << it.key().asString() << std::endl;
+
     // check if we want this signal
     if (std::find(signal_names.begin(), signal_names.end(),
           it.key().asString()) == signal_names.end()) {
       continue;
     }
-    
+
     const Json::Value signal_params = all_signals[it.key().asString()];
 
     // check if we are building our pdf out of multiple contributions
@@ -215,119 +246,173 @@ FitConfig::FitConfig(std::string filename) {
         for (Json::Value::const_iterator jt=signal_params["pdfs"].begin();
             jt!=signal_params["pdfs"].end();++jt){
 
-
           const Json::Value contrib_params = signal_params["pdfs"][jt.key().asString()];
-          std::string name = jt.key().asString(); 
-          std::string title = contrib_params.get("title", name).asString();
-          float sigma = contrib_params.get("constraint", 0.0).asFloat() * this->live_time * this->efficiency;
-          float nexpected = contrib_params["rate"].asFloat() * this->live_time * this->efficiency;
-
-          std::cout << "FitConfig::FitConfig: Loading data for "
-            << name << std::endl;
-          // load data
-          std::vector<std::string> filenames;
-          for (Json::Value::const_iterator kt=contrib_params["files"].begin();
-              kt!=contrib_params["files"].end(); ++kt) {
-            filenames.push_back((*kt).asString());
-          }
-
-          Signal s(name,title,nexpected,sigma,this->hdf5_fields,
-              this->sample_fields,this->observables,this->cuts,this->systematics,
-              filenames);
-
-          float years = 1.0 * s.nevents / (s.nexpected / this->live_time /
-              this->efficiency);
-
-          std::cout << "FitConfig::FitConfig: Initialized PDF for " << s.name
-            << " using " << s.nevents << " events (" << years << " y)"
-            << std::endl;
-
+          Signal s = CreateSinglePDFSignal(contrib_params,jt.key().asString());
           this->signals.push_back(s);
         }
       }else{
-        // it is chained, get each contribution as a pdfz and add them
-        std::vector<Signal> pdfs;
-        std::vector<float> params;
-        int nexpected_total = 0;
-        for (Json::Value::const_iterator jt=signal_params["pdfs"].begin();
-            jt!=signal_params["pdfs"].end();++jt){
-          const Json::Value contrib_params = signal_params["pdfs"][jt.key().asString()];
-          std::string name = jt.key().asString(); 
-          float nexpected = contrib_params["rate"].asFloat() * this->live_time * this->efficiency;
-
-          std::cout << "FitConfig::FitConfig: Loading data for "
-            << name << std::endl;
-          // load data
-          std::vector<std::string> filenames;
-          for (Json::Value::const_iterator kt=contrib_params["files"].begin();
-              kt!=contrib_params["files"].end(); ++kt) {
-            filenames.push_back((*kt).asString());
-          }
-
-
-          // build the histogram evaluator
-          Signal s(name,"",nexpected,0,this->hdf5_fields,
-                this->sample_fields,this->observables,this->cuts,this->systematics,
-                filenames);
-          pdfs.push_back(s);
-          params.push_back(s.nexpected*10.0);
-          nexpected_total += s.nexpected;
-        }
-        for (size_t i=0;i<this->systematics.size();i++)
-          params.push_back(0);
-
-        // Now sample all these pdfs to get samples with the correct relative weighting
-        std::cout << "FitConfig::FitConfig: Generating combined pdf for " << it.key().asString() << std::endl;
-        std::vector<float> samples = make_fake_dataset(pdfs,this->systematics,this->observables,params,true);
-
-        // Now create a new pdf from these samples
-        std::string name = it.key().asString(); 
-        std::string title = signal_params.get("title", name).asString();
-        float sigma = signal_params.get("constraint", 0.0).asFloat() * this->live_time * this->efficiency;
-        float nexpected = signal_params.get("rate",nexpected_total).asFloat() * this->live_time * this->efficiency;
-        Signal s(name,title,nexpected,sigma,this->observables,this->systematics,samples);
-
-        float years = 1.0 * s.nevents / (s.nexpected / this->live_time /
-          this->efficiency);
-
-        std::cout << "FitConfig::FitConfig: Initialized PDF for " << s.name
-          << " using " << s.nevents << " events (" << years << " y)"
-          << std::endl;
-
+        Signal s = CreateMultiPDFSignal(signal_params,it.key().asString());
         this->signals.push_back(s);
-
       }
     }else{
-      std::string name = it.key().asString(); 
-      std::string title = signal_params.get("title", name).asString();
-      float sigma = signal_params.get("constraint", 0.0).asFloat() * this->live_time * this->efficiency;
-      float nexpected = signal_params["rate"].asFloat() * this->live_time * this->efficiency;
-      
-      std::cout << "FitConfig::FitConfig: Loading data for "
-        << name << std::endl;
-
-      // load data
-      std::vector<std::string> filenames;
-      for (Json::Value::const_iterator jt=signal_params["files"].begin();
-          jt!=signal_params["files"].end(); ++jt) {
-        filenames.push_back((*jt).asString());
-      }
-
-      Signal s(name,title,nexpected,sigma,this->hdf5_fields,
-          this->sample_fields,this->observables,this->cuts,this->systematics,
-          filenames);
-
-      float years = 1.0 * s.nevents / (s.nexpected / this->live_time /
-          this->efficiency);
-
-      std::cout << "FitConfig::FitConfig: Initialized PDF for " << s.name
-        << " using " << s.nevents << " events (" << years << " y)"
-        << std::endl;
-
-
+      Signal s = CreateSinglePDFSignal(signal_params, it.key().asString());
       this->signals.push_back(s);
     }
   }
+}
+
+Signal FitConfig::CreateSinglePDFSignal(const Json::Value signal_params, std::string name)
+{
+  std::string title = signal_params.get("title", name).asString();
+  float sigma = signal_params.get("constraint", 0.0).asFloat() * this->live_time * this->efficiency_corr;
+  float nexpected = signal_params["rate"].asFloat() * this->live_time * this->efficiency_corr;
+  
+  std::cout << "FitConfig::CreateSinglePDFSignal: Loading data for "
+    << name << std::endl;
+
+  std::vector<Observable> observables_notime = this->observables;
+  std::vector<size_t> sample_fields_notime = this->sample_fields;
+  observables_notime.pop_back();
+  sample_fields_notime.pop_back();
+
+  // STEP 1:
+  // Create TH1 for each fill fraction
+  std::vector<TH1*> hists;
+  std::vector<double> times;
+  std::vector<double> efficiencies;
+  int nevents_total = 0;
+  for (Json::Value::const_iterator it=signal_params["files"].begin();
+      it!=signal_params["files"].end();++it){
+    double fill_fraction = atof(it.key().asString().c_str());
+    std::vector<std::string> filenames;
+    for (Json::Value::const_iterator jt=signal_params["files"][it.key().asString()].begin();
+        jt!=signal_params["files"][it.key().asString()].end();++jt){
+      filenames.push_back((*jt).asString());
+    }
+    try{
+      //FIXME
+    Signal s(name,"",nexpected,fill_fraction,this->hdf5_fields,
+        sample_fields_notime,observables_notime,this->cuts,this->systematics,
+        filenames);
+
+    float years = 1.0 * s.nevents / (nexpected / this->live_time /
+        this->efficiency_corr);
+    std::cout << "FitConfig::CreateSinglePDFSignal: " << fill_fraction << ": using "
+      << s.nevents << " events (" << years << " y) (efficiency: " << s.efficiency << ")" << std::endl;
+    nevents_total += s.nevents;
+
+    double time = this->pf->GetTimeAtFill(fill_fraction);
+
+    hists.push_back(dynamic_cast<pdfz::EvalHist*>(s.histogram)->DefaultHistogram());
+    efficiencies.push_back(s.efficiency);
+    times.push_back(time);
+
+    }
+    catch(pdfz::Error e){
+      std::cout << e.msg << std::endl;
+      throw e;
+    }
+  }
+
+  // STEP 2:
+  // Create Time TH1 which gives event rate as a function of time as a fraction of
+  // the event rate for full scintillator fill (first without considering efficiency)
+  TH1D* timeh1 = (TH1D*) this->pf->GetTimeProfile("scintillator")->Clone();
+
+  // STEP 3:
+  // Scale by real efficiency
+  LinearInterpolator iefficiency(times,efficiencies);
+  for (int i=1;i<=timeh1->GetNbinsX();i++){
+    double efficiency = iefficiency(timeh1->GetBinCenter(i));
+    timeh1->SetBinContent(i,timeh1->GetBinContent(i)*efficiency);
+  }
+
+  // STEP 4:
+  // Create TH2 and interpolate between bins of TH1s
+  // //FIXME for higher dimensions
+  TH2D* totalh2 = new TH2D((name+"th2").c_str(),(name+"th2").c_str(),this->observables[0].bins,this->observables[0].lower,
+      this->observables[0].upper,this->pf->GetTimeBins(),0,this->live_time);
+  // loop over each bin, create an interpolator, and interpolate across time
+  for (size_t i=0;i<this->observables[0].bins;i++){
+    std::vector<double> x;
+    std::vector<double> y;
+    for (size_t j=0;j<hists.size();j++){
+      x.push_back(times[j]);
+      y.push_back(hists[j]->GetBinContent(i+1));
+    }
+    LinearInterpolator ibins(x,y);
+    for (int j=0;j<this->pf->GetTimeBins();j++){
+      double content = ibins(totalh2->GetYaxis()->GetBinCenter(j+1))*timeh1->GetBinContent(j+1);
+      totalh2->SetBinContent(i+1,j+1,content);
+    }
+  }
+  std::cout << std::endl;
+
+  TFile ftime((name+".root").c_str(),"RECREATE");
+  totalh2->Write();
+  ftime.Close();
+
+  for (size_t i=0;i<hists.size();i++)
+    delete hists[i];
+
+  // STEP 5:
+  // Randomly sample this TH2D to create a list of samples to feed into a new Signal
+  int num_samples;
+  if (nexpected > 0){
+    num_samples = nexpected*totalh2->Integral()*10.0;
+  }else{
+    num_samples = nevents_total; 
+  }
+  std::cout << "FitConfig::CreateSinglePDFSignal: Generating " << num_samples << " samples." << std::endl;
+  std::vector<float> samples = sample_pdf(totalh2,num_samples);
+  
+  // STEP 6:
+  // Make a new Signal from these samples
+  double effective_live_time_corr = totalh2->Integral()/this->live_time;
+  Signal s(name,title,nexpected*effective_live_time_corr,sigma*effective_live_time_corr,
+      this->observables,this->systematics,samples);
+
+  std::cout << "FitConfig::CreateSinglePDFSignal: Initialized PDF for " << s.name << std::endl;
+
+  return s;
+}
+ 
+Signal FitConfig::CreateMultiPDFSignal(const Json::Value signal_params, std::string name)
+{
+  // it is chained, get each contribution as a pdfz and add them
+  std::vector<Signal> pdfs;
+  std::vector<float> params;
+  int nexpected_total = 0;
+  for (Json::Value::const_iterator it=signal_params["pdfs"].begin();
+      it!=signal_params["pdfs"].end();++it){
+    const Json::Value contrib_params = signal_params["pdfs"][it.key().asString()];
+    Signal s = CreateSinglePDFSignal(contrib_params,it.key().asString());
+    pdfs.push_back(s);
+    params.push_back(s.nexpected*10.0);
+    nexpected_total += s.nexpected;
+  }
+  for (size_t i=0;i<this->systematics.size();i++)
+    params.push_back(0);
+
+
+  // Now sample all these pdfs to get samples with the correct relative weighting
+  std::cout << "FitConfig::CreateMultiPDFSignal: Generating combined pdf for " << name << std::endl;
+  std::vector<float> samples = make_fake_dataset(pdfs,this->systematics,this->observables,params,true);
+
+  // Now create a new pdf from these samples
+  std::string title = signal_params.get("title", name).asString();
+  float sigma = signal_params.get("constraint", 0.0).asFloat() * this->live_time * this->efficiency_corr;
+  float nexpected = signal_params.get("rate",nexpected_total).asFloat() * this->live_time * this->efficiency_corr;
+  Signal s(name,title,nexpected,sigma,this->observables,this->systematics,samples);
+
+  float years = 1.0 * s.nevents / (s.nexpected / this->live_time /
+      this->efficiency_corr);
+
+  std::cout << "FitConfig::CreateMultiPDFSignal: Initialized PDF for " << s.name
+    << " using " << s.nevents << " events (" << years << " y)"
+    << std::endl;
+
+  return s;
 }
 
 

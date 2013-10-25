@@ -44,5 +44,18 @@ float get_ntuple_entry(TNtuple* nt, int i, std::string field);
  */
 std::vector<float> get_correlation_matrix(TNtuple* nt);
 
+class LinearInterpolator{
+  public:
+    LinearInterpolator(){};
+    LinearInterpolator(std::vector<double> _x, std::vector<double> _y){x=_x;y=_y;};
+    void Setup(std::vector<double> _x, std::vector<double> _y){x=_x;y=_y;};
+    double operator()(double _x);
+
+  protected:
+    std::vector<double> x;
+    std::vector<double> y;
+};
+
+
 #endif  // __UTILS_H__
 

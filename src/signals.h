@@ -67,6 +67,7 @@ class Signal {
     std::string title;  //!< histogram title in ROOT-LaTeX format
     double nexpected;  //!< events expected in this fit
     double sigma;  //!< fractional uncertainty
+    double efficiency; //!< Fraction of generated events that make it past cuts (not counting the efficiency correction)
     size_t nevents;  //!< number of events in PDF
     pdfz::Eval* histogram;  //!< PDF
 };

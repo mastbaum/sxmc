@@ -417,8 +417,13 @@ namespace pdfz {
             for (int x=0; x < nbins[0]; x++) {
                 int source_bin = x * bin_stride[0];
                 int target_bin = hist->GetBin(x+1);
-                hist->SetBinContent(target_bin, bins[source_bin] / this->bin_volume / norm);
-                hist->SetBinError(target_bin, sqrt(bins[source_bin]) / this->bin_volume / norm);
+                if (norm > 0){
+                  hist->SetBinContent(target_bin, bins[source_bin] / this->bin_volume / norm);
+                  hist->SetBinError(target_bin, sqrt(bins[source_bin]) / this->bin_volume / norm);
+                }else{
+                  hist->SetBinContent(target_bin, 0);
+                  hist->SetBinError(target_bin, 0);
+                }
             }
             break;
 
@@ -431,8 +436,13 @@ namespace pdfz {
                 for (int y=0; y < nbins[1]; y++) {
                     int source_bin = x * bin_stride[0] + y * bin_stride[1];
                     int target_bin = hist->GetBin(x+1, y+1);
-                    hist->SetBinContent(target_bin, bins[source_bin] / this->bin_volume / norm);
-                    hist->SetBinError(target_bin, sqrt(bins[source_bin]) / this->bin_volume / norm);
+                    if (norm > 0){
+                      hist->SetBinContent(target_bin, bins[source_bin] / this->bin_volume / norm);
+                      hist->SetBinError(target_bin, sqrt(bins[source_bin]) / this->bin_volume / norm);
+                    }else{
+                      hist->SetBinContent(target_bin, 0);
+                      hist->SetBinError(target_bin, 0);
+                    }
                 }
             }
             break;
@@ -448,8 +458,13 @@ namespace pdfz {
                     for (int z=0; z < nbins[2]; z++) {
                         int source_bin = x * bin_stride[0] + y * bin_stride[1] + z * bin_stride[2];
                         int target_bin = hist->GetBin(x+1, y+1, z+1);
-                        hist->SetBinContent(target_bin, bins[source_bin] / this->bin_volume / norm);
-                        hist->SetBinError(target_bin, sqrt(bins[source_bin]) / this->bin_volume / norm);
+                        if (norm > 0){
+                          hist->SetBinContent(target_bin, bins[source_bin] / this->bin_volume / norm);
+                          hist->SetBinError(target_bin, sqrt(bins[source_bin]) / this->bin_volume / norm);
+                        }else{
+                          hist->SetBinContent(target_bin, 0);
+                          hist->SetBinError(target_bin, 0);
+                        }
                     }
                 }
             }
@@ -654,7 +669,7 @@ namespace pdfz {
 
       // Generate event array by sampling ROOT histograms, including only events
       // that pass cuts
-      size_t obs_id = 0;
+      size_t obs_id = events.size();
       events.resize(events.size() + observed * this->nobservables);
       if (hist->IsA() == TH1D::Class()) {
         TH1D* ht = dynamic_cast<TH1D*>(hist);
@@ -720,6 +735,27 @@ namespace pdfz {
       }
       return observed;
 
+    }
+
+    TH1* EvalHist::DefaultHistogram()
+    {
+      hemi::Array<unsigned> norms_buffer(1, true);
+      norms_buffer.writeOnlyDevicePtr();
+      SetNormalizationBuffer(&norms_buffer);
+      if (this->syst){
+        hemi::Array<double> params_buffer(this->syst->size(), true);
+        for (size_t i=0;i<this->syst->size();i++){
+          params_buffer.writeOnlyHostPtr()[i] = 0;
+        }
+        params_buffer.writeOnlyDevicePtr();
+        SetParameterBuffer(&params_buffer);
+        return CreateHistogram();
+      }else{
+        hemi::Array<double> params_buffer(0,true);
+        params_buffer.writeOnlyDevicePtr();
+        SetParameterBuffer(&params_buffer);
+        return CreateHistogram();
+      }
     }
 
     ///////////////////// EvalKernel ///////////////////////

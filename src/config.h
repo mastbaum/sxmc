@@ -13,6 +13,7 @@
 #include <sxmc/utils.h>
 #include <sxmc/signals.h>
 #include <sxmc/pdfz.h>
+#include <sxmc/partialfill.h>
 
 class TH1D;
 class TH2F;
@@ -49,6 +50,9 @@ class FitConfig {
 
     virtual ~FitConfig() {}
 
+    Signal CreateSinglePDFSignal(const Json::Value signal_params, std::string name);
+    Signal CreateMultiPDFSignal(const Json::Value signal_params, std::string name);
+
     /** Pretty-print the fit parameters */
     void print() const;
 
@@ -56,7 +60,7 @@ class FitConfig {
     unsigned steps;  //!< number of mcmc steps
     float confidence;  //!< confidence level for results (e.g. 0.9)
     float live_time;  //!< experiment live time in years
-    float efficiency;  //!< overall efficiency correction
+    float efficiency_corr;  //!< overall efficiency correction
     float burnin_fraction;  //!< fraction of steps to use for burn-in period
     float signal_eff;  //!< signal efficiency, i.e. fraction of signal in fit
     bool debug_mode;  //!< enable/disable debugging mode (accept/save all)
@@ -69,6 +73,9 @@ class FitConfig {
 
     std::vector<std::string> hdf5_fields; //!< Name and order of fields in hdf5 files
     std::vector<size_t> sample_fields; //!< sample_fields[i] = j means samples[i] <=> hdf5_fields[j]
+
+    PartialFill* pf;
+
 };
 
 #endif  // __CONFIG_H__

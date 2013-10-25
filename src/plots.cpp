@@ -211,37 +211,8 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
         }
       }
 
-      if (n == "av_tl208" || n == "av_bi214" ||
-          n == "water_tl208" || n == "water_bi214" ||
-          n == "int_ropes_tl208" || n == "int_ropes_bi214" ||
-          n == "hd_ropes_tl208" || n == "hd_ropes_bi214" ||
-          n == "pmt_bg") {
-        plots_external[j].add(hpdf[j], signals[i].title, "hist");
-        std::string hname = "et" + signals[i].name + observables[j].name;
-        if (external_total[j] == NULL) {
-          external_total[j] = (TH1D*) hpdf[j]->Clone(hname.c_str());
-        }
-        else {
-          if (hpdf[j] && hpdf[j]->Integral() > 0) {
-            external_total[j]->Add((TH1D*) hpdf[j]->Clone(hname.c_str()));
-          }
-        }
-      }
-      else if (n != "zeronu" && n != "twonu" && n != "int_tl208" &&
-               n != "int_bi214" && n != "b8") {
-        plots_cosmogenic[j].add(hpdf[j], signals[i].title, "hist");
-        std::string hname = "ct" + signals[i].name + observables[j].name;
-        if (cosmogenic_total[j] == NULL) {
-          cosmogenic_total[j] = (TH1D*) hpdf[j]->Clone(hname.c_str());
-        }
-        else {
-          cosmogenic_total[j]->Add((TH1D*) hpdf[j]->Clone(hname.c_str()));
-        }
-      }
-      else {
-        if (hpdf[j] && hpdf[j]->Integral() > 0) {
-          plots_full[j].add(hpdf[j], signals[i].title, "hist");
-        }
+      if (hpdf[j] && hpdf[j]->Integral() > 0) {
+        plots_full[j].add(hpdf[j], signals[i].title, "hist");
       }
     }
   }

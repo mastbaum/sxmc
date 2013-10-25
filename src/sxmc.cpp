@@ -64,7 +64,15 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
                                      std::string signal_name, float signal_eff,
                                      float confidence, unsigned nexperiments,
                                      float live_time, const bool debug_mode,
-                                     std::string output_path) {
+                                     std::string output_path)
+{
+  for (size_t i=0;i<signals.size();i++){
+    TFile f1((output_path+signals[i].name+"_pdf.root").c_str(),"RECREATE");
+    TH1* hist = dynamic_cast<pdfz::EvalHist*> (signals[i].histogram)->DefaultHistogram();
+    hist->Write();
+    f1.Close();
+  }
+
   std::map<std::string, TH1F> limits;
   //limits["counts_proj"] = TH1F("counts_proj", ";Counts in fit range;Fraction",
   //                             10000, 0, 500);
@@ -84,6 +92,7 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
       params.push_back(systematics[j].mean);
       param_names.push_back(systematics[j].name);
     }
+
 
     // Make fake data
     std::vector<float> data = \

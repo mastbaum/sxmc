@@ -313,6 +313,11 @@ namespace pdfz {
          *  1, 2 or 3 histograms.
          */
         virtual TH1* CreateHistogram();
+    
+        /** Sets the systematics to zero
+         *  and calls create histogram
+         */
+        TH1* DefaultHistogram();
 
         /** Brute force tests a bunch of CUDA configurations to find the best one */
         virtual void Optimize();

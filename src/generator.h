@@ -8,6 +8,7 @@
 #define __GENERATOR_H__
 
 #include <vector>
+#include <TH1.h>
 
 #include <sxmc/signals.h>
 
@@ -37,6 +38,11 @@ std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
                                      std::vector<Observable>& observables,
                                      std::vector<float> params,
                                      bool poisson=true);
+
+/* Uses ROOT to sample a histogram, but determines
+ * whether it is a TH1,TH2,TH3 and responds appropriately
+ */
+std::vector<float> sample_pdf(TH1* hist, int nsamples);
 
 
 // Is just TMath::Nint redefined here to get away with bug

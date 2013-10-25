@@ -10,6 +10,57 @@
 #include <sxmc/generator.h>
 #include <sxmc/signals.h>
 
+std::vector<float> sample_pdf(TH1* hist, int nsamples)
+{
+  size_t obs_id = 0;
+  std::vector<float> events;
+  if (hist->IsA() == TH1D::Class()) {
+    events.resize(nsamples);
+    TH1D* ht = dynamic_cast<TH1D*>(hist);
+
+    double obs;
+    for (int j=0; j<nsamples; j++) {
+      obs = ht->GetRandom();
+
+      events[obs_id++] = obs;
+    }
+  }
+  else if (hist->IsA() == TH2D::Class()) {
+    events.resize(nsamples*2);
+    TH2D* ht = dynamic_cast<TH2D*>(hist);
+
+    double obs0;
+    double obs1;
+    for (int j=0; j<nsamples; j++) {
+      ht->GetRandom2(obs0, obs1);
+
+      events[obs_id++] = obs0;
+      events[obs_id++] = obs1;
+    }
+  }
+  else if (hist->IsA() == TH3D::Class()) {
+    events.resize(nsamples*3);
+    TH3D* ht = dynamic_cast<TH3D*>(hist);
+
+    double obs0;
+    double obs1;
+    double obs2;
+    for (int j=0; j<nsamples; j++) {
+      ht->GetRandom3(obs0, obs1, obs2);
+
+      events[obs_id++] = obs0;
+      events[obs_id++] = obs1;
+      events[obs_id++] = obs2;
+    }
+  }
+  else {
+    std::cerr << "make_fake_dataset: Unknown histogram class: "
+      << hist->ClassName() << std::endl;
+    assert(false);
+  }
+  return events;
+}
+
 std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
                                      std::vector<Systematic>& systematics,
                                      std::vector<Observable>& observables,
