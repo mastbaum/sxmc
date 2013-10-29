@@ -94,7 +94,7 @@ MCMC::~MCMC() {
 }
 
 
-LikelihoodSpace* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
+LikelihoodSpace* MCMC::operator()(std::vector<float>& data, std::vector<int>& weights, unsigned nsteps,
                                   float burnin_fraction, const bool debug_mode,
                                   unsigned sync_interval) {
   // cuda/hemi block sizes
@@ -128,6 +128,10 @@ LikelihoodSpace* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
 
   hemi::Array<double> proposed_nll(1, true);
   proposed_nll.writeOnlyHostPtr();
+
+  // create hemi buffer for weighting data points
+  hemi::Array<int> dataweights(data.size(), true);
+  dataweights.copyFromHost(&weights.front(), weights.size());
 
   // initial standard deviations for each dimension
   hemi::Array<float> jump_width(this->nparameters, true);
@@ -174,7 +178,7 @@ LikelihoodSpace* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
   }
 
   // calculate nll with initial parameters
-  nll(lut.readOnlyPtr(), nevents,
+  nll(lut.readOnlyPtr(), dataweights.readOnlyPtr(), nevents,
       current_vector.readOnlyPtr(), current_nll.writeOnlyPtr(),
       event_partial_sums.ptr(), event_total_sum.ptr());
 
@@ -230,7 +234,7 @@ LikelihoodSpace* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
     // partial sums of event term
     HEMI_KERNEL_LAUNCH(nll_event_chunks, this->nnllblocks,
                        this->nllblocksize, 0, 0,
-                       lut.readOnlyPtr(),
+                       lut.readOnlyPtr(), dataweights.readOnlyPtr(),
                        proposed_vector.readOnlyPtr(),
                        nevents, this->nsignals,
                        event_partial_sums.ptr());
@@ -293,12 +297,12 @@ LikelihoodSpace* MCMC::operator()(std::vector<float>& data, unsigned nsteps,
 }
 
 
-void MCMC::nll(const float* lut, size_t nevents, const double* v, double* nll,
+void MCMC::nll(const float* lut, const int* dataweights, size_t nevents, const double* v, double* nll,
                double* event_partial_sums, double* event_total_sum) {
   // partial sums of event term
   HEMI_KERNEL_LAUNCH(nll_event_chunks,
                      this->nnllblocks, this->nllblocksize, 0, 0,
-                     lut, v, nevents, this->nsignals, event_partial_sums);
+                     lut, dataweights, v, nevents, this->nsignals, event_partial_sums);
 
   // total of event term
   HEMI_KERNEL_LAUNCH(nll_event_reduce, 1, this->nreducethreads,  

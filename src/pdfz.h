@@ -39,6 +39,7 @@
  *     const int nparams = 2; // two systematic parameters
  *
  *     std::vector<float> samples(nsamples * nfields);
+ *     this->weights.copyFromHost(&_weights.front(), _weights.size());
  *     std::vector<double> lower(nobs);
  *     std::vector<double> upper(nobs);
  *     std::vector<float> eval_points(neval_points * nobs);
@@ -301,7 +302,7 @@ namespace pdfz {
             If optimize is set to true (default), then the CUDA block
             configuration will be optimized the first time EvalAsync() is called.
         */
-        EvalHist(const std::vector<float> &samples, int nfields, int nobservables,
+        EvalHist(const std::vector<float> &samples, const std::vector<int> &_weights, int nfields, int nobservables,
                  const std::vector<double> &lower, const std::vector<double> &upper,
                  const std::vector<int> &nbins, bool optimize=true);
 
@@ -328,13 +329,13 @@ namespace pdfz {
         virtual void EvalFinished();
 
 
-        int RandomSample(std::vector<float> &events, float nexpected, std::vector<float> &syst_vals, std::vector<float> &uppers, std::vector<float> &lowers, bool poisson=false);
+        int RandomSample(std::vector<float> &events, std::vector<int> &eventweights, double nexpected, std::vector<double> &syst_vals, std::vector<float> &uppers, std::vector<float> &lowers, bool poisson=false, long int maxsamples=1e7);
 
-        int RandomSample(std::vector<float> &events, float nexpected, bool poisson=false){
-          std::vector<float> syst_vals(syst->size(),0);
+        int RandomSample(std::vector<float> &events, std::vector<int> &eventweights, double nexpected, bool poisson=false, long int maxsamples=1e7){
+          std::vector<double> syst_vals(syst->size(),0);
           std::vector<float> _upper;
           std::vector<float> _lower;
-          return RandomSample(events, nexpected,syst_vals,_upper,_lower, poisson);
+          return RandomSample(events, eventweights, nexpected,syst_vals,_upper,_lower, poisson, maxsamples);
         };
 
     protected:
@@ -342,6 +343,7 @@ namespace pdfz {
         hemi::Array<int> *read_bins;
         hemi::Array<int> nbins;
         hemi::Array<int> bin_stride;
+        hemi::Array<int> weights;
         int total_nbins;
         double bin_volume;
         hemi::Array<unsigned int> *bins;

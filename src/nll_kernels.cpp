@@ -82,6 +82,7 @@ void jump_decider_device(RNGState* rng, double* nll_current,
 
 
 HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
+                              const int* __restrict__ dataweights,
                               const double* __restrict__ pars,
                               const size_t ne, const size_t ns,
                               double* sums) {
@@ -95,7 +96,7 @@ HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
       float v = lut[j * ne + i];
       s += pars[j] * (!isnan(v) ? v : 0);  // handle nans from empty hists
     }
-    sum += log(s);
+    sum += log(s)*dataweights[i];
   }
   if (!isnan(sum)) {
     sums[offset] = sum;

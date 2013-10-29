@@ -10,14 +10,17 @@
 Signal::Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
     std::vector<Observable>& observables,
     std::vector<Systematic>& systematics,
-    std::vector<float>& _samples) : name(_name), title(_title), category(_category), nexpected(_nexpected),
+    std::vector<float>& _samples, std::vector<int> &_weights) : name(_name), title(_title), category(_category), nexpected(_nexpected),
   sigma(_sigma), efficiency(1)
 {
 
   assert(_samples.size() % observables.size() == 0);
-  this->nevents = _samples.size() / observables.size();
+  this->nevents = 0;
+  for (size_t i=0;i<_weights.size();i++)
+    this->nevents += _weights[i];
 
   std::vector<float> samples(_samples.size());
+  std::vector<int> weights(_weights.size());
 
   std::vector<bool> field_has_exclude(observables.size(), false);
   std::vector<double> field_exclude_lower(observables.size());
@@ -33,7 +36,7 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
 
 
   size_t sample_index = 0;
-  for (size_t i=0; i<this->nevents; i++) {
+  for (size_t i=0; i<_weights.size(); i++) {
     // apply cuts
     size_t excludes_total = 0;
     size_t excludes_cut = 0;
@@ -55,18 +58,24 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
     for (size_t j=0; j<observables.size(); j++){
       samples[sample_index * observables.size() + j] = _samples[i * observables.size() + j];
     }
+    weights[sample_index] = _weights[i];
     sample_index++;
   }
 
   // perhaps we skipped some events due to cuts
-  if (sample_index != this->nevents) {
-    std::cout << "Signal::Signal: " << this->nevents - sample_index <<
-      " of " << this->nevents << " events cut (" << 1.0*sample_index/this->nevents << ")" << std::endl;
+  if (sample_index != _weights.size()) {
+    int weighted_nevents = 0;
+    for (size_t i=0;i<sample_index;i++)
+      weighted_nevents += weights[i];
+    double rescale = 1.0 * weighted_nevents/ this->nevents;
+    std::cout << "Signal::Signal: " << this->nevents - weighted_nevents <<
+      " of " << this->nevents << " events cut (" << rescale << ")" << std::endl;
     samples.resize(sample_index * observables.size());
-    this->efficiency *= (1.0 * sample_index / this->nevents);
-    this->nexpected *= (1.0 * sample_index / this->nevents);
-    this->sigma *= (1.0 * sample_index / this->nevents);
-    this->nevents = sample_index;
+    weights.resize(sample_index);
+    this->efficiency *= rescale;
+    this->nexpected *= rescale;
+    this->sigma *= rescale;
+    this->nevents = weighted_nevents;
   }
 
   // build bin and limit arrays
@@ -80,7 +89,7 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
   }
 
   // build the histogram evaluator
-  this->histogram = new pdfz::EvalHist(samples, observables.size(),
+  this->histogram = new pdfz::EvalHist(samples, weights, observables.size(),
       observables.size(),
       lower, upper, nbins);
 
@@ -296,8 +305,11 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
     }
   }
 
+  // create default weights
+  std::vector<int> weights(samples.size(),1);
+
   // build the histogram evaluator
-  this->histogram = new pdfz::EvalHist(samples, sample_fields.size(),
+  this->histogram = new pdfz::EvalHist(samples, weights, sample_fields.size(),
       observables.size(),
       lower, upper, nbins);
 

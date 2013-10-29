@@ -1,4 +1,5 @@
 #include <iostream>
+#include <utility>
 #include <fstream>
 #include <streambuf>
 #include <string>
@@ -366,18 +367,16 @@ Signal FitConfig::CreateSinglePDFSignal(const Json::Value signal_params, std::st
   }else{
     num_samples = nevents_total; 
   }
+  double effective_live_time_corr = totalh2->Integral()/this->live_time;
   
-  if (num_samples > 1e8){
-    num_samples = 1e8;
-  }
   std::cout << "FitConfig::CreateSinglePDFSignal: Generating " << num_samples << " samples." << std::endl;
-  std::vector<float> samples = sample_pdf(totalh2,num_samples);
+  std::pair<std::vector<float>, std::vector<int> > samples = sample_pdf(totalh2,num_samples);
   
   // STEP 6:
   // Make a new Signal from these samples
-  double effective_live_time_corr = totalh2->Integral()/this->live_time;
+  std::cout << "EFFECTIVE LIVE TIME: " << effective_live_time_corr << ", nexpected: " << nexpected*effective_live_time_corr << std::endl;
   Signal s(name,title,nexpected*effective_live_time_corr,sigma*effective_live_time_corr,
-      category,this->observables,this->systematics,samples);
+      category,this->observables,this->systematics,samples.first,samples.second);
 
   std::cout << "FitConfig::CreateSinglePDFSignal: Initialized PDF for " << s.name << std::endl;
 
@@ -388,7 +387,7 @@ Signal FitConfig::CreateMultiPDFSignal(const Json::Value signal_params, std::str
 {
   // it is chained, get each contribution as a pdfz and add them
   std::vector<Signal> pdfs;
-  std::vector<float> params;
+  std::vector<double> params;
   int nexpected_total = 0;
   for (Json::Value::const_iterator it=signal_params["pdfs"].begin();
       it!=signal_params["pdfs"].end();++it){
@@ -404,14 +403,14 @@ Signal FitConfig::CreateMultiPDFSignal(const Json::Value signal_params, std::str
 
   // Now sample all these pdfs to get samples with the correct relative weighting
   std::cout << "FitConfig::CreateMultiPDFSignal: Generating combined pdf for " << name << std::endl;
-  std::vector<float> samples = make_fake_dataset(pdfs,this->systematics,this->observables,params,true);
+  std::pair<std::vector<float>, std::vector<int> > samples = make_fake_dataset(pdfs,this->systematics,this->observables,params,true);
 
   // Now create a new pdf from these samples
   std::string title = signal_params.get("title", name).asString();
   std::string category = signal_params.get("category","").asString();
   float sigma = signal_params.get("constraint", 0.0).asFloat() * this->live_time * this->efficiency_corr;
   float nexpected = signal_params.get("rate",nexpected_total).asFloat() * this->live_time * this->efficiency_corr;
-  Signal s(name,title,nexpected,sigma,category,this->observables,this->systematics,samples);
+  Signal s(name,title,nexpected,sigma,category,this->observables,this->systematics,samples.first,samples.second);
 
   float years = 1.0 * s.nevents / (s.nexpected / this->live_time /
       this->efficiency_corr);

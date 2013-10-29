@@ -1,4 +1,5 @@
 #include <iostream>
+#include <utility>
 #include <vector>
 #include <assert.h>
 #include <TRandom.h>
@@ -10,64 +11,148 @@
 #include <sxmc/generator.h>
 #include <sxmc/signals.h>
 
-std::vector<float> sample_pdf(TH1* hist, int nsamples)
+std::pair<std::vector<float>, std::vector<int> >   sample_pdf(TH1* hist, long int nsamples, long int maxsamples)
 {
-  size_t obs_id = 0;
   std::vector<float> events;
+  std::vector<int> weights;
+
+
+  double histint = hist->Integral();
+  int totalbins = hist->GetNbinsX()*hist->GetNbinsY()*hist->GetNbinsZ();
+  double maxperbin = maxsamples/(1.0*totalbins);
+
+  std::vector<int> histweights(totalbins);
+  bool weighted = false;
+  if (nsamples > maxsamples){
+    weighted = true;
+    std::cout << "Creating weighted dataset wherever bincount > " << maxperbin<< std::endl;
+    for (int i=0;i<hist->GetNbinsX();i++){
+      for (int j=0;j<hist->GetNbinsY();j++){
+        for (int k=0;k<hist->GetNbinsZ();k++){
+          double height = hist->GetBinContent(i+1,j+1,k+1);
+          if (nsamples*(height/histint) > maxperbin){
+            int weight = ((nsamples*(height/histint)) / maxperbin) + 1;
+            hist->SetBinContent(i+1,j+1,k+1,height/weight);
+            std::cout << "Weighting bin " << i << " " << j << " " << k << " (" << k + j*hist->GetNbinsZ() + i*hist->GetNbinsY()*hist->GetNbinsZ() << ") " << ", binheight: " << height << " (" << height*histint << "), Weight: " << weight << ", now " << hist->GetBinContent(i+1,j+1,k+1) << std::endl;
+            histweights[k + j*hist->GetNbinsZ() + i*hist->GetNbinsY()*hist->GetNbinsZ()] = weight;
+          }else{
+            histweights[k + j*hist->GetNbinsZ() + i*hist->GetNbinsY()*hist->GetNbinsZ()] = 1.0;
+            //        std::cout << "Not weighting bin " << i << ", binheight: " << height << " (" << height*histint << ")" << std::endl;
+          }
+        }
+      }
+    }
+  }else{
+    std::cout << nsamples << " < " << maxsamples << std::endl;
+
+  }
+
+  int allocatesize = nsamples;
+  if (weighted){
+    double totalweight = 0;
+    for (int i=0;i<hist->GetNbinsX();i++)
+      for (int j=0;j<hist->GetNbinsY();j++)
+        for (int k=0;k<hist->GetNbinsZ();k++)
+          totalweight += hist->GetBinContent(i+1,j+1,k+1)*histweights[k + j*hist->GetNbinsZ() + i*hist->GetNbinsY()*hist->GetNbinsZ()];
+    std::cout << "NSAMPLES: " << nsamples << ", TOTALWEIGHT: " << totalweight << std::endl;
+    allocatesize = (int) (nsamples * (1.5*hist->Integral()/histint));
+  }
+  std::cout << "ALLOCATESIZE: " << allocatesize << std::endl;
+
   if (hist->IsA() == TH1D::Class()) {
-    events.resize(nsamples);
+    events.reserve(allocatesize);
+    weights.reserve(allocatesize);
     TH1D* ht = dynamic_cast<TH1D*>(hist);
 
     double obs;
-    for (int j=0; j<nsamples; j++) {
+    long int j;
+    for (j=0; j<nsamples; j++) {
       obs = ht->GetRandom();
 
-      events[obs_id++] = obs;
+      events.push_back(obs);
+
+      if (weighted){
+        int ibin = (hist->GetXaxis()->FindBin(obs)-1);
+        weights.push_back(histweights[ibin]);
+        j += histweights[ibin]-1;
+      }else{
+        weights.push_back(1);
+      }
     }
+    if (j > nsamples)
+      weights.back() -= j-nsamples;
   }
   else if (hist->IsA() == TH2D::Class()) {
-    events.resize(nsamples*2);
+    events.reserve(allocatesize*2);
+    weights.reserve(allocatesize);
     TH2D* ht = dynamic_cast<TH2D*>(hist);
 
     double obs0;
     double obs1;
-    for (int j=0; j<nsamples; j++) {
+    long int j;
+    for (j=0; j<nsamples; j++) {
       ht->GetRandom2(obs0, obs1);
 
-      events[obs_id++] = obs0;
-      events[obs_id++] = obs1;
+      events.push_back(obs0);
+      events.push_back(obs1);
+
+      if (weighted){
+        int ibin = (hist->GetYaxis()->FindBin(obs1)-1) + (hist->GetXaxis()->FindBin(obs0)-1)*hist->GetNbinsY();
+        weights.push_back(histweights[ibin]);
+        j += histweights[ibin]-1;
+      }else{
+        weights.push_back(1);
+      }
     }
+    if (j > nsamples)
+      weights.back() -= j-nsamples;
   }
   else if (hist->IsA() == TH3D::Class()) {
-    events.resize(nsamples*3);
+    events.reserve(allocatesize*3);
+    weights.reserve(allocatesize);
     TH3D* ht = dynamic_cast<TH3D*>(hist);
 
     double obs0;
     double obs1;
     double obs2;
-    for (int j=0; j<nsamples; j++) {
+    long int j;
+    for (j=0; j<nsamples; j++) {
       ht->GetRandom3(obs0, obs1, obs2);
 
-      events[obs_id++] = obs0;
-      events[obs_id++] = obs1;
-      events[obs_id++] = obs2;
+      events.push_back(obs0);
+      events.push_back(obs1);
+      events.push_back(obs2);
+
+      if (weighted){
+        int ibin = (hist->GetZaxis()->FindBin(obs2)-1) + 
+          (hist->GetYaxis()->FindBin(obs1)-1)*hist->GetNbinsZ() +
+          (hist->GetXaxis()->FindBin(obs0)-1)*hist->GetNbinsZ()*hist->GetNbinsY();
+        weights.push_back(histweights[ibin]);
+        j += histweights[ibin]-1;
+      }else{
+        weights.push_back(1);
+      }
     }
+    if (j > nsamples)
+      weights.back() -= j-nsamples;
   }
   else {
     std::cerr << "make_fake_dataset: Unknown histogram class: "
       << hist->ClassName() << std::endl;
     assert(false);
   }
-  return events;
+
+  std::cout << "Made " << weights.size() << ", weighted to " << nsamples << std::endl;
+  return std::make_pair(events,weights);
 }
 
-std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
+std::pair<std::vector<float>, std::vector<int> >  make_fake_dataset(std::vector<Signal>& signals,
                                      std::vector<Systematic>& systematics,
                                      std::vector<Observable>& observables,
-                                     std::vector<float> params, bool poisson) {
+                                     std::vector<double> params, bool poisson, int maxsamples) {
   std::cout << "make_fake_dataset: Generating dataset..." << std::endl;
 
-  std::vector<float> syst_vals;
+  std::vector<double> syst_vals;
   for (size_t i=signals.size();i<signals.size()+systematics.size();i++){
     syst_vals.push_back(params[i]); 
   }
@@ -79,18 +164,19 @@ std::vector<float> make_fake_dataset(std::vector<Signal>& signals,
   }
 
   std::vector<float> events;
+  std::vector<int> weights;
   std::vector<unsigned> observed(signals.size());
   for (size_t i=0;i<signals.size();i++){
     observed[i] = \
-      dynamic_cast<pdfz::EvalHist*>(signals[i].histogram)->RandomSample(events,params[i],
-          syst_vals,upper,lower,poisson);
+      dynamic_cast<pdfz::EvalHist*>(signals[i].histogram)->RandomSample(events,weights,params[i],
+          syst_vals,upper,lower,poisson,maxsamples);
 
     std::cout << "make_fake_dataset: " << signals[i].name << ": "
               << observed[i] << " events (" << signals[i].nexpected
               << " expected)" << std::endl;
   }
 
-  return events;
+  return std::make_pair(events,weights);
 }
 
 

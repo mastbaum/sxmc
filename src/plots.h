@@ -39,7 +39,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
               std::vector<Signal> signals,
               std::vector<Systematic> systematics,
               std::vector<Observable> observables,
-              std::vector<float> data,
+              std::vector<float> data, std::vector<int> weights,
               std::string output_path);
 
 

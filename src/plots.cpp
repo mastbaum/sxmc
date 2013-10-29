@@ -132,7 +132,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
               std::vector<Signal> signals,
               std::vector<Systematic> systematics,
               std::vector<Observable> observables,
-              std::vector<float> data,
+              std::vector<float> data, std::vector<int> weights,
               std::string output_path) {
 
   std::vector<std::string> categories;
@@ -254,7 +254,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
     hdata->SetLineColor(kBlack);
 
     for (size_t idata=0; idata<data.size() / observables.size(); idata++) {
-      hdata->Fill(data[idata * observables.size() + i]);
+      hdata->Fill(data[idata * observables.size() + i],weights[idata]);
     }
 
     for (size_t j=0;j<categories.size();j++){

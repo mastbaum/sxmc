@@ -99,7 +99,7 @@ HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
  * \param ns Number of signals
  * \param sums Output sums for subsets of events
  */
-HEMI_KERNEL(nll_event_chunks)(const float* lut, const double* pars,
+HEMI_KERNEL(nll_event_chunks)(const float* lut, const int* dataweights, const double* pars,
                               const size_t ne, const size_t ns,
                               double* sums);
 

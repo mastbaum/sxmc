@@ -9,6 +9,7 @@
 
 #include <iostream>
 #include <vector>
+#include <utility>
 #include <iomanip>
 #include <string>
 #include <sstream>
@@ -79,7 +80,7 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
   for (unsigned i=0; i<nexperiments; i++) {
     std::cout << "Experiment " << i + 1 << " / " << nexperiments << std::endl;
 
-    std::vector<float> params;
+    std::vector<double> params;
     std::vector<std::string> param_names;
     for (size_t j=0; j<signals.size(); j++) {
       params.push_back(signals[j].nexpected);
@@ -92,12 +93,12 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
 
 
     // Make fake data
-    std::vector<float> data = \
+    std::pair<std::vector<float>, std::vector<int> > data = \
       make_fake_dataset(signals, systematics, observables, params, true);
 
     // Run MCMC
     MCMC mcmc(signals, systematics, observables);
-    LikelihoodSpace* ls = mcmc(data, steps, burnin_fraction, debug_mode);
+    LikelihoodSpace* ls = mcmc(data.first, data.second, steps, burnin_fraction, debug_mode);
 
     // Write out samples for debugging
     TFile f((output_path+"lspace.root").c_str(), "recreate");
@@ -111,7 +112,7 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
 
     // Make spectral plots
     plot_fit(ls->get_best_fit(), live_time, signals,
-             systematics, observables, data,output_path);
+             systematics, observables, data.first, data.second ,output_path);
 
     // Signal sensitivity
 

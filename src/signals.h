@@ -70,7 +70,8 @@ class Signal {
     Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
         std::vector<Observable>& observables,
         std::vector<Systematic>& systematics,
-        std::vector<float>& _samples);
+        std::vector<float>& _samples,
+        std::vector<int>& _weights);
 
     std::string name;  //!< string identifier
     std::string title;  //!< histogram title in ROOT-LaTeX format

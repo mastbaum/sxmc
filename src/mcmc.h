@@ -65,7 +65,8 @@ class MCMC {
      * \param sync_interval How often to copy accepted from GPU to storage
      * \returns LikelihoodSpace built from samples
      */
-    LikelihoodSpace* operator()(std::vector<float>& data, unsigned nsteps,
+    LikelihoodSpace* operator()(std::vector<float>& data, std::vector<int>& weights,
+                                unsigned nsteps,
                                 float burnin_fraction,
                                 const bool debug_mode=false,
                                 unsigned sync_interval=10000);
@@ -91,7 +92,7 @@ class MCMC {
      *                           calculation
      * \param event_total_sum Pre-allocated buffer for event term total
      */
-    void nll(const float* lut, size_t nevents,
+    void nll(const float* lut, const int* dataweights, size_t nevents,
              const double* v, double* nll,
              double* event_partial_sums,
              double* event_total_sum);
