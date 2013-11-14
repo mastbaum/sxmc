@@ -95,7 +95,7 @@ TNtuple* LikelihoodSpace::get_contour(float delta) {
     names.push_back(name);
   }
 
-  float* params_branch = new float[names.size() + 1];
+  float* params_branch = new float[names.size()];
   for (size_t i=0; i<names.size(); i++) {
     this->samples->SetBranchAddress(names[i].c_str(), &params_branch[i]);
   }
@@ -104,7 +104,7 @@ TNtuple* LikelihoodSpace::get_contour(float delta) {
   this->samples->SetBranchAddress("likelihood", &ml_branch);
 
   // Build a new TNtuple with samples inside the contour
-  float* v = new float[names.size()];
+  float* v = new float[names.size() + 1];
   for (int i=0; i<this->samples->GetEntries(); i++) {
     this->samples->GetEntry(i);
     if (ml_branch < this->ml + delta) {

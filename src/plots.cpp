@@ -13,7 +13,8 @@
 
 #include <sxmc/plots.h>
 
-const int colors[28] = {kRed,      kGreen,    kBlue,      kMagenta,
+const int ncolors = 27;
+const int colors[27] = {kRed,      kGreen,    kBlue,      kMagenta,
                         kCyan,     kYellow,   kOrange,    kViolet+2,
                         kRed+2,    kGreen+2,  kBlue+2,    kMagenta+2,
                         kCyan+2,   kYellow+2, kOrange+2,  kRed-7,
@@ -199,7 +200,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
     std::string n = signals[i].name;
 
     for (size_t j=0; j<observables.size(); j++) {
-      hpdf[j]->SetLineColor(colors[i % 28]);
+      hpdf[j]->SetLineColor(colors[i % ncolors]);
       if (fit_total[j] == NULL) {
         std::string hfname = "fit_total_" + signals[i].name;
         fit_total[j] = (TH1D*) hpdf[j]->Clone(hfname.c_str());

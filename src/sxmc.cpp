@@ -53,21 +53,17 @@
  * \param nexperiments Number of fake experiments to run
  * \param live_time Experiment live time in years
  * \param debug_mode If true, accept and save all steps
- * \returns A (name, histogram limits from the experiments) map
+ * \returns A list of the upper limits
  */
-std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
-                                     std::vector<Systematic>& systematics,
-                                     std::vector<Observable>& observables,
-                                     std::vector<Observable>& cuts,
-                                     unsigned steps, float burnin_fraction,
-                                     std::string signal_name, float signal_eff,
-                                     float confidence, unsigned nexperiments,
-                                     float live_time, const bool debug_mode) {
-  std::map<std::string, TH1F> limits;
-  limits["counts_proj"] = TH1F("counts_proj", ";Counts in fit range;Fraction",
-                               10000, 0, 500);
-  limits["counts_cont"] = TH1F("counts_cont", ";Counts in fit range;Fraction",
-                               10000, 0, 500);
+std::vector<float> ensemble(std::vector<Signal>& signals,
+                             std::vector<Systematic>& systematics,
+                             std::vector<Observable>& observables,
+                             std::vector<Observable>& cuts,
+                             unsigned steps, float burnin_fraction,
+                             std::string signal_name, float signal_eff,
+                             float confidence, unsigned nexperiments,
+                             float live_time, const bool debug_mode) {
+  std::vector<float> limits;
 
   for (unsigned i=0; i<nexperiments; i++) {
     std::cout << "Experiment " << i + 1 << " / " << nexperiments << std::endl;
@@ -98,7 +94,19 @@ std::map<std::string, TH1F> ensemble(std::vector<Signal>& signals,
     plot_fit(ls->get_best_fit(), live_time, signals,
              systematics, observables, data);
 
-    // Signal sensitivity
+    // Signal sensitivity, Bayesian for now
+    TH1F* signal_projection = ls->get_projection(signal_name);
+    int bin = 0;
+    do {
+      bin++;
+    } while ((signal_projection->Integral(0, bin) /
+              signal_projection->Integral()) < confidence);
+
+    float limit = signal_projection->GetBinLowEdge(bin) +
+                  signal_projection->GetBinWidth(bin);
+
+    std::cout << "Signal limit: " << limit << std::endl;
+    limits.push_back(limit);
 
     delete ls;
   }
@@ -135,41 +143,32 @@ int main(int argc, char* argv[]) {
   fc.print();
 
   // Run ensemble
-  std::map<std::string, TH1F> limits = \
+  std::vector<float> limits = \
     ensemble(fc.signals, fc.systematics, fc.observables, fc.cuts, fc.steps,
              fc.burnin_fraction, fc.signal_name, fc.signal_eff, fc.confidence,
              fc.experiments, fc.live_time, fc.debug_mode);
 
-  // Plot distribution of limits
-/*
+  // Limits
+  float average_limit;
+  std::sort(limits.begin(), limits.end());
+  float half = 1.0 * ((limits.size() + 1) / 2) - 1;
+  average_limit = (limits.at(static_cast<int>(std::floor(half))) +
+                   limits.at(static_cast<int>(std::ceil(half)))) / 2;
+
+  std::cout << "Average-limit sensitivity " << average_limit << " at "
+            << fc.confidence * 100 << "\% CL" << std::endl;
+
   TCanvas c1;
-  std::map<std::string, TH1F>::iterator it;
-  for (it=limits.begin(); it!=limits.end(); it++) {
-    it->second.DrawNormalized();
-    c1.SaveAs((fc.output_file + "_limits_" + it->first + ".pdf").c_str());
-    c1.SaveAs((fc.output_file + "_limits_" + it->first + ".C").c_str());
-*/
-
-/*
-    // Find median
-    double xq[1] = {0.5};
-    double yq[1];
-    it->second.GetQuantiles(1, yq, xq);
-
-    float lower_boundary, upper_boundary;
-    bool is_limit;
-    find_interval(&it->second, yq[0], lower_boundary, upper_boundary,
-                  is_limit, false, 0.682);
-    float lower_error = yq[0] - lower_boundary;
-    float upper_error = upper_boundary - yq[0];
-
-    std::cout << "Average-limit sensitivity " << it->first << " at "
-              << fc.confidence * 100 << "\%: " << yq[0]
-              << " -" << lower_error
-              << " +" << upper_error
-              << std::endl;
+  TNtuple ntlimits("ntlimits", "ntlimits", "limit");
+  for (size_t i=0; i<limits.size(); i++) {
+    ntlimits.Fill(limits[i]);
   }
-*/
+  ntlimits.Draw("limit>>_hlim", "", "goff");
+  TH1F* hlim = dynamic_cast<TH1F*>(gDirectory->FindObject("_hlim"));
+  assert(hlim);
+  hlim->Draw();
+  c1.SaveAs((fc.output_file + "_limits.pdf").c_str());
+  c1.SaveAs((fc.output_file + "_limits.C").c_str());
 
   return 0;
 }

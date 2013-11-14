@@ -19,7 +19,8 @@ class TNtuple;
 class TH1;
 
 /** A ROOT color palette in which sequential colors look okay. */
-extern const int colors[28];
+extern const int ncolors;
+extern const int colors[27];
 
 
 /**

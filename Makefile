@@ -71,7 +71,7 @@ all: build_dirs includes $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/p
 .PHONY: doc test includes
 
 clean:
-	-$(RM) build/*.o build/test/*.o build/jsoncpp/*.o bin/* include/sxmc/*
+	-$(RM) build/*.o build/test/*.o build/jsoncpp/*.o $(EXE) include/sxmc/*
 
 doc:
 	cd src && doxygen Doxyfile
