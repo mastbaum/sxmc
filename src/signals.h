@@ -60,6 +60,11 @@ struct Systematic {
  */
 class Signal {
   public:
+    /**
+     * Construct a Signal from a list of hdf5 files
+     *
+     * \param filenames
+     */ 
     Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
         std::vector<std::string>& hdf5_fields,
         std::vector<size_t>& sample_fields,
@@ -67,6 +72,11 @@ class Signal {
         std::vector<Observable>& cuts,
         std::vector<Systematic>& systematics,
         std::vector<std::string>& filenames);
+    /**
+     * Construct a Signal from a list of samples and weights 
+     *
+     * \param samples
+     */ 
     Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
         std::vector<Observable>& observables,
         std::vector<Systematic>& systematics,

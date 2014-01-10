@@ -13,7 +13,6 @@
 #include <sxmc/utils.h>
 #include <sxmc/signals.h>
 #include <sxmc/pdfz.h>
-#include <sxmc/partialfill.h>
 
 class TH1D;
 class TH2F;
@@ -50,7 +49,9 @@ class FitConfig {
 
     virtual ~FitConfig() {}
 
+    // Create a Signal from only one pdf
     Signal CreateSinglePDFSignal(const Json::Value signal_params, std::string name);
+    // Create a Signal from several pdfs with relative weights
     Signal CreateMultiPDFSignal(const Json::Value signal_params, std::string name);
 
     /** Pretty-print the fit parameters */
@@ -70,9 +71,7 @@ class FitConfig {
     std::vector<Observable> cuts;  //!< Cuts applied before fit
 
     std::vector<std::string> hdf5_fields; //!< Name and order of fields in hdf5 files
-    std::vector<size_t> sample_fields; //!< sample_fields[i] = j means samples[i] <=> hdf5_fields[j]
-
-    PartialFill* pf;
+    std::vector<size_t> sample_fields; //!< sample_fields[i] = j means that samples[i] <=> hdf5_fields[j]
 
 };
 
