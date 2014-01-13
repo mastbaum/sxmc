@@ -137,11 +137,10 @@ LikelihoodSpace* MCMC::operator()(std::vector<float>& data, std::vector<int>& we
   hemi::Array<float> jump_width(this->nparameters, true);
   const float scale_factor = 2.4 * 2.4 / this->nparameters;  // Haario, 2001
   for (size_t i=0; i<this->nparameters; i++) {
-    float mean = this->parameter_means->readOnlyHostPtr()[i];
-    float sigma = this->parameter_sigma->readOnlyHostPtr()[i] / 10;
+    float mean = max(this->parameter_means->readOnlyHostPtr()[i], 10.0);
+    float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
     float width = (sigma > 0 ? sigma : sqrt(mean));
-    jump_width.writeOnlyHostPtr()[i] = \
-      (width > 0 ? width : 1.0 / this->nobservables) * scale_factor;
+    jump_width.writeOnlyHostPtr()[i] = 0.1 * width * scale_factor;
   }
 
   // buffers for computing event term in nll
@@ -203,7 +202,7 @@ LikelihoodSpace* MCMC::operator()(std::vector<float>& data, std::vector<int>& we
     }
 
     // re-tune jump distribution based on burn-in phase
-    if (i == burnin_steps) {
+    if (i == burnin_steps || i == 2 * burnin_steps) {
       std::cout << "MCMC: Burn-in phase completed after " << burnin_steps
                 << " steps" << std::endl;
 
@@ -224,7 +223,6 @@ LikelihoodSpace* MCMC::operator()(std::vector<float>& data, std::vector<int>& we
 
         hsproj->Delete();
       }
-
       // save all steps when in debug mode
       if (!debug_mode) {
         nt->Reset();

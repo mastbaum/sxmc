@@ -219,16 +219,13 @@ FitConfig::FitConfig(std::string filename) {
             jt!=signal_params["pdfs"].end();++jt){
 
           const Json::Value contrib_params = signal_params["pdfs"][jt.key().asString()];
-          Signal s = CreateSinglePDFSignal(contrib_params,jt.key().asString());
-          this->signals.push_back(s);
+          this->signals.push_back(CreateSinglePDFSignal(contrib_params,jt.key().asString()));
         }
       }else{
-        Signal s = CreateMultiPDFSignal(signal_params,it.key().asString());
-        this->signals.push_back(s);
+        this->signals.push_back(CreateMultiPDFSignal(signal_params,it.key().asString()));
       }
     }else{
-      Signal s = CreateSinglePDFSignal(signal_params, it.key().asString());
-      this->signals.push_back(s);
+      this->signals.push_back(CreateSinglePDFSignal(signal_params, it.key().asString()));
     }
   }
 }

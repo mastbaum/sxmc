@@ -68,7 +68,7 @@ class LikelihoodSpace {
      * \returns A map from parameter names to Intervals
      */
     std::map<std::string, Interval>
-    extract_best_fit(float& ml, ErrorType error_type=ERROR_PROJECTION);
+    extract_best_fit(float& ml, ErrorType error_type=ERROR_CONTOUR);
 
     TNtuple* GetSamples(){return samples;};
 
