@@ -340,13 +340,13 @@ namespace pdfz {
 
     protected:
         hemi::Array<float> samples;
+        hemi::Array<int> weights;
         hemi::Array<int> *read_bins;
         hemi::Array<int> nbins;
         hemi::Array<int> bin_stride;
-        hemi::Array<int> weights;
+        hemi::Array<unsigned int> *bins;
         int total_nbins;
         double bin_volume;
-        hemi::Array<unsigned int> *bins;
 
         int bin_nthreads_per_block;
         int bin_nblocks;

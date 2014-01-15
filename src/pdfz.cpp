@@ -482,9 +482,11 @@ namespace pdfz {
 
     void EvalHist::Optimize()
     {
+      if (this->read_bins){
         OptimizeBin();
         OptimizeEval();
         needs_optimization = false;
+      }
     }
 
     void EvalHist::OptimizeBin()

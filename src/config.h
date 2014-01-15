@@ -49,11 +49,6 @@ class FitConfig {
 
     virtual ~FitConfig() {}
 
-    // Create a Signal from only one pdf
-    Signal CreateSinglePDFSignal(const Json::Value signal_params, std::string name);
-    // Create a Signal from several pdfs with relative weights
-    Signal CreateMultiPDFSignal(const Json::Value signal_params, std::string name);
-
     /** Pretty-print the fit parameters */
     void print() const;
 
@@ -70,8 +65,9 @@ class FitConfig {
     std::vector<Observable> observables;  //!< Observables used in PDFs
     std::vector<Observable> cuts;  //!< Cuts applied before fit
 
-    std::vector<std::string> hdf5_fields; //!< Name and order of fields in hdf5 files
-    std::vector<size_t> sample_fields; //!< sample_fields[i] = j means that samples[i] <=> hdf5_fields[j]
+    std::vector<std::string> sample_fields; //!< Name and order of fields in samples. This includes all observable fields and all systematic fields (in the case where a cut is placed based on a field effected by a systematic
+
+    std::vector<std::string> hdf5_fields; //!< Default Name and order of fields in hdf5 files
 
 };
 

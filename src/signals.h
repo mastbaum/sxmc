@@ -23,7 +23,7 @@ struct Observable {
   std::string title;  //!< Title in ROOT LaTeX format, for display
   std::string field;  //!< Name of the field (e.g. "energy")
   std::string units;  //!< Units as string, used in plotting
-  size_t field_index;  //!< Index in the sampled data for this filed
+  size_t field_index;  //!< Index in the sampled data for this field
   size_t bins;  //!< Number of bins
   float lower;  //!< Lower physical bound
   float upper;  //!< Upper physical bound
@@ -60,6 +60,18 @@ struct Systematic {
  */
 class Signal {
   public:
+
+    /**
+     * Construct a Signal from a list of root files
+     *
+     * \param filenames
+     */ 
+    Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
+        std::vector<std::string>& sample_fields,
+        std::vector<Observable>& observables,
+        std::vector<Observable>& cuts,
+        std::vector<Systematic>& systematics,
+        std::vector<std::string>& filenames);
     /**
      * Construct a Signal from a list of hdf5 files
      *
@@ -67,7 +79,7 @@ class Signal {
      */ 
     Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
         std::vector<std::string>& hdf5_fields,
-        std::vector<size_t>& sample_fields,
+        std::vector<std::string>& sample_fields,
         std::vector<Observable>& observables,
         std::vector<Observable>& cuts,
         std::vector<Systematic>& systematics,
@@ -79,9 +91,11 @@ class Signal {
      */ 
     Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
         std::vector<Observable>& observables,
+        std::vector<Observable>& cuts,
         std::vector<Systematic>& systematics,
-        std::vector<float>& _samples,
-        std::vector<int>& _weights);
+        std::vector<float>& samples,
+        std::vector<std::string>& sample_fields,
+        std::vector<int>& weights);
 
     std::string name;  //!< string identifier
     std::string title;  //!< histogram title in ROOT-LaTeX format
@@ -90,7 +104,38 @@ class Signal {
     double sigma;  //!< fractional uncertainty
     double efficiency; //!< Fraction of generated events that make it past cuts (not counting the efficiency correction)
     size_t nevents;  //!< number of events in PDF
+    size_t nevents_physical;  //!< number of simulated events used to make pdf (nevents/efficiency)
     pdfz::Eval* histogram;  //!< PDF
+
+  protected:
+
+    void build_pdfz(std::vector<float> &samples,std::vector<int> &weights, int nfields,
+        std::vector<Observable> &observables,
+        std::vector<Systematic> &systematics);
+
+    void set_efficiency(std::vector<Systematic> &systematics);
+
+    void apply_exclusions(std::vector<float>& samples,
+        std::vector<std::string>& sample_fields,
+        std::vector<int>& weights,
+        std::vector<Observable>& observables);
+
+    void apply_exclusions(std::vector<float>& samples,
+        std::vector<std::string>& sample_fields,
+        std::vector<Observable>& observables){
+      std::vector<int> fake;
+      apply_exclusions(samples,sample_fields,fake,observables);
+    };
+
+    void read_dataset_to_samples(std::vector<float>& samples,
+        std::vector<float>& dataset,
+        std::vector<std::string>& sample_fields,
+        std::vector<std::string>& dataset_fields,
+        std::vector<Observable>& cuts);
+
+    void do_r3_hack(std::vector<float>& samples,
+        std::vector<std::string>& sample_fields,
+        std::vector<Observable>& observables);
 };
 
 

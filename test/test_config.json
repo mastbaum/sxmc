@@ -1,0 +1,74 @@
+{
+  "fit": {
+    "experiments": 1,
+    "steps": 100000,
+    "burnin_fraction": 0.2,
+    "signal_name": "data1",
+    "output_file": "fit_example",
+    "debug_mode": false,
+    "signals": [
+      "data1", "data2", "data3", "data4"
+    ],
+    "observables": ["energy"],
+    "cuts": ["radius"],
+    "systematics": []
+  },
+
+  "experiment": {
+    "live_time": 1.0,
+    "confidence": 0.9
+  },
+
+  "pdfs": {
+    "observables": {
+      "energy": {
+        "title": "Reconstructed energy (MeV)",
+        "units": "MeV",
+        "field": "energy",
+        "bins": 50,
+        "min": 0.0,
+        "max": 10.0
+      },
+      "radius": {
+        "title": "Reconstructed radius (mm)",
+        "units": "mm",
+        "field": "radius",
+        "bins": 50,
+        "min": 0.0,
+        "max": 3500.0
+      }
+    }
+  },
+  "signals": {
+    "data1": {
+      "title": "Data 1",
+      "files": ["./test/data1_1.root","./test/data1_2.root"],
+      "rate": 1000.0
+    },
+    "data2": {
+      "title": "Data 2",
+      "chain": true,
+      "pdfs": {
+        "data2_1" : {"title": "Data 2_1",
+          "files": ["./test/data2_1.root"],
+          "rate": 1000
+        },
+        "data2_2" : {"title": "Data 2_2",
+          "files": ["./test/data2_2.root"],
+          "rate":1000
+        }
+      }
+    },
+    "data3": {
+      "title": "Data 3",
+      "files": ["./test/data3_1.root"],
+      "rate": 0.0
+    },
+    "data4": {
+      "title": "Data 4",
+      "files": ["./test/data4_1.root"],
+      "rate": 1000.0
+    }
+  }
+}
+

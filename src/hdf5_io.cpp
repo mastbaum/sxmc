@@ -41,6 +41,8 @@ herr_t read_float_vector_hdf5(const std::string &filename,
     int ndims;
     std::vector<hsize_t> dims;
     unsigned int nelements = 1;
+    
+    int oldsize = data.size();
 
     // Open file
     file_id = H5Fopen(filename.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
@@ -63,15 +65,20 @@ herr_t read_float_vector_hdf5(const std::string &filename,
         goto close_file;  // No really, Linus said it was OK.
     }
 
-    rank.resize(ndims);
-    for (unsigned int i=0; i<rank.size(); i++) {
-        rank[i] = dims[i];
-        nelements *= dims[i];
+    rank.resize(ndims,0);
+    rank[0] += dims[0];
+    nelements *= dims[0];
+    for (unsigned int i=1; i<rank.size(); i++) {
+      if (rank[i] != 0 && rank[i] != dims[i]){
+        H5Fclose(file_id);
+        return -1;
+      }
+      nelements *= dims[i];
     }
 
     // Read the data
-    data.resize(nelements);
-    status = H5LTread_dataset_float(file_id, dataset.c_str(), &data.front());
+    data.resize(oldsize+nelements);
+    status = H5LTread_dataset_float(file_id, dataset.c_str(), &data[oldsize]);
 
 close_file:
     H5Fclose(file_id);
