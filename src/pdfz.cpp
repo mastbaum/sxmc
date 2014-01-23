@@ -651,10 +651,15 @@ namespace pdfz {
         #endif
     }
     
-    int EvalHist::RandomSample(std::vector<float> &events, std::vector<int> &eventweights, double nexpected, std::vector<double> &syst_vals, std::vector<float> &uppers, std::vector<float> &lowers, bool poisson, long int maxsamples)
-    {
+    int EvalHist::RandomSample(std::vector<float> &events,
+                               std::vector<int> &eventweights,
+                               double nexpected,
+                               std::vector<double> &syst_vals,
+                               std::vector<float> &uppers,
+                               std::vector<float> &lowers, bool poisson,
+                               long int maxsamples) {
       hemi::Array<double> params_buffer(syst_vals.size(), true);
-      for (size_t i=0;i<syst_vals.size();i++){
+      for (size_t i=0; i<syst_vals.size(); i++){
         params_buffer.writeOnlyHostPtr()[i] = syst_vals[i];
       }
       params_buffer.writeOnlyHostPtr();
@@ -663,36 +668,42 @@ namespace pdfz {
       this->SetNormalizationBuffer(&norms_buffer);
       this->SetParameterBuffer(&params_buffer);
       TH1* hist = this->CreateHistogram();
-      int totalbins = hist->GetNbinsX()*hist->GetNbinsY()*hist->GetNbinsZ();
+      int totalbins = \
+        hist->GetNbinsX() * hist->GetNbinsY() * hist->GetNbinsZ();
 
       std::vector<int> histweights(totalbins);
 
       long int observed;
-      if (poisson)
+      if (poisson) {
         observed = gRandom->Poisson(nexpected);
-      else
+      }
+      else {
         observed = nint(nexpected);
+      }
 
       double histint = hist->Integral();
-      double maxperbin = maxsamples/(1.0*totalbins);
+      double maxperbin = maxsamples / (1.0 * totalbins);
       
       bool weighted = false;
-      if (observed > maxsamples){
+      if (observed > maxsamples) {
         // we need to create weighted samples
         weighted = true;
-        std::cout << "Creating weighted samples wherever bincount > " << maxsamples/totalbins << std::endl;
-        for (int i=0;i<hist->GetNbinsX();i++){
-          for (int j=0;j<hist->GetNbinsY();j++){
-            for (int k=0;k<hist->GetNbinsZ();k++){
-              double height = hist->GetBinContent(i+1,j+1,k+1);
-              if (observed*(height/histint) > maxperbin){
-                int weight = (int) ((observed*(height/histint))/maxperbin) + 1;
-                hist->SetBinContent(i+1,j+1,k+1,height/weight);
-                std::cout << "Weighting bin " << i << ", binheight: " << height << " (" << height/histint << "), Weight: " << weight << " " << std::endl;
-                histweights[k + j*hist->GetNbinsZ() + i*hist->GetNbinsY()*hist->GetNbinsZ()] = weight;
-              }else{
-                histweights[k + j*hist->GetNbinsZ() + i*hist->GetNbinsY()*hist->GetNbinsZ()] = 1.0;
-                //        std::cout << "Not weighting bin " << i << ", binheight: " << height << " (" << height*histint << ")" << std::endl;
+        for (int i=0; i<hist->GetNbinsX(); i++) {
+          for (int j=0; j<hist->GetNbinsY(); j++) {
+            for (int k=0; k<hist->GetNbinsZ(); k++) {
+              double height = hist->GetBinContent(i+1, j+1, k+1);
+              if (observed * (height / histint) > maxperbin) {
+                int weight = static_cast<int>((observed * (height/histint) /
+                                              maxperbin) + 1);
+                hist->SetBinContent(i+1, j+1, k+1, height/weight);
+                histweights[k +
+                            j*hist->GetNbinsZ() +
+                            i*hist->GetNbinsY()*hist->GetNbinsZ()] = weight;
+              }
+              else {
+                histweights[k +
+                            j*hist->GetNbinsZ() +
+                            i*hist->GetNbinsY()*hist->GetNbinsZ()] = 1.0;
               }
             }
           }
@@ -700,11 +711,13 @@ namespace pdfz {
       }
   
       int allocatesize = observed;
-      if (weighted)
-        allocatesize = (int) (observed*(1.5*hist->Integral()/histint));
+      if (weighted) {
+        allocatesize = static_cast<int>(observed *
+                                        (1.5 * hist->Integral() / histint));
+      }
 
-      // Generate event array by sampling ROOT histograms, including only events
-      // that pass cuts
+      // Generate event array by sampling ROOT histograms, including only
+      // events that pass cuts
       events.reserve(events.size() + allocatesize * this->nobservables);
       eventweights.reserve(eventweights.size() + allocatesize);
       if (hist->IsA() == TH1D::Class()) {
@@ -713,26 +726,29 @@ namespace pdfz {
         double obs;
         unsigned j;
         for (j=0; j<observed; j++) {
-          if (uppers.size() > 0){
+          if (uppers.size() > 0) {
             do {
               obs = ht->GetRandom();
             } while(obs > uppers[0] || obs < lowers[0]);
-          }else{
+          }
+          else {
             obs = ht->GetRandom();
           }
 
           events.push_back(obs);
 
-          if (weighted){
-            int ibin = (hist->GetXaxis()->FindBin(obs)-1);
+          if (weighted) {
+            int ibin = (hist->GetXaxis()->FindBin(obs) - 1);
             eventweights.push_back(histweights[ibin]);
             j += histweights[ibin]-1;
-          }else{
+          }
+          else {
             eventweights.push_back(1);
           }
         }
-        if (j > observed)
+        if (j > observed) {
           eventweights.back() -= j-observed;
+        }
       }
       else if (hist->IsA() == TH2D::Class()) {
         TH2D* ht = dynamic_cast<TH2D*>(hist);
@@ -741,28 +757,33 @@ namespace pdfz {
         double obs1;
         unsigned j;
         for (j=0; j<observed; j++) {
-          if (uppers.size() > 0){
+          if (uppers.size() > 0) {
             do {
               ht->GetRandom2(obs0, obs1);
             } while(obs0 > uppers[0] || obs0 < lowers[0] ||
                 obs1 > uppers[1] || obs1 < lowers[1]);
-          }else{
+          }
+          else {
             ht->GetRandom2(obs0, obs1);
           }
 
           events.push_back(obs0);
           events.push_back(obs1);
 
-          if (weighted){
-            int ibin = (hist->GetYaxis()->FindBin(obs1)-1) + (hist->GetXaxis()->FindBin(obs0)-1)*hist->GetNbinsY();
+          if (weighted) {
+            int ibin = ((hist->GetYaxis()->FindBin(obs1)-1) +
+                        (hist->GetXaxis()->FindBin(obs0)-1) *
+                         hist->GetNbinsY());
             eventweights.push_back(histweights[ibin]);
             j += histweights[ibin]-1;
-          }else{
+          }
+          else {
             eventweights.push_back(1);
           }
         }
-        if (j > observed)
+        if (j > observed) {
           eventweights.back() -= j-observed;
+        }
       }
       else if (hist->IsA() == TH3D::Class()) {
         TH3D* ht = dynamic_cast<TH3D*>(hist);
@@ -772,13 +793,14 @@ namespace pdfz {
         double obs2;
         unsigned j;
         for (j=0; j<observed; j++) {
-          if (uppers.size() > 0){
+          if (uppers.size() > 0) {
             do {
               ht->GetRandom3(obs0, obs1, obs2);
             } while(obs0 > uppers[0] || obs0 < lowers[0] ||
                 obs1 > uppers[1] || obs1 < lowers[1] ||
                 obs2 > uppers[2] || obs2 < lowers[2]);
-          }else{
+          }
+          else {
             ht->GetRandom3(obs0, obs1, obs2);
           }
 
@@ -786,18 +808,22 @@ namespace pdfz {
           events.push_back(obs1);
           events.push_back(obs2);
 
-          if (weighted){
-            int ibin = (hist->GetZaxis()->FindBin(obs2)-1) + 
-              (hist->GetYaxis()->FindBin(obs1)-1)*hist->GetNbinsZ() +
-              (hist->GetXaxis()->FindBin(obs0)-1)*hist->GetNbinsZ()*hist->GetNbinsY();
+          if (weighted) {
+            int ibin = ((hist->GetZaxis()->FindBin(obs2)-1) + 
+                        (hist->GetYaxis()->FindBin(obs1)-1) *
+                         hist->GetNbinsZ() +
+                        (hist->GetXaxis()->FindBin(obs0)-1) *
+                         hist->GetNbinsZ()*hist->GetNbinsY());
             eventweights.push_back(histweights[ibin]);
             j += histweights[ibin]-1;
-          }else{
+          }
+          else {
             eventweights.push_back(1);
           }
         }
-        if (j > observed)
+        if (j > observed) {
           eventweights.back() -= j-observed;
+        }
       }
       else {
         std::cerr << "sample_pdfz: Unknown histogram class: "
@@ -805,7 +831,6 @@ namespace pdfz {
         assert(false);
       }
       return observed;
-
     }
 
     TH1* EvalHist::DefaultHistogram()
@@ -832,3 +857,4 @@ namespace pdfz {
     ///////////////////// EvalKernel ///////////////////////
 
 } // namespace pdfz
+

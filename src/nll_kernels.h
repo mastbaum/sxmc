@@ -94,14 +94,15 @@ HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
  * Calculate -sum(log(sum(Nj * Pj(xi)))) contribution to NLL.
  *
  * \param lut Pj(xi) lookup table
+ * \param dataweights TODO
  * \param pars Event rates (normalizations) for each signal
  * \param ne Number of events in the data
  * \param ns Number of signals
  * \param sums Output sums for subsets of events
  */
-HEMI_KERNEL(nll_event_chunks)(const float* lut, const int* dataweights, const double* pars,
-                              const size_t ne, const size_t ns,
-                              double* sums);
+HEMI_KERNEL(nll_event_chunks)(const float* lut, const int* dataweights,
+                              const double* pars, const size_t ne,
+                              const size_t ns, double* sums);
 
 
 /**

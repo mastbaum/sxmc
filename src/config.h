@@ -64,11 +64,15 @@ class FitConfig {
     std::vector<Systematic> systematics;  //!< Systematics used in PDFs
     std::vector<Observable> observables;  //!< Observables used in PDFs
     std::vector<Observable> cuts;  //!< Cuts applied before fit
+    std::vector<std::string> hdf5_fields; //!< Name/order of hdf5 file fields
 
-    std::vector<std::string> sample_fields; //!< Name and order of fields in samples. This includes all observable fields and all systematic fields (in the case where a cut is placed based on a field effected by a systematic
-
-    std::vector<std::string> hdf5_fields; //!< Default Name and order of fields in hdf5 files
-
+    /**
+     * Name and order of fields in samples.
+     *
+     * This includes all observable fields and all systematic fields (in the
+     * case where a cut is placed based on a field effected by a systematic)
+     */
+    std::vector<std::string> sample_fields;
 };
 
 #endif  // __CONFIG_H__

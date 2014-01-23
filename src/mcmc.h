@@ -59,13 +59,16 @@ class MCMC {
     /**
      * Perform walk.
      *
+     * \param data TODO
+     * \param weights TODO
      * \param nsteps Number of random-walk steps to take
      * \param burnin_fraction Fraction of initial steps to throw out
      * \param debug_mode If true, accept and save all steps
      * \param sync_interval How often to copy accepted from GPU to storage
      * \returns LikelihoodSpace built from samples
      */
-    LikelihoodSpace* operator()(std::vector<float>& data, std::vector<int>& weights,
+    LikelihoodSpace* operator()(std::vector<float>& data,
+                                std::vector<int>& weights,
                                 unsigned nsteps,
                                 float burnin_fraction,
                                 const bool debug_mode=false,

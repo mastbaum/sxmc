@@ -94,9 +94,10 @@ MCMC::~MCMC() {
 }
 
 
-LikelihoodSpace* MCMC::operator()(std::vector<float>& data, std::vector<int>& weights, unsigned nsteps,
-                                  float burnin_fraction, const bool debug_mode,
-                                  unsigned sync_interval) {
+LikelihoodSpace*
+MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
+                 unsigned nsteps, float burnin_fraction, const bool debug_mode,
+                 unsigned sync_interval) {
   // cuda/hemi block sizes
   int bs = 128;
   int nb = this->nsignals / bs + 1;
@@ -295,12 +296,14 @@ LikelihoodSpace* MCMC::operator()(std::vector<float>& data, std::vector<int>& we
 }
 
 
-void MCMC::nll(const float* lut, const int* dataweights, size_t nevents, const double* v, double* nll,
-               double* event_partial_sums, double* event_total_sum) {
+void MCMC::nll(const float* lut, const int* dataweights, size_t nevents,
+               const double* v, double* nll, double* event_partial_sums,
+               double* event_total_sum) {
   // partial sums of event term
   HEMI_KERNEL_LAUNCH(nll_event_chunks,
                      this->nnllblocks, this->nllblocksize, 0, 0,
-                     lut, dataweights, v, nevents, this->nsignals, event_partial_sums);
+                     lut, dataweights, v, nevents, this->nsignals,
+                     event_partial_sums);
 
   // total of event term
   HEMI_KERNEL_LAUNCH(nll_event_reduce, 1, this->nreducethreads,  

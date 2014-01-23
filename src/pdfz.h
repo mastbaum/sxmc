@@ -329,13 +329,21 @@ namespace pdfz {
         virtual void EvalFinished();
 
 
-        int RandomSample(std::vector<float> &events, std::vector<int> &eventweights, double nexpected, std::vector<double> &syst_vals, std::vector<float> &uppers, std::vector<float> &lowers, bool poisson=false, long int maxsamples=1e7);
+        int RandomSample(std::vector<float> &events,
+                         std::vector<int> &eventweights, double nexpected,
+                         std::vector<double> &syst_vals,
+                         std::vector<float> &uppers,
+                         std::vector<float> &lowers, bool poisson=false,
+                         long int maxsamples=1e7);
 
-        int RandomSample(std::vector<float> &events, std::vector<int> &eventweights, double nexpected, bool poisson=false, long int maxsamples=1e7){
-          std::vector<double> syst_vals(syst->size(),0);
+        int RandomSample(std::vector<float> &events,
+                         std::vector<int> &eventweights, double nexpected,
+                         bool poisson=false, long int maxsamples=1e7) {
+          std::vector<double> syst_vals(syst->size(), 0);
           std::vector<float> _upper;
           std::vector<float> _lower;
-          return RandomSample(events, eventweights, nexpected,syst_vals,_upper,_lower, poisson, maxsamples);
+          return RandomSample(events, eventweights, nexpected, syst_vals,
+                              _upper, _lower, poisson, maxsamples);
         };
 
     protected:

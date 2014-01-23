@@ -7,6 +7,10 @@
  * each.
  */
 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <errno.h>
+#include <unistd.h>
 #include <iostream>
 #include <vector>
 #include <utility>
@@ -65,9 +69,12 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
                              std::string output_path) {
   std::vector<float> limits;
 
-  for (size_t i=0;i<signals.size();i++){
-    TFile f1((output_path+signals[i].name+"_pdf.root").c_str(),"RECREATE");
-    TH1* hist = dynamic_cast<pdfz::EvalHist*> (signals[i].histogram)->DefaultHistogram();
+  for (size_t i=0; i<signals.size(); i++) {
+    const char* output_file = \
+      (output_path + signals[i].name + "_pdf.root").c_str();
+    TFile f1(output_file, "RECREATE");
+    TH1* hist = \
+      dynamic_cast<pdfz::EvalHist*>(signals[i].histogram)->DefaultHistogram();
     hist->Write();
     f1.Close();
   }
@@ -93,10 +100,11 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
 
     // Run MCMC
     MCMC mcmc(signals, systematics, observables);
-    LikelihoodSpace* ls = mcmc(data.first, data.second, steps, burnin_fraction, debug_mode);
+    LikelihoodSpace* ls = \
+      mcmc(data.first, data.second, steps, burnin_fraction, debug_mode);
 
     // Write out samples for debugging
-    TFile f((output_path+"lspace.root").c_str(), "recreate");
+    TFile f((output_path + "lspace.root").c_str(), "recreate");
     TNtuple* lsclone = (TNtuple*) ls->GetSamples()->Clone("ls");
     lsclone->Write();
     lsclone->Delete();
@@ -106,8 +114,8 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
     ls->print_correlations();
 
     // Make spectral plots
-    plot_fit(ls->get_best_fit(), live_time, signals,
-             systematics, observables, data.first, data.second ,output_path);
+    plot_fit(ls->get_best_fit(), live_time, signals, systematics, observables,
+             data.first, data.second, output_path);
 
     /*
     // Signal sensitivity, Bayesian for now
@@ -133,6 +141,29 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
 
 
 /**
+ * Check the output path; create if necessary.
+ *
+ * \param path The path for the output directory
+ * \returns 0 on success, non-zero on failure
+ */
+int check_create_output(std::string path) {
+  struct stat st;
+  if (stat(path.c_str(), &st) != 0) {
+    if (mkdir(path.c_str(), 0777) != 0 && errno != EEXIST) {
+      std::cerr << "Error creating output directory, errno = "
+                << errno << std::endl;
+      return -1;
+    }
+  }
+  else if (!S_ISDIR(st.st_mode)) {
+    std::cerr << "Output path exists and is not a directory" << std::endl;
+    return -1;
+  }
+  return 0;
+}
+
+
+/**
  * Run the sensitivity calculation
  *
  * \param argc Argument count: must be 2
@@ -141,7 +172,9 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
  */
 int main(int argc, char* argv[]) {
   if (argc != 3) {
-    std::cerr << "Usage: " << argv[0] << " fit_configuration.json output_path" << std::endl;
+    std::cerr << "Usage: " << argv[0]
+              << " fit_configuration.json output_path"
+              << std::endl;
     exit(1);
   }
 
@@ -149,26 +182,32 @@ int main(int argc, char* argv[]) {
   delete gRandom;
   gRandom = new TRandom2(0);
   gRandom->SetSeed(0);
-
   gStyle->SetErrorX(0);
   gStyle->SetOptStat(0);
   gErrorIgnoreLevel = kWarning;
 
+  // Set and check/create output path
   std::string output_path = std::string(argv[2]);
-  if (output_path.at( output_path.length() - 1 ) != '/'){
+  if (output_path.at(output_path.length() - 1) != '/'){
     output_path = output_path + "/";
+  }
+  if (check_create_output(output_path) != 0) {
+    std::cerr << "Error with output path." << std::endl;
+    throw(2);
   }
 
   // Load configuration from JSON file
+  std::cout << "sxmc: Loading configuration..." << std::endl;
   std::string config_filename = std::string(argv[1]);
   FitConfig fc(config_filename);
   fc.print();
 
   // Run ensemble
+  std::cout << "sxmc: Running ensemble..." << std::endl;
   std::vector<float> limits = \
     ensemble(fc.signals, fc.systematics, fc.observables, fc.cuts, fc.steps,
-             fc.burnin_fraction, fc.confidence,
-             fc.experiments, fc.live_time, fc.debug_mode, output_path);
+             fc.burnin_fraction, fc.confidence, fc.experiments, fc.live_time,
+             fc.debug_mode, output_path);
 
 
   /*

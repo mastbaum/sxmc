@@ -96,7 +96,7 @@ HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
       float v = lut[j * ne + i];
       s += pars[j] * (!isnan(v) ? v : 0);  // handle nans from empty hists
     }
-    sum += log(s)*dataweights[i];
+    sum += log(s) * dataweights[i];
   }
   if (!isnan(sum)) {
     sums[offset] = sum;

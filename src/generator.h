@@ -34,16 +34,18 @@
  * \return Array with samples
  */
 
-std::pair<std::vector<float>, std::vector<int> > make_fake_dataset(std::vector<Signal>& signals,
-                                     std::vector<Systematic>& systematics,
-                                     std::vector<Observable>& observables,
-                                     std::vector<double> params,
-                                     bool poisson=true, int maxsamples=1e7);
+std::pair<std::vector<float>, std::vector<int> >
+make_fake_dataset(std::vector<Signal>& signals,
+                  std::vector<Systematic>& systematics,
+                  std::vector<Observable>& observables,
+                  std::vector<double> params,
+                  bool poisson=true, int maxsamples=1e7);
 
 /* Uses ROOT to sample a histogram, but determines
  * whether it is a TH1,TH2,TH3 and responds appropriately
  */
-std::pair<std::vector<float>, std::vector<int> > sample_pdf(TH1* hist, long int nsamples, long int maxsamples=1e7);
+std::pair<std::vector<float>, std::vector<int> >
+sample_pdf(TH1* hist, long int nsamples, long int maxsamples=1e7);
 
 
 // Is just TMath::Nint redefined here to get away with bug

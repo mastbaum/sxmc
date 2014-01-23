@@ -11,11 +11,10 @@
 #include <string>
 
 // because c++ is the devil
-struct my_bool
-{
+struct my_bool {
       bool the_bool;
 };
- 
+
 
 /**
  * Opens a root file and reads the given dataset to a float
@@ -26,11 +25,10 @@ struct my_bool
  * \param rank The rank of the input data
  * \return Status code, negative in case of failure
  */
-
 int read_float_vector_ttree(const std::string &filename,
                             std::vector<float> &data, 
                             std::vector<unsigned int> &rank,
                             std::vector<std::string> &ttree_fields);
 
-#endif // __TTREE_IO_H__
+#endif  // __TTREE_IO_H__
 

@@ -66,9 +66,9 @@ ifndef ROOTSYS
 $(error ROOTSYS is not set)
 endif
 
-all: build_dirs includes $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o $(OBJECTS) $(JSONCPP_OBJECTS) $(EXE)
+all: build_dirs includes bin/create_test_data $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o $(OBJECTS) $(JSONCPP_OBJECTS) $(EXE)
 
-.PHONY: doc test includes
+.PHONY: doc test includes bin/create_test_data
 
 clean:
 	-$(RM) build/*.o build/test/*.o build/jsoncpp/*.o $(EXE) include/sxmc/*
@@ -109,6 +109,9 @@ $(OBJ_DIR)/pdfz.o: src/pdfz.cpp
 
 $(EXE): $(OBJECTS) $(JSONCPP_OBJECTS) $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o
 	$(GCC) -o $@ $^ $(CFLAGS) $(LFLAGS) $(CUDA_LFLAGS)
+
+bin/create_test_data:
+	$(GCC) -o $@ test/create_test_data.c $(shell root-config --libs) -I$(shell root-config --incdir)
 
 
 ###### Test Infrastructure ############

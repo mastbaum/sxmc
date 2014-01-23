@@ -72,18 +72,23 @@ std::vector<float> get_correlation_matrix(TNtuple* nt) {
   return matrix;
 }
 
-double LinearInterpolator::operator()(double _x)
-{
-    if (_x < x.front() || _x > x.back()){
-          std::cout << "Out of range! Range: " << x.front() << " to " << x.back()  << ", trying " << _x << std::endl;
-              return 0;
-                }
-      if (_x == x.front())
-            return y.front();
-        size_t i=1;
-          while (_x > x[i] && i < (x.size()-1)){
-                i++;
-                  }
-            return y[i-1] + (y[i]-y[i-1])*(_x-x[i-1])/(x[i]-x[i-1]);
+
+double LinearInterpolator::operator()(double _x) {
+  if (_x < x.front() || _x > x.back()) {
+    std::cout << "LinearInterpolator: Out of range! Range: "
+              << x.front() << " to " << x.back()
+              << ", trying " << _x << std::endl;
+      return 0;
+  }
+
+  if (_x == x.front()) {
+    return y.front();
+  }
+
+  size_t i=1;
+  while (_x > x[i] && i < (x.size()-1)) {
+    i++;
+  }
+  return y[i-1] + (y[i]-y[i-1]) * (_x-x[i-1]) / (x[i]-x[i-1]);
 }
 

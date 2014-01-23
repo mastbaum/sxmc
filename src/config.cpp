@@ -56,7 +56,7 @@ FitConfig::FitConfig(std::string filename) {
   // pdf parameters
   const Json::Value pdf_params = root["pdfs"];
   // default hdf5 fields
-  if (pdf_params.isMember("hdf5_fields")){
+  if (pdf_params.isMember("hdf5_fields")) {
     for (Json::Value::const_iterator it=pdf_params["hdf5_fields"].begin();
         it!=pdf_params["hdf5_fields"].end(); ++it) {
       this->hdf5_fields.push_back((*it).asString());
@@ -154,28 +154,20 @@ FitConfig::FitConfig(std::string filename) {
     std::string field_name = this->observables[i].field;
     // if it is not already in the list of fields add it, otherwise
     // get the index of where it already is
-    size_t index = get_index_with_append<std::string>(this->sample_fields, field_name);
+    size_t index = get_index_with_append<std::string>(this->sample_fields,
+                                                      field_name);
     this->observables[i].field_index = index;
   }
-  /*
-  // Add any additional observables used for cuts
-  for (size_t i=0;i<this->cuts.size(); i++){
-    std::string field_name = this->cuts[i].field;
-    // if it is not already in the list of fields add it, otherwise
-    // get the index of where it already is
-    size_t index = get_index_with_append<std::string>(this->sample_fields, field_name);
-    this->cuts[i].field_index = index;
-  }
-  */
 
   // Add any additional observables used for systematics
   for (size_t i=0; i<this->systematics.size(); i++) {
     std::string field_name = this->systematics[i].observable_field;
 
     // systematic observable must be an observable or a cut
-    size_t index = (std::find(this->sample_fields.begin(), this->sample_fields.end(),
-          field_name) -
-        this->sample_fields.begin());
+    size_t index = (std::find(this->sample_fields.begin(),
+                              this->sample_fields.end(),
+                              field_name) -
+                    this->sample_fields.begin());
     assert(index < this->sample_fields.size());
 
     this->systematics[i].observable_field_index = index;
@@ -184,10 +176,11 @@ FitConfig::FitConfig(std::string filename) {
     if (this->systematics[i].type != pdfz::Systematic::RESOLUTION_SCALE) {
       continue;
     }
-    // we want to store the truth value in our sample so we can use it to manipulate the
-    // observed value correctly when we adjust this systematic
+    // we want to store the truth value in our sample so we can use it to
+    // manipulate the observed value correctly when we adjust this systematic
     field_name = this->systematics[i].truth_field;
-    index = get_index_with_append<std::string>(this->sample_fields, field_name);
+    index = get_index_with_append<std::string>(this->sample_fields,
+                                               field_name);
     this->systematics[i].truth_field_index = index;
   }
 
@@ -203,135 +196,185 @@ FitConfig::FitConfig(std::string filename) {
   for (Json::Value::const_iterator it=all_signals.begin();
        it!=all_signals.end(); ++it) {
 
-    std::cout << std::endl << std::endl << "NEW SIGNAL: " << it.key().asString() << std::endl;
-
     // check if we want this signal
     if (std::find(signal_names.begin(), signal_names.end(),
           it.key().asString()) == signal_names.end()) {
       continue;
     }
 
+    std::cout << "FitConfig: Loading data for " << it.key().asString()
+              << std::endl;
+
     const Json::Value signal_params = all_signals[it.key().asString()];
 
     // check if we are building our pdf out of multiple contributions
-    if (signal_params.isMember("pdfs")){
+    if (signal_params.isMember("pdfs")) {
       // loop over contributions
-      if (!signal_params.get("chain",true)){
+      if (!signal_params.get("chain", true)) {
         // its not chained, treat each part as a separate signal
         for (Json::Value::const_iterator jt=signal_params["pdfs"].begin();
-            jt!=signal_params["pdfs"].end();++jt){
+             jt!=signal_params["pdfs"].end(); ++jt) {
 
           // extract parameters for this pdf
-          const Json::Value contrib_params = signal_params["pdfs"][jt.key().asString()];
+          const Json::Value contrib_params = \
+            signal_params["pdfs"][jt.key().asString()];
           std::string name = jt.key().asString();
           std::string title = contrib_params.get("title", name).asString();
           std::string category = contrib_params.get("category","").asString();
-          float sigma = contrib_params.get("constraint", 0.0).asFloat() * this->live_time * this->efficiency_corr;
-          float nexpected = contrib_params["rate"].asFloat() * this->live_time * this->efficiency_corr;
+          float sigma = (contrib_params.get("constraint", 0.0).asFloat() *
+                         this->live_time * this->efficiency_corr);
+          float nexpected = (contrib_params["rate"].asFloat() *
+                             this->live_time * this->efficiency_corr);
           std::vector<std::string> filenames;
-          int rootfile = 0;
+          bool rootfile = false;
           for (Json::Value::const_iterator kt=contrib_params["files"].begin();
-              kt!=contrib_params["files"].end();++kt){
+               kt!=contrib_params["files"].end(); ++kt) {
             filenames.push_back((*kt).asString());
-            if ((*kt).asString().compare ((*kt).asString().length() - 4, 4, "root") == 0)
-              rootfile = 1;
+            if ((*kt).asString().compare((*kt).asString().length() - 4,
+                                         4, "root") == 0) {
+              rootfile = true;
+            }
           }
 
-          if (rootfile)
-            this->signals.push_back(Signal(name,title,nexpected,sigma,category,this->sample_fields,
-                  this->observables,this->cuts,this->systematics,filenames));
-          else
-            this->signals.push_back(Signal(name,title,nexpected,sigma,category,this->hdf5_fields,this->sample_fields,
-                  this->observables,this->cuts,this->systematics,filenames));
+          if (rootfile) {
+            this->signals.push_back(Signal(name, title, nexpected, sigma,
+                                           category, this->sample_fields,
+                                           this->observables, this->cuts, 
+                                           this->systematics,filenames));
+          }
+          else {
+            this->signals.push_back(Signal(name, title, nexpected, sigma,
+                                           category, this->hdf5_fields,
+                                           this->sample_fields,
+                                           this->observables, this->cuts,
+                                           this->systematics,filenames));
+          }
         }
-      }else{
+      }
+      else {
         // it is chained, get each contribution as a pdfz and add them
         std::vector<Signal> pdfs;
         std::vector<double> params;
         int nexpected_total = 0;
         double efficiency_total = 0;
         for (Json::Value::const_iterator jt=signal_params["pdfs"].begin();
-            jt!=signal_params["pdfs"].end();++jt){
-
+             jt!=signal_params["pdfs"].end(); ++jt) {
           // extract parameters for this pdf
-          const Json::Value contrib_params = signal_params["pdfs"][jt.key().asString()];
+          const Json::Value contrib_params = \
+            signal_params["pdfs"][jt.key().asString()];
           std::string name = jt.key().asString();
           std::string title = contrib_params.get("title", name).asString();
           std::string category = contrib_params.get("category","").asString();
-          float sigma = contrib_params.get("constraint", 0.0).asFloat() * this->live_time * this->efficiency_corr;
-          float nexpected = contrib_params["rate"].asFloat() * this->live_time * this->efficiency_corr;
+          float sigma = (contrib_params.get("constraint", 0.0).asFloat() *
+                         this->live_time * this->efficiency_corr);
+          float nexpected = (contrib_params["rate"].asFloat() *
+                             this->live_time * this->efficiency_corr);
           std::vector<std::string> filenames;
-          int rootfile = 0;
+          bool rootfile = false;
           for (Json::Value::const_iterator kt=contrib_params["files"].begin();
-              kt!=contrib_params["files"].end();++kt){
+              kt!=contrib_params["files"].end(); ++kt) {
             filenames.push_back((*kt).asString());
-            if ((*kt).asString().compare ((*kt).asString().length() - 4, 4, "root") == 0)
-              rootfile = 1;
+            if ((*kt).asString().compare((*kt).asString().length() - 4,
+                                         4, "root") == 0) {
+              rootfile = true;
+            }
           }
 
-          if (rootfile)
-            pdfs.push_back(Signal(name,title,nexpected,sigma,category,this->sample_fields,
-                  this->observables,this->cuts,this->systematics,filenames));
-          else
-            pdfs.push_back(Signal(name,title,nexpected,sigma,category,this->hdf5_fields,this->sample_fields,
-                  this->observables,this->cuts,this->systematics,filenames));
-          params.push_back(pdfs.back().nexpected*10.0);
-          nexpected_total += pdfs.back().nexpected;
-          efficiency_total += pdfs.back().nexpected/pdfs.back().efficiency;
-        }
-        efficiency_total = nexpected_total/efficiency_total;
+          if (rootfile) {
+            pdfs.push_back(Signal(name, title, nexpected, sigma, category,
+                                  this->sample_fields, this->observables,
+                                  this->cuts, this->systematics, filenames));
+          }
+          else {
+            pdfs.push_back(Signal(name, title, nexpected, sigma, category,
+                                  this->hdf5_fields, this->sample_fields,
+                                  this->observables, this->cuts,
+                                  this->systematics, filenames));
+          }
 
-        // Now sample all these pdfs to get samples with the correct relative weighting
-        std::cout << "FitConfig::CreateMultiPDFSignal: Generating combined pdf for " << it.key().asString() << std::endl;
-        for (size_t i=0;i<this->systematics.size();i++)
+          params.push_back(pdfs.back().nexpected * 10.0);
+          nexpected_total += pdfs.back().nexpected;
+          efficiency_total += pdfs.back().nexpected / pdfs.back().efficiency;
+        }
+
+        efficiency_total = nexpected_total / efficiency_total;
+
+        // Now sample all these pdfs to get samples with the correct relative
+        // weighting
+        std::cout << "FitConfig::CreateMultiPDFSignal: "
+                  << "Generating combined pdf for "
+                  << it.key().asString() << std::endl;
+        for (size_t i=0; i<this->systematics.size(); i++) {
           params.push_back(0);
-        std::pair<std::vector<float>, std::vector<int> > samples = make_fake_dataset(pdfs,this->systematics,this->observables,params,true);
+        }
+        std::pair<std::vector<float>, std::vector<int> > samples = \
+          make_fake_dataset(pdfs, this->systematics, this->observables,
+                            params, true);
 
         // Now create a new pdf from these samples
         std::string name = it.key().asString();
         std::string title = signal_params.get("title", name).asString();
-        std::string category = signal_params.get("category","").asString();
-        float sigma = signal_params.get("constraint", 0.0).asFloat() * this->live_time * this->efficiency_corr;
-        float nexpected = signal_params.get("rate",nexpected_total).asFloat() * this->live_time * this->efficiency_corr;
-        this->signals.push_back(Signal(name,title,nexpected,sigma,category,
-              this->observables,this->cuts,this->systematics,samples.first,this->sample_fields,samples.second));
+        std::string category = signal_params.get("category", "").asString();
+        float sigma = (signal_params.get("constraint", 0.0).asFloat() *
+                       this->live_time * this->efficiency_corr);
+        float nexpected = \
+          (signal_params.get("rate", nexpected_total).asFloat() *
+           this->live_time * this->efficiency_corr);
+
+        this->signals.push_back(Signal(name, title, nexpected, sigma, category,
+                                       this->observables, this->cuts,
+                                       this->systematics, samples.first,
+                                       this->sample_fields, samples.second));
 
         // correct for efficiency
         this->signals.back().efficiency *= efficiency_total;
         this->signals.back().nevents_physical /= efficiency_total;
         this->signals.back().sigma *= efficiency_total;
-        std::cout << "CORRECTED TO " << this->signals.back().nevents_physical << " " << this->signals.back().nevents << " " << this->signals.back().efficiency << std::endl;
 
-        float years = 1.0 * this->signals.back().nevents / (this->signals.back().nexpected / this->live_time);
+        float years = (1.0 * this->signals.back().nevents /
+                       (this->signals.back().nexpected / this->live_time));
 
-        std::cout << "FitConfig::CreateMultiPDFSignal: Initialized PDF for " << name
-          << " using " << this->signals.back().nevents << " events (" << years << " y)"
-          << std::endl;
+        std::cout << "FitConfig::CreateMultiPDFSignal: "
+                  << "Initialized PDF for " << name
+                  << " using " << this->signals.back().nevents
+                  << " events (" << years << " y)"
+                  << std::endl;
       }
-    }else{
+    }
+    else {
       // extract parameters for this pdf
       std::string name = it.key().asString();
       std::string title = signal_params.get("title", name).asString();
-      std::string category = signal_params.get("category","").asString();
-      float sigma = signal_params.get("constraint", 0.0).asFloat() * this->live_time * this->efficiency_corr;
-      float nexpected = signal_params["rate"].asFloat() * this->live_time * this->efficiency_corr;
+      std::string category = signal_params.get("category", "").asString();
+      float sigma = (signal_params.get("constraint", 0.0).asFloat() *
+                     this->live_time * this->efficiency_corr);
+      float nexpected = (signal_params["rate"].asFloat() *
+                         this->live_time * this->efficiency_corr);
       std::vector<std::string> filenames;
-      int rootfile = 0;
+      bool rootfile = false;
       for (Json::Value::const_iterator it=signal_params["files"].begin();
-          it!=signal_params["files"].end();++it){
+          it!=signal_params["files"].end(); ++it) {
         filenames.push_back((*it).asString());
-        if ((*it).asString().compare ((*it).asString().length() - 4, 4, "root") == 0)
-          rootfile = 1;
+        if ((*it).asString().compare((*it).asString().length() - 4,
+                                     4, "root") == 0)
+          rootfile = true;
       }
-      if (rootfile)
-        this->signals.push_back(Signal(name,title,nexpected,sigma,category,this->sample_fields,
-              this->observables,this->cuts,this->systematics,filenames));
-      else
-        this->signals.push_back(Signal(name,title,nexpected,sigma,category,this->hdf5_fields,this->sample_fields,
-              this->observables,this->cuts,this->systematics,filenames));
+      if (rootfile) {
+        this->signals.push_back(Signal(name, title, nexpected, sigma, category,
+                                       this->sample_fields, this->observables,
+                                       this->cuts, this->systematics,
+                                       filenames));
+      }
+      else {
+        this->signals.push_back(Signal(name, title, nexpected, sigma, category,
+                                       this->hdf5_fields, this->sample_fields,
+                                       this->observables, this->cuts,
+                                       this->systematics, filenames));
+      }
     }
   }
 }
+
 
 void FitConfig::print() const {
   std::cout << "Fit:" << std::endl
