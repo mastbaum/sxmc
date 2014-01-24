@@ -231,7 +231,7 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
   std::vector<unsigned int> rank;
   std::vector<std::string> ttree_fields;
   for (size_t i=0; i<filenames.size(); i++) {
-    int code = read_float_vector_ttree(filenames[i], dataset, rank, ttree_fields);
+    int code = sxmc::io::read_float_vector_ttree(filenames[i], dataset, rank, ttree_fields);
     assert(code >= 0);
   }
 
@@ -269,7 +269,7 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected, float _s
   std::vector<float> dataset;
   std::vector<unsigned> rank;
   for (size_t i=0; i<filenames.size(); i++) {
-    int code = read_float_vector_hdf5(filenames[i], this->name,
+    int code = sxmc::io::read_float_vector_hdf5(filenames[i], this->name,
         dataset, rank);
     assert(code >= 0);
   }

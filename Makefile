@@ -42,12 +42,11 @@ CUDACC = $(CC) -x cu
 CC += --compiler-options "$(GCCFLAGS) -Wno-unused-function"
 endif
 
-INCLUDES_SRC := $(wildcard src/*.h)
-INCLUDES_DST := $(addprefix ./include/sxmc/, $(notdir $(INCLUDES_SRC)))
-
-OBJ_DIR = build
-SOURCES = $(filter-out src/mcmc.cpp src/nll_kernels.cpp src/pdfz.cpp, $(wildcard src/*.cpp))
-OBJECTS = $(SOURCES:src/%.cpp=$(OBJ_DIR)/%.o)
+OBJ_DIR = ./build
+SRCDIRS := $(subst ./src/,,$(dir $(shell find ./src -name '*.cpp' -print)))
+SRC := $(subst ./src/,,$(shell find ./src -name '*.cpp' -type f))
+SOURCES = $(filter-out mcmc.cpp nll_kernels.cpp pdfz.cpp, $(SRC))
+OBJECTS = $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 JSONCPP_SOURCES = $(wildcard $(JSONCPP_SRC)/*.cpp)
 JSONCPP_OBJECTS = $(JSONCPP_SOURCES:$(JSONCPP_SRC)/%.cpp=$(OBJ_DIR)/jsoncpp/%.o)
 
@@ -77,34 +76,31 @@ doc:
 	cd src && doxygen Doxyfile
 
 build_dirs:
-	test -d include/sxmc || mkdir -p include/sxmc
-	test -d build || mkdir build
-	test -d build/jsoncpp || mkdir -p build/jsoncpp
-	test -d bin || mkdir bin
+	@mkdir -p include/sxmc
+	@mkdir -p build
+	@mkdir -p build/jsoncpp
+	@mkdir -p bin
+	@$(foreach dir,$(SRCDIRS),mkdir -p build/$(dir))
 
-includes: include_dir $(INCLUDES_DST)
+includes: include_dir
+	@find src -name *.h -type f -exec cp {} ./include/sxmc \;
 
 include_dir:
-	test -d include/sxmc || mkdir -p include/sxmc
-
-include/sxmc/%: %
-	cp $^ include/sxmc
-
-vpath %.h src
+	@mkdir -p include/sxmc
 
 $(OBJ_DIR)/jsoncpp/%.o: $(JSONCPP_SRC)/%.cpp
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-$(OBJ_DIR)/%.o: src/%.cpp
+$(OBJ_DIR)/%.o: ./src/%.cpp includes
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-$(OBJ_DIR)/mcmc.o: src/mcmc.cpp
+$(OBJ_DIR)/mcmc.o: src/mcmc.cpp includes
 	$(CUDACC) -c -o $@ $< $(CFLAGS)
 
-$(OBJ_DIR)/nll_kernels.o: src/nll_kernels.cpp
+$(OBJ_DIR)/nll_kernels.o: src/nll_kernels.cpp includes
 	$(CUDACC) -c -o $@ $< $(CFLAGS)
 
-$(OBJ_DIR)/pdfz.o: src/pdfz.cpp
+$(OBJ_DIR)/pdfz.o: src/pdfz.cpp includes
 	$(CUDACC) -c -o $@ $< $(CFLAGS)
 
 $(EXE): $(OBJECTS) $(JSONCPP_OBJECTS) $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o

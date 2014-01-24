@@ -14,6 +14,9 @@
 
 #include <sxmc/ttree_io.h>
  
+namespace sxmc {
+  namespace io {
+
 int read_float_vector_ttree(const std::string &filename,
                             std::vector<float> &data, 
                             std::vector<unsigned int> &rank,
@@ -150,4 +153,7 @@ int read_float_vector_ttree(const std::string &filename,
   f->Close();
   return 0;
 }
+
+  }  // namespace io
+}  // namespace sxmc
 

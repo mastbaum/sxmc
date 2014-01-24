@@ -3,6 +3,9 @@
 
 #include <sxmc/hdf5_io.h>
 
+namespace sxmc {
+  namespace io {
+
 herr_t write_float_vector_hdf5(const std::string &filename,
                                const std::string &dataset,
                                const std::vector<float> &data, 
@@ -84,4 +87,7 @@ close_file:
     H5Fclose(file_id);
     return status;
 }
+
+  }  // namespace io
+}  // namespace sxmc
 

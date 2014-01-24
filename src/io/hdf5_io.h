@@ -10,6 +10,9 @@
 #include <vector>
 #include <string>
 
+namespace sxmc {
+  namespace io {
+
 /**
  * Opens an HDF5 file and write the given data to a float
  * dataset.  The rank array is the number of elements in data
@@ -42,6 +45,9 @@ int read_float_vector_hdf5(const std::string& filename,
                            const std::string& dataset,
                            std::vector<float>& data, 
                            std::vector<unsigned int>& rank);
+
+  }  // namespace io
+}  // namespace sxmc
 
 #endif // __HDF5_IO_H__
 

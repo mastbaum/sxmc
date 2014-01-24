@@ -10,6 +10,9 @@
 #include <vector>
 #include <string>
 
+namespace sxmc {
+  namespace io {
+
 // because c++ is the devil
 struct my_bool {
       bool the_bool;
@@ -29,6 +32,9 @@ int read_float_vector_ttree(const std::string &filename,
                             std::vector<float> &data, 
                             std::vector<unsigned int> &rank,
                             std::vector<std::string> &ttree_fields);
+
+  }  // namespace io
+}  // namespace sxmc
 
 #endif  // __TTREE_IO_H__
 
