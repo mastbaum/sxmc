@@ -56,7 +56,7 @@ class FitConfig {
     unsigned steps;  //!< number of mcmc steps
     float confidence;  //!< confidence level for results (e.g. 0.9)
     float live_time;  //!< experiment live time in years
-    float efficiency_corr;  //!< overall efficiency correction
+    float efficiency_correction;  //!< overall efficiency correction
     float burnin_fraction;  //!< fraction of steps to use for burn-in period
     bool debug_mode;  //!< enable/disable debugging mode (accept/save all)
     std::string output_file;  //!< base filename for output

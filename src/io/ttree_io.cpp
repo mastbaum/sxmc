@@ -51,24 +51,18 @@ int read_float_vector_ttree(const std::string &filename,
   TBranch* temp;
   std::vector<TBranch*> temp_branches, branches;
   std::vector<EDataType> temp_types, types;
-  std::vector<int> int_values;
-  std::vector<float> float_values;
-  std::vector<double> double_values;
-  std::vector<my_bool> bool_values;
+
   while ((temp = dynamic_cast<TBranch*>(next()))) {
     temp_branches.push_back(temp);
     temp_types.push_back(kOther_t);
   }
 
-  bool first_file = true;
-  if (ttree_fields.size() > 0) {
-    first_file = false;
-  }
+  bool first_file = (ttree_fields.size() == 0);
 
   // Make a list of all the branches that we can convert to floats
-  TClass* my_class;
-  for (size_t i=0;i<temp_branches.size();i++) {
-    temp_branches[i]->GetExpectedType(my_class, temp_types[i]);
+  TClass* cls;
+  for (size_t i=0; i<temp_branches.size(); i++) {
+    temp_branches[i]->GetExpectedType(cls, temp_types[i]);
 
     if (temp_types[i] == 3 || temp_types[i] == 5 ||
         temp_types[i] == 8 || temp_types[i] == 18) {
@@ -84,36 +78,34 @@ int read_float_vector_ttree(const std::string &filename,
           return -1;
         }
       }
-
-      int_values.push_back(-1);
-      float_values.push_back(-1);
-      double_values.push_back(-1);
-      my_bool boolfix;
-      boolfix.the_bool = false;
-      bool_values.push_back(boolfix);
     }
   }
 
+  int* int_values = new int[branches.size()];
+  float* float_values = new float[branches.size()];
+  double* double_values = new double[branches.size()];
+  bool* bool_values = new bool[branches.size()];
+
   for (size_t i=0;i<branches.size();i++) {
-    if (types[i] == 3) {
-      t->SetBranchAddress(branches[i]->GetName(), &int_values[i],
-                          &branches[i]);
-    }
-    else if (types[i] == 5) {
-      t->SetBranchAddress(branches[i]->GetName(), &float_values[i],
-                          &branches[i]);
-    }
-    else if (types[i] == 8) {
-      t->SetBranchAddress(branches[i]->GetName(), &double_values[i],
-                          &branches[i]);
-    }
-    else if (types[i] == 18) {
-      t->SetBranchAddress(branches[i]->GetName(), &(bool_values[i].the_bool),
-                          &branches[i]);
-    }
-    else {
-      // something is wrong!
-      return -1;
+    switch (types[i]) {
+      case 3:
+        t->SetBranchAddress(branches[i]->GetName(), &int_values[i],
+                            &branches[i]);
+        break;
+      case 5:
+        t->SetBranchAddress(branches[i]->GetName(), &float_values[i],
+                            &branches[i]);
+        break;
+      case 8:
+        t->SetBranchAddress(branches[i]->GetName(), &double_values[i],
+                            &branches[i]);
+        break;
+      case 18:
+        t->SetBranchAddress(branches[i]->GetName(), &(bool_values[i]),
+                            &branches[i]);
+        break;
+      default:
+        return -1;
     }
   }
 
@@ -124,13 +116,14 @@ int read_float_vector_ttree(const std::string &filename,
   else {
     rank[0] += num_entries;
   }
+
   int oldsize = data.size();
   data.resize(oldsize + num_entries * branches.size());
 
   // read in the values
-  for (int i=0;i<num_entries;i++) {
+  for (int i=0; i<num_entries; i++) {
     t->GetEntry(i);
-    for (size_t j=0;j<branches.size();j++) {
+    for (size_t j=0; j<branches.size(); j++) {
       if (types[j] == 3) {
         data[oldsize + i*branches.size()+j] = \
           static_cast<float>(int_values[j]);
@@ -145,12 +138,18 @@ int read_float_vector_ttree(const std::string &filename,
       }
       else if (types[j] == 18) {
         data[oldsize + i*branches.size()+j] = \
-          static_cast<float>(bool_values[j].the_bool);
+          static_cast<float>(bool_values[j]);
       }
     }
   }
 
   f->Close();
+
+  delete[] int_values;
+  delete[] float_values;
+  delete[] double_values;
+  delete[] bool_values;
+
   return 0;
 }
 

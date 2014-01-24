@@ -46,16 +46,20 @@ FitConfig::FitConfig(std::string filename) {
     throw(1);
   }
 
-  // experiment parameters
+  // Experiment parameters
   const Json::Value experiment_params = root["experiment"];
   assert(experiment_params.isMember("live_time"));
   this->live_time = experiment_params["live_time"].asFloat();
-  this->confidence = experiment_params["confidence"].asFloat();
-  this->efficiency_corr = experiment_params.get("efficiency_corr", 1.0).asFloat();
 
-  // pdf parameters
+  assert(experiment_params.isMember("confidence"));
+  this->confidence = experiment_params["confidence"].asFloat();
+
+  this->efficiency_correction = \
+    experiment_params.get("efficiency_correction", 1.0).asFloat();
+
+  // PDF parameters
   const Json::Value pdf_params = root["pdfs"];
-  // default hdf5 fields
+  // Default HDF5 fields
   if (pdf_params.isMember("hdf5_fields")) {
     for (Json::Value::const_iterator it=pdf_params["hdf5_fields"].begin();
         it!=pdf_params["hdf5_fields"].end(); ++it) {
@@ -63,18 +67,24 @@ FitConfig::FitConfig(std::string filename) {
     }
   }
 
-  // create list of possible observables
+  // Create list of possible observables
   std::map<std::string, Observable> all_observables;
   for (Json::Value::const_iterator it=pdf_params["observables"].begin();
        it!=pdf_params["observables"].end(); ++it) {
     Json::Value o_json = pdf_params["observables"][it.key().asString()];
     Observable o;
     o.name = it.key().asString();
+    assert(o_json.isMember("title"));
     o.title = o_json["title"].asString();
+    assert(o_json.isMember("field"));
     o.field = o_json["field"].asString();
+    assert(o_json.isMember("bins"));
     o.bins = o_json["bins"].asInt();
+    assert(o_json.isMember("min"));
     o.lower = o_json["min"].asFloat();
+    assert(o_json.isMember("max"));
     o.upper = o_json["max"].asFloat();
+    assert(o_json.isMember("units"));
     o.units = o_json["units"].asString();
     if (o_json.isMember("exclude")) {
       o.exclude = true;
@@ -87,16 +97,19 @@ FitConfig::FitConfig(std::string filename) {
     all_observables[it.key().asString()] = o;
   }
 
-  // create list of possible systematics
+  // Create list of possible systematics
   std::map<std::string, Systematic> all_systematics;
   for (Json::Value::const_iterator it=pdf_params["systematics"].begin();
        it!=pdf_params["systematics"].end(); ++it) {
     Json::Value s_json = pdf_params["systematics"][it.key().asString()];
     Systematic s;
     s.name = it.key().asString();
+    assert(s_json.isMember("title"));
     s.title = s_json["title"].asString();
+    assert(s_json.isMember("observable_field"));
     s.observable_field = s_json["observable_field"].asString();
 
+    assert(s_json.isMember("type"));
     std::string type_string = s_json["type"].asString();
     if (type_string == "scale") {
         s.type = pdfz::Systematic::SCALE;
@@ -106,6 +119,7 @@ FitConfig::FitConfig(std::string filename) {
     }
     else if (type_string == "resolution_scale") {
         s.type = pdfz::Systematic::RESOLUTION_SCALE;
+        assert(s_json.isMember("truth_field"));
         s.truth_field = s_json["truth_field"].asString();
     }
     else {
@@ -114,6 +128,7 @@ FitConfig::FitConfig(std::string filename) {
       throw(1);
     }
 
+    assert(s_json.isMember("mean"));
     s.mean = s_json["mean"].asFloat();
     s.sigma = s_json.get("sigma", 0.0).asFloat();
     s.fixed = s_json.get("fixed", false).asBool();
@@ -121,42 +136,41 @@ FitConfig::FitConfig(std::string filename) {
     all_systematics[it.key().asString()] = s;
   }
 
-  // fit parameters
+  // Fit parameters
   const Json::Value fit_params = root["fit"];
+  assert(fit_params.isMember("experiments"));
   this->experiments = fit_params["experiments"].asInt();
+  assert(fit_params.isMember("steps"));
   this->steps = fit_params["steps"].asInt();
   this->burnin_fraction = fit_params.get("burnin_fraction", 0.1).asFloat();
   this->output_file = fit_params.get("output_file", "fit_spectrum").asString();
   this->debug_mode = fit_params.get("debug_mode", false).asBool();
 
-  // find observables we want to fit for
+  // Find observables we want to fit for
   for (Json::Value::const_iterator it=fit_params["observables"].begin();
        it!=fit_params["observables"].end(); ++it) {
     this->observables.push_back(all_observables[(*it).asString()]);
   }
 
-  // find observables we want to cut on
+  // Find observables we want to cut on
   for (Json::Value::const_iterator it=fit_params["cuts"].begin();
        it!=fit_params["cuts"].end(); ++it) {
     this->cuts.push_back(all_observables[(*it).asString()]);
   }
 
-  // find systematics we want to use
+  // Find systematics we want to use
   for (Json::Value::const_iterator it=fit_params["systematics"].begin();
        it!=fit_params["systematics"].end(); ++it) {
     this->systematics.push_back(all_systematics[(*it).asString()]);
   }
 
-  // we are now going to determine the order of data fields in our
-  // sampled data. sample_fields will map it to the hdf5 fields,
-  // and field_index will map each observable/syst to the data field
+  // Determine the order of data fields in the sampled data.
+  // sample_fields will map it to the hdf5 fields
+  // field_index will map each observable/syst to the data field
   for (size_t i=0; i<this->observables.size(); i++) {
     std::string field_name = this->observables[i].field;
-    // if it is not already in the list of fields add it, otherwise
-    // get the index of where it already is
-    size_t index = get_index_with_append<std::string>(this->sample_fields,
-                                                      field_name);
-    this->observables[i].field_index = index;
+    this->observables[i].field_index = \
+      get_index_with_append<std::string>(this->sample_fields, field_name);
   }
 
   // Add any additional observables used for systematics
@@ -222,9 +236,9 @@ FitConfig::FitConfig(std::string filename) {
           std::string title = contrib_params.get("title", name).asString();
           std::string category = contrib_params.get("category","").asString();
           float sigma = (contrib_params.get("constraint", 0.0).asFloat() *
-                         this->live_time * this->efficiency_corr);
+                         this->live_time * this->efficiency_correction);
           float nexpected = (contrib_params["rate"].asFloat() *
-                             this->live_time * this->efficiency_corr);
+                             this->live_time * this->efficiency_correction);
           std::vector<std::string> filenames;
           bool rootfile = false;
           for (Json::Value::const_iterator kt=contrib_params["files"].begin();
@@ -266,9 +280,9 @@ FitConfig::FitConfig(std::string filename) {
           std::string title = contrib_params.get("title", name).asString();
           std::string category = contrib_params.get("category","").asString();
           float sigma = (contrib_params.get("constraint", 0.0).asFloat() *
-                         this->live_time * this->efficiency_corr);
+                         this->live_time * this->efficiency_correction);
           float nexpected = (contrib_params["rate"].asFloat() *
-                             this->live_time * this->efficiency_corr);
+                             this->live_time * this->efficiency_correction);
           std::vector<std::string> filenames;
           bool rootfile = false;
           for (Json::Value::const_iterator kt=contrib_params["files"].begin();
@@ -316,10 +330,10 @@ FitConfig::FitConfig(std::string filename) {
         std::string title = signal_params.get("title", name).asString();
         std::string category = signal_params.get("category", "").asString();
         float sigma = (signal_params.get("constraint", 0.0).asFloat() *
-                       this->live_time * this->efficiency_corr);
+                       this->live_time * this->efficiency_correction);
         float nexpected = \
           (signal_params.get("rate", nexpected_total).asFloat() *
-           this->live_time * this->efficiency_corr);
+           this->live_time * this->efficiency_correction);
 
         this->signals.push_back(Signal(name, title, nexpected, sigma, category,
                                        this->observables, this->cuts,
@@ -347,9 +361,9 @@ FitConfig::FitConfig(std::string filename) {
       std::string title = signal_params.get("title", name).asString();
       std::string category = signal_params.get("category", "").asString();
       float sigma = (signal_params.get("constraint", 0.0).asFloat() *
-                     this->live_time * this->efficiency_corr);
+                     this->live_time * this->efficiency_correction);
       float nexpected = (signal_params["rate"].asFloat() *
-                         this->live_time * this->efficiency_corr);
+                         this->live_time * this->efficiency_correction);
       std::vector<std::string> filenames;
       bool rootfile = false;
       for (Json::Value::const_iterator it=signal_params["files"].begin();

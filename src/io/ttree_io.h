@@ -13,12 +13,6 @@
 namespace sxmc {
   namespace io {
 
-// because c++ is the devil
-struct my_bool {
-      bool the_bool;
-};
-
-
 /**
  * Opens a root file and reads the given dataset to a float
  * vector.
