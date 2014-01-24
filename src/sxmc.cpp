@@ -43,9 +43,7 @@
 /**
  * Run an ensemble of independent fake experiments
  *
- * Run experiments, fit with mcmc, and tabulate background-fluctuation
- * sensitivity for each, creating a histogram of limits. The estimated
- * sensitivity is the median of the limits of the ensemble.
+ * Run experiments, fit each with MCMC.
  *
  * \param signals List of Signals defining PDFs, rates, etc.
  * \param systematics List of Systematics applied to PDFs
@@ -88,11 +86,11 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
       params.push_back(signals[j].nexpected);
       param_names.push_back(signals[j].name);
     }
+
     for (size_t j=0; j<systematics.size(); j++) {
       params.push_back(systematics[j].mean);
       param_names.push_back(systematics[j].name);
     }
-
 
     // Make fake data
     std::pair<std::vector<float>, std::vector<int> > data = \
@@ -105,7 +103,7 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
 
     // Write out samples for debugging
     TFile f((output_path + "lspace.root").c_str(), "recreate");
-    TNtuple* lsclone = (TNtuple*) ls->GetSamples()->Clone("ls");
+    TNtuple* lsclone = dynamic_cast<TNtuple*>(ls->get_samples()->Clone("ls"));
     lsclone->Write();
     lsclone->Delete();
     f.Close();
@@ -117,21 +115,7 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
     plot_fit(ls->get_best_fit(), live_time, signals, systematics, observables,
              data.first, data.second, output_path);
 
-    /*
-    // Signal sensitivity, Bayesian for now
-    TH1F* signal_projection = ls->get_projection(signal_name);
-    int bin = 0;
-    do {
-      bin++;
-    } while ((signal_projection->Integral(0, bin) /
-              signal_projection->Integral()) < confidence);
-
-    float limit = signal_projection->GetBinLowEdge(bin) +
-                  signal_projection->GetBinWidth(bin);
-
-    std::cout << "Signal limit: " << limit << std::endl;
-    limits.push_back(limit);
-    */
+    // TODO: Compute sensitivity
 
     delete ls;
   }
@@ -209,30 +193,7 @@ int main(int argc, char* argv[]) {
              fc.burnin_fraction, fc.confidence, fc.experiments, fc.live_time,
              fc.debug_mode, output_path);
 
-
-  /*
-  // Limits
-  float average_limit;
-  std::sort(limits.begin(), limits.end());
-  float half = 1.0 * ((limits.size() + 1) / 2) - 1;
-  average_limit = (limits.at(static_cast<int>(std::floor(half))) +
-                   limits.at(static_cast<int>(std::ceil(half)))) / 2;
-
-  std::cout << "Average-limit sensitivity " << average_limit << " at "
-            << fc.confidence * 100 << "\% CL" << std::endl;
-
-  TCanvas c1;
-  TNtuple ntlimits("ntlimits", "ntlimits", "limit");
-  for (size_t i=0; i<limits.size(); i++) {
-    ntlimits.Fill(limits[i]);
-  }
-  ntlimits.Draw("limit>>_hlim", "", "goff");
-  TH1F* hlim = dynamic_cast<TH1F*>(gDirectory->FindObject("_hlim"));
-  assert(hlim);
-  hlim->Draw();
-  c1.SaveAs((fc.output_file + "_limits.pdf").c_str());
-  c1.SaveAs((fc.output_file + "_limits.C").c_str());
-  */
+  // TODO: Find average (median) limit
 
   return 0;
 }

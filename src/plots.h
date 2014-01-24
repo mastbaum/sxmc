@@ -26,8 +26,6 @@ extern const int colors[27];
 /**
  * Plot the results of a fit.
  *
- * \todo Don't hard-code plot types (int/ext/cosmogenic); extend config file.
- *
  * \param best_fit The best-fit point, used for normalizations
  * \param live_time Live time in y, used for display only
  * \param signals List of Signals, used for PDFs

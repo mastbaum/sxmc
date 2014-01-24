@@ -135,7 +135,6 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
               std::vector<Observable> observables,
               std::vector<float> data, std::vector<int> weights,
               std::string output_path) {
-
   std::vector<std::string> categories;
   categories.push_back("full");
   for (size_t i=0; i<signals.size(); i++) {
@@ -168,10 +167,6 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
     std::vector<TH1D*> totals(observables.size(), NULL);
     all_totals[categories[j]] = totals;
   }
-
-//  std::vector<TH1D*> external_total(observables.size(), NULL);
-//  std::vector<TH1D*> cosmogenic_total(observables.size(), NULL);
-//  std::vector<TH1D*> fit_total(observables.size(), NULL);
 
   // Extract best-fit parameter values
   std::vector<float> params;
@@ -254,9 +249,8 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
   }  // signals
 
   for (size_t i=0; i<observables.size(); i++) {
-    TH1D* hdata = \
-      (TH1D*) SpectralPlot::make_like(all_plots["full"][i].histograms[0],
-                                      "hdata");
+    TH1D* hdata = (TH1D*) SpectralPlot::make_like(
+        all_plots["full"][i].histograms[0], "hdata");
 
     hdata->SetMarkerStyle(20);
     hdata->SetLineColor(kBlack);
@@ -275,8 +269,8 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
           (TH1D*) all_totals[categories[j]][i]->Clone(categories[j].c_str());
         t->SetLineStyle(2);
         all_plots[categories[j]][i].add(t, "Total", "hist");
-        all_plots["full"][i].add(all_totals[categories[j]][i],
-                                 categories[j], "hist");
+        all_plots["full"][i].add(
+            all_totals[categories[j]][i], categories[j], "hist");
       }
     }
 

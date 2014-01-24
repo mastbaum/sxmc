@@ -79,7 +79,7 @@
       "title": "^{8}B #nu ES",
       "rate": 1536.7,  // SNO,
       "chain": true,
-      "pdfs": {
+      "signals": {
         "b8_scintillator": {
           "title": "^{8}B #nu ES in scintillator",
           "files": ["/path/to/b8_scintillator.hdf5"],

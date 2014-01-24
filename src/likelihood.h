@@ -70,7 +70,12 @@ class LikelihoodSpace {
     std::map<std::string, Interval>
     extract_best_fit(float& ml, ErrorType error_type=ERROR_CONTOUR);
 
-    TNtuple* GetSamples(){return samples;};
+    /**
+     * Get a pointer to the TNtuple of samples.
+     *
+     * \returns A pointer to the samples
+     */
+    const TNtuple* get_samples() { return samples; }
 
   private:
     TNtuple* samples;  //!< Samples of the likelihood function

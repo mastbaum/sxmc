@@ -106,6 +106,9 @@ class Signal {
                     int nfields, std::vector<Observable> &observables,
                     std::vector<Systematic> &systematics);
 
+    /**
+     * Compute an efficiency based on central value of systematics.
+     */
     void set_efficiency(std::vector<Systematic> &systematics);
 
     /**

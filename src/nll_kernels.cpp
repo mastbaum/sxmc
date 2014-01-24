@@ -60,7 +60,7 @@ void jump_decider_device(RNGState* rng, double* nll_current,
   double u = gRandom->Uniform();
 #endif
 
-  // metropolis algorithm
+  // Metropolis algorithm
   double np = nll_proposed[0];
   double nc = nll_current[0];
   if (debug_mode || (np < nc || u <= exp(nc - np))) {
@@ -71,7 +71,7 @@ void jump_decider_device(RNGState* rng, double* nll_current,
     accepted[0] += 1;
   }
 
-  // append all steps to jump buffer
+  // Append all steps to jump buffer
   int count = counter[0];
   for (unsigned i=0; i<nparameters; i++) {
     jump_buffer[count * (nparameters + 1) + i] = v_current[i];
@@ -94,7 +94,7 @@ HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
     double s = 0;
     for (size_t j=0; j<ns; j++) {
       float v = lut[j * ne + i];
-      s += pars[j] * (!isnan(v) ? v : 0);  // handle nans from empty hists
+      s += pars[j] * (!isnan(v) ? v : 0);  // Handle nans from empty hists
     }
     sum += log(s) * dataweights[i];
   }
@@ -141,7 +141,7 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
                       const double* sigmas,
                       const double* events_total,
                       double* nll) {
-  // total from sum over events, once
+  // Total from sum over events, once
   double sum = -events_total[0];
 
   if (isnan(sum)) {
@@ -150,18 +150,18 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
   }
 
   for (unsigned i=0; i<nparameters; i++) {
-    // non-negative rates
+    // Non-negative rates
     if (i < nsignals && pars[i] < 0) {
       nll[0] = 1e18;
       return;      
     }
 
-    // normalization constraints
+    // Normalization constraints
     if (i < nsignals) {
       sum += pars[i];
     }
 
-    // gaussian constraints
+    // Gaussian constraints
     if (sigmas[i] > 0) {
       double x = (pars[i] - means[i]) / sigmas[i];
       sum += x * x;

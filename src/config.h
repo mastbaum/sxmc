@@ -18,6 +18,28 @@ class TH1D;
 class TH2F;
 
 /**
+ * Container for signal parameters extracted from config JSON object.
+ */
+struct SignalParams {
+  float nexpected;  //!< Number of events expected
+  float sigma;  //!< Gaussian constraint
+  std::string title;  //!< Title of signal (for plotting)
+  std::string category;  //!< Category (for plotting)
+  std::vector<std::string> files;  //!< List of filenames with dataset
+};
+
+
+/**
+ * Extract the parameters from a JSON::Value configuration object.
+ *
+ * \param params The JSON object
+ * \param scale Scaling factor applied to the expected rate and sigma
+ * \returns A SignalParams with the parameters set
+ */
+SignalParams get_signal_params(const Json::Value& params, float scale=1.0);
+
+
+/**
  * Get the index of an object in a vector.
  *
  * If the object isn't found, add it to the end and then return the index.
@@ -27,7 +49,7 @@ class TH2F;
  * \param o The object to locate
  * \return The index of the object
  */
-template <class T>
+template <typename T>
 size_t get_index_with_append(std::vector<T>& v, T o);
 
 
@@ -52,15 +74,15 @@ class FitConfig {
     /** Pretty-print the fit parameters */
     void print() const;
 
-    unsigned experiments;  //!< number of ensemble experiments
-    unsigned steps;  //!< number of mcmc steps
-    float confidence;  //!< confidence level for results (e.g. 0.9)
-    float live_time;  //!< experiment live time in years
-    float efficiency_correction;  //!< overall efficiency correction
-    float burnin_fraction;  //!< fraction of steps to use for burn-in period
-    bool debug_mode;  //!< enable/disable debugging mode (accept/save all)
-    std::string output_file;  //!< base filename for output
-    std::vector<Signal> signals;  //!< signal histograms and metadata
+    unsigned experiments;  //!< Number of experiments in ensemble
+    unsigned steps;  //!< Number of MCMC steps
+    float confidence;  //!< Confidence level for results (e.g. 0.9)
+    float live_time;  //!< Experiment live time in years
+    float efficiency_correction;  //!< Overall efficiency correction
+    float burnin_fraction;  //!< Fraction of steps to use for burn-in period
+    bool debug_mode;  //!< Enable/disable debugging mode (accept/save all)
+    std::string output_file;  //!< Base filename for output
+    std::vector<Signal> signals;  //!< Signal histograms and metadata
     std::vector<Systematic> systematics;  //!< Systematics used in PDFs
     std::vector<Observable> observables;  //!< Observables used in PDFs
     std::vector<Observable> cuts;  //!< Cuts applied before fit

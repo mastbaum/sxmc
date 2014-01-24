@@ -9,41 +9,11 @@
 #include <assert.h>
 #include <json/value.h>
 #include <json/reader.h>
-#include <TFile.h>
-#include <TH1.h>
-#include <TH1D.h>
-#include <TH2F.h>
-#include <TMath.h>
 
-#include <sxmc/signals.h>
 #include <sxmc/config.h>
-#include <sxmc/utils.h>
-#include <sxmc/generator.h>
+#include <sxmc/signals.h>
 
-template <class T>
-size_t get_index_with_append(std::vector<T>& v, T o) {
-  size_t index = std::find(v.begin(), v.end(), o) - v.begin();
-  if (index == v.size()) {
-    v.push_back(o);
-    return v.size() - 1;
-  }
-  return index;
-}
-
-
-/**
- * Container for signal parameters extracted from config JSON object.
- */
-struct SignalParams {
-  float nexpected;  //!< Number of events expected
-  float sigma;  //!< Gaussian constraint
-  std::string title;  //!< Title of signal (for plotting)
-  std::string category;  //!< Category (for plotting)
-  std::vector<std::string> files;  //!< List of filenames with dataset
-};
-
-
-SignalParams get_signal_params(const Json::Value& params, float scale=1.0) {
+SignalParams get_signal_params(const Json::Value& params, float scale) {
   SignalParams sp;
   assert(params.isMember("rate"));
   sp.nexpected = params["rate"].asFloat() * scale;
@@ -55,6 +25,17 @@ SignalParams get_signal_params(const Json::Value& params, float scale=1.0) {
     sp.files.push_back((*it).asString());
   }
   return sp;
+}
+
+
+template <typename T>
+size_t get_index_with_append(std::vector<T>& v, T o) {
+  size_t index = std::find(v.begin(), v.end(), o) - v.begin();
+  if (index == v.size()) {
+    v.push_back(o);
+    return v.size() - 1;
+  }
+  return index;
 }
 
 
@@ -197,7 +178,7 @@ FitConfig::FitConfig(std::string filename) {
   for (size_t i=0; i<this->systematics.size(); i++) {
     std::string field_name = this->systematics[i].observable_field;
 
-    // systematic observable must be an observable or a cut
+    // Systematic observable must be an observable or a cut
     size_t index = (std::find(this->sample_fields.begin(),
                               this->sample_fields.end(),
                               field_name) -
@@ -206,19 +187,20 @@ FitConfig::FitConfig(std::string filename) {
 
     this->systematics[i].observable_field_index = index;
 
-    // add non-observable parameters
+    // Add non-observable parameters
     if (this->systematics[i].type != pdfz::Systematic::RESOLUTION_SCALE) {
       continue;
     }
-    // we want to store the truth value in our sample so we can use it to
-    // manipulate the observed value correctly when we adjust this systematic
+
+    // Store the truth value in our sample so we can use it to manipulate the
+    // observed value correctly when we adjust this systematic
     field_name = this->systematics[i].truth_field;
     index = get_index_with_append<std::string>(this->sample_fields,
                                                field_name);
     this->systematics[i].truth_field_index = index;
   }
 
-  // signal parameters
+  //// Signal parameters
   std::vector<std::string> signal_names;
   for (Json::Value::iterator it=fit_params["signals"].begin();
        it!=fit_params["signals"].end(); ++it) {
@@ -237,7 +219,7 @@ FitConfig::FitConfig(std::string filename) {
       continue;
     }
 
-    std::cout << "FitConfig: Loading data for " << name << std::endl;
+    std::cout << "FitConfig: Loading signal " << name << std::endl;
 
     const Json::Value signal_params = all_signals[name];
     const float scale = this->live_time * this->efficiency_correction;
@@ -246,7 +228,7 @@ FitConfig::FitConfig(std::string filename) {
       // Multiple contributions to signal
       if (signal_params.get("chain", true).asBool()) {
         // Chained
-        std::cerr << "Chaining not implemented" << std::endl;
+        std::cerr << "Chaining yet not implemented" << std::endl;
         assert(false);
       }
       else {

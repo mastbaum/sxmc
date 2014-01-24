@@ -12,16 +12,6 @@
 class TNtuple;
 
 /**
- * A container for a range of values
- */
-template <class T>
-struct Range {
-  T min;  //!< minimum value
-  T max;  //!< maximum value
-};
-
-
-/**
  * Get a value from a TNtuple by event ID and field name.
  *
  * \param nt The source TNtuple

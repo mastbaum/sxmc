@@ -12,6 +12,43 @@
 #include <sxmc/signals.h>
 
 std::pair<std::vector<float>, std::vector<int> >
+make_fake_dataset(std::vector<Signal>& signals,
+                  std::vector<Systematic>& systematics,
+                  std::vector<Observable>& observables,
+                  std::vector<double> params, bool poisson, int maxsamples) {
+  std::cout << "make_fake_dataset: Generating dataset..." << std::endl;
+
+  std::vector<double> syst_vals;
+  for (size_t i=signals.size(); i<signals.size() + systematics.size(); i++) {
+    syst_vals.push_back(params[i]);
+  }
+
+  std::vector<float> upper;
+  std::vector<float> lower;
+  for (size_t i=0; i<observables.size(); i++) {
+    upper.push_back(observables[i].upper);
+    lower.push_back(observables[i].lower);
+  }
+
+  std::vector<float> events;
+  std::vector<int> weights;
+  std::vector<unsigned> observed(signals.size());
+  for (size_t i=0; i<signals.size(); i++) {
+    observed[i] = \
+      dynamic_cast<pdfz::EvalHist*>(signals[i].histogram)->RandomSample(
+        events, weights, params[i], syst_vals,upper, lower,
+        poisson, maxsamples);
+
+    std::cout << "make_fake_dataset: " << signals[i].name << ": "
+              << observed[i] << " events (" << signals[i].nexpected
+              << " expected)" << std::endl;
+  }
+
+  return std::make_pair(events, weights);
+}
+
+
+std::pair<std::vector<float>, std::vector<int> >
 sample_pdf(TH1* hist, long int nsamples, long int maxsamples) {
   std::vector<float> events;
   std::vector<int> weights;
@@ -31,17 +68,15 @@ sample_pdf(TH1* hist, long int nsamples, long int maxsamples) {
       for (int j=0; j<hist->GetNbinsY(); j++) {
         for (int k=0; k<hist->GetNbinsZ(); k++) {
           double height = hist->GetBinContent(i+1, j+1, k+1);
+          int idx = \
+            k + j*hist->GetNbinsZ() + i*hist->GetNbinsY()*hist->GetNbinsZ();
           if (nsamples * (height / histint) > maxperbin) {
             int weight = ((nsamples * (height / histint)) / maxperbin) + 1;
             hist->SetBinContent(i+1, j+1, k+1, height/weight);
-            histweights[k +
-                        j*hist->GetNbinsZ() + 
-                        i*hist->GetNbinsY()*hist->GetNbinsZ()] = weight;
+            histweights[idx] = weight;
           }
           else {
-            histweights[k +
-                        j*hist->GetNbinsZ() +
-                        i*hist->GetNbinsY()*hist->GetNbinsZ()] = 1.0;
+            histweights[idx] = 1.0;
           }
         }
       }
@@ -54,10 +89,10 @@ sample_pdf(TH1* hist, long int nsamples, long int maxsamples) {
     for (int i=0; i<hist->GetNbinsX(); i++) {
       for (int j=0; j<hist->GetNbinsY(); j++) {
         for (int k=0; k<hist->GetNbinsZ(); k++) {
-          totalweight += (hist->GetBinContent(i+1, j+1, k+1) *
-                          histweights[k +
-                                      j*hist->GetNbinsZ() +
-                                      i*hist->GetNbinsY()*hist->GetNbinsZ()]);
+          int idx = \
+            k + j*hist->GetNbinsZ() + i*hist->GetNbinsY()*hist->GetNbinsZ();
+          totalweight += \
+            hist->GetBinContent(i+1, j+1, k+1) * histweights[idx];
         }
       }
     }
@@ -159,43 +194,6 @@ sample_pdf(TH1* hist, long int nsamples, long int maxsamples) {
 
   std::cout << "make_fake_dataset: Made " << weights.size()
             << ", weighted to " << nsamples << std::endl;
-  return std::make_pair(events,weights);
-}
-
-
-std::pair<std::vector<float>, std::vector<int> >
-make_fake_dataset(std::vector<Signal>& signals,
-                  std::vector<Systematic>& systematics,
-                  std::vector<Observable>& observables,
-                  std::vector<double> params, bool poisson, int maxsamples) {
-  std::cout << "make_fake_dataset: Generating dataset..." << std::endl;
-
-  std::vector<double> syst_vals;
-  for (size_t i=signals.size(); i<signals.size() + systematics.size(); i++) {
-    syst_vals.push_back(params[i]);
-  }
-
-  std::vector<float> upper;
-  std::vector<float> lower;
-  for (size_t i=0; i<observables.size(); i++) {
-    upper.push_back(observables[i].upper);
-    lower.push_back(observables[i].lower);
-  }
-
-  std::vector<float> events;
-  std::vector<int> weights;
-  std::vector<unsigned> observed(signals.size());
-  for (size_t i=0; i<signals.size(); i++) {
-    observed[i] = \
-      dynamic_cast<pdfz::EvalHist*>(signals[i].histogram)->RandomSample(
-        events, weights, params[i], syst_vals,upper, lower,
-        poisson, maxsamples);
-
-    std::cout << "make_fake_dataset: " << signals[i].name << ": "
-              << observed[i] << " events (" << signals[i].nexpected
-              << " expected)" << std::endl;
-  }
-
   return std::make_pair(events,weights);
 }
 

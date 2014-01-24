@@ -33,7 +33,6 @@
  * \param poisson If true, Poisson-distribute the signal rates
  * \return Array with samples
  */
-
 std::pair<std::vector<float>, std::vector<int> >
 make_fake_dataset(std::vector<Signal>& signals,
                   std::vector<Systematic>& systematics,
@@ -41,15 +40,17 @@ make_fake_dataset(std::vector<Signal>& signals,
                   std::vector<double> params,
                   bool poisson=true, int maxsamples=1e7);
 
-/* Uses ROOT to sample a histogram, but determines
- * whether it is a TH1,TH2,TH3 and responds appropriately
+
+/**
+ * Sample a ROOT TH1 (TH1, TH2, or TH3) histogram.
  */
 std::pair<std::vector<float>, std::vector<int> >
 sample_pdf(TH1* hist, long int nsamples, long int maxsamples=1e7);
 
 
-// Is just TMath::Nint redefined here to get away with bug
-// compiling the TMath header anywhere you have cuda headers
+/**
+ * TMath::Nint clone to avoid clash with CUDA headers.
+ */
 unsigned nint(float nexpected);
 
 #endif  // __GENERATOR_H__
