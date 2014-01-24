@@ -1,15 +1,13 @@
 Signal Extraction with MCMC
 ===========================
-A GPU-accelerated fit program which calculates fully frequentist confidence
-intervals or limits, computing the likelihood space with a Markov Chain
-Monte Carlo.
+A GPU-accelerated unbinned maximum likelihood fit using a Markov Chain Monte
+Carlo, intended for calculating confidence intervals or limits.
 
 Building
 --------
 `sxmc` requires the following libraries:
 
 * [ROOT](http://root.cern.ch)
-* [HDF5](http://www.hdfgroup.org/HDF5/doc/index.html)
 * [Doxygen](http://doxygen.org) (if building documentation)
 
 It also uses [hemi](https://github.com/harrism/hemi), which is included as a
@@ -48,13 +46,12 @@ The output is placed into the `doc` directory.
 
 Usage
 -----
-1. Create HDF5 data files: The data used to build the PDFs is stored in a row-
-   major array format in HDF5 files. The column labels are specified in the
-   fit configuration file.
+1. Create ROOT data files: The data used to build the PDFs is stored in
+   TNtuples. The branch names match those used in the configuration file.
 
 2. Configure fit: Set up the fit parameters and signal PDFs using a JSON-format
    configuration file. An example is provided in `config/`.
 
-3. To calculate signal sensitivity, run:
-   `$ ./bin/sensitivity config/your_file.json`
+3. To run fits:
+   `$ ./bin/sxmc config/your_file.json output_dir`
 

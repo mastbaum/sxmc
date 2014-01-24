@@ -52,7 +52,6 @@ struct Systematic {
 };
 
 
-
 /**
  * \class Signal
  *
@@ -60,84 +59,83 @@ struct Systematic {
  */
 class Signal {
   public:
-
     /**
      * Construct a Signal from a list of root files
      *
      * \param filenames
      */ 
-    Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
-        std::vector<std::string>& sample_fields,
-        std::vector<Observable>& observables,
-        std::vector<Observable>& cuts,
-        std::vector<Systematic>& systematics,
-        std::vector<std::string>& filenames);
-    /**
-     * Construct a Signal from a list of hdf5 files
-     *
-     * \param filenames
-     */ 
-    Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
-        std::vector<std::string>& hdf5_fields,
-        std::vector<std::string>& sample_fields,
-        std::vector<Observable>& observables,
-        std::vector<Observable>& cuts,
-        std::vector<Systematic>& systematics,
-        std::vector<std::string>& filenames);
+    Signal(std::string _name, std::string _title, float _nexpected,
+           float _sigma, std::string _category,
+           std::vector<std::string>& sample_fields,
+           std::vector<Observable>& observables,
+           std::vector<Observable>& cuts,
+           std::vector<Systematic>& systematics,
+           std::vector<std::string>& filenames);
+ 
     /**
      * Construct a Signal from a list of samples and weights 
      *
      * \param samples
      */ 
-    Signal(std::string _name, std::string _title, float _nexpected, float _sigma, std::string _category,
-        std::vector<Observable>& observables,
-        std::vector<Observable>& cuts,
-        std::vector<Systematic>& systematics,
-        std::vector<float>& samples,
-        std::vector<std::string>& sample_fields,
-        std::vector<int>& weights);
+    Signal(std::string _name, std::string _title, float _nexpected,
+           float _sigma, std::string _category,
+           std::vector<Observable>& observables,
+           std::vector<Observable>& cuts,
+           std::vector<Systematic>& systematics,
+           std::vector<float>& samples,
+           std::vector<std::string>& sample_fields,
+           std::vector<int>& weights);
 
     std::string name;  //!< string identifier
     std::string title;  //!< histogram title in ROOT-LaTeX format
-    std::string category; //!< category like external, cosmogenic, etc for plotting purposes
+    std::string category;  //!< category like external, cosmogenic, etc.
+                           //!< for plotting purposes
     double nexpected;  //!< events expected in this fit
     double sigma;  //!< fractional uncertainty
-    double efficiency; //!< Fraction of generated events that make it past cuts (not counting the efficiency correction)
+    double efficiency;  //!< Fraction of generated events that make it past
+                        //!< cuts (not counting the efficiency correction)
     size_t nevents;  //!< number of events in PDF
-    size_t nevents_physical;  //!< number of simulated events used to make pdf (nevents/efficiency)
+    size_t n_mc;  //!< number of simulated events used to make pdf
     pdfz::Eval* histogram;  //!< PDF
 
   protected:
-
-    void build_pdfz(std::vector<float> &samples,std::vector<int> &weights, int nfields,
-        std::vector<Observable> &observables,
-        std::vector<Systematic> &systematics);
+    /**
+     * Construct the pdfz histogram object.
+     */
+    void build_pdfz(std::vector<float> &samples,std::vector<int> &weights,
+                    int nfields, std::vector<Observable> &observables,
+                    std::vector<Systematic> &systematics);
 
     void set_efficiency(std::vector<Systematic> &systematics);
 
+    /**
+     * Apply an exclusion region that removes part of the dataset.
+     */
     void apply_exclusions(std::vector<float>& samples,
-        std::vector<std::string>& sample_fields,
-        std::vector<int>& weights,
-        std::vector<Observable>& observables);
+                          std::vector<std::string>& sample_fields,
+                          std::vector<int>& weights,
+                          std::vector<Observable>& observables);
 
+    /**
+     * Apply an exclusion region that removes part of the dataset.
+     */
     void apply_exclusions(std::vector<float>& samples,
-        std::vector<std::string>& sample_fields,
-        std::vector<Observable>& observables){
+                          std::vector<std::string>& sample_fields,
+                          std::vector<Observable>& observables) {
       std::vector<int> fake;
-      apply_exclusions(samples,sample_fields,fake,observables);
+      apply_exclusions(samples, sample_fields, fake, observables);
     };
 
+    /**
+     * Copy the requested sample fields from the fields of the same name
+     * in the dataset array.
+     */
     void read_dataset_to_samples(std::vector<float>& samples,
-        std::vector<float>& dataset,
-        std::vector<std::string>& sample_fields,
-        std::vector<std::string>& dataset_fields,
-        std::vector<Observable>& cuts);
-
-    void do_r3_hack(std::vector<float>& samples,
-        std::vector<std::string>& sample_fields,
-        std::vector<Observable>& observables);
+                                 std::vector<float>& dataset,
+                                 std::vector<std::string>& sample_fields,
+                                 std::vector<std::string>& dataset_fields,
+                                 std::vector<Observable>& cuts);
 };
-
 
 #endif  // __SIGNALS_H__
 
