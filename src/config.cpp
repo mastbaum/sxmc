@@ -12,6 +12,7 @@
 
 #include <sxmc/config.h>
 #include <sxmc/signals.h>
+#include <sxmc/utils.h>
 
 SignalParams get_signal_params(const Json::Value& params, float scale) {
   SignalParams sp;
@@ -25,17 +26,6 @@ SignalParams get_signal_params(const Json::Value& params, float scale) {
     sp.files.push_back((*it).asString());
   }
   return sp;
-}
-
-
-template <typename T>
-size_t get_index_with_append(std::vector<T>& v, T o) {
-  size_t index = std::find(v.begin(), v.end(), o) - v.begin();
-  if (index == v.size()) {
-    v.push_back(o);
-    return v.size() - 1;
-  }
-  return index;
 }
 
 

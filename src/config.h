@@ -40,20 +40,6 @@ SignalParams get_signal_params(const Json::Value& params, float scale=1.0);
 
 
 /**
- * Get the index of an object in a vector.
- *
- * If the object isn't found, add it to the end and then return the index.
- * Useful for creating unique ordered lists.
- *
- * \param v The vector
- * \param o The object to locate
- * \return The index of the object
- */
-template <typename T>
-size_t get_index_with_append(std::vector<T>& v, T o);
-
-
-/**
  * \class FitConfig
  * \brief Manages the configuration of a fit
  *
@@ -86,14 +72,8 @@ class FitConfig {
     std::vector<Systematic> systematics;  //!< Systematics used in PDFs
     std::vector<Observable> observables;  //!< Observables used in PDFs
     std::vector<Observable> cuts;  //!< Cuts applied before fit
-
-    /**
-     * Name and order of fields in samples.
-     *
-     * This includes all observable fields and all systematic fields (in the
-     * case where a cut is placed based on a field effected by a systematic)
-     */
-    std::vector<std::string> sample_fields;
+    std::vector<std::string> sample_fields;  //!< Names of sample array fields:
+                                             //!< observables and systematics
 };
 
 #endif  // __CONFIG_H__

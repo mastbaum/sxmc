@@ -9,8 +9,10 @@
 #include <TH1F.h>
 #include <TDirectory.h>
 
+#include <sxmc/contour.h>
 #include <sxmc/likelihood.h>
-#include <sxmc/errors.h>
+#include <sxmc/error_estimator.h>
+#include <sxmc/projection.h>
 #include <sxmc/utils.h>
 
 LikelihoodSpace::LikelihoodSpace(TNtuple* _samples) {
@@ -161,10 +163,10 @@ LikelihoodSpace::extract_best_fit(float& ml, ErrorType error_type) {
   // Extract errors
   ErrorEstimator* error = NULL;
   if (error_type == ERROR_PROJECTION) {
-    error = new ProjectionError(this);
+    error = new sxmc::errors::Projection(this);
   }
   else if (error_type == ERROR_CONTOUR) {
-    error = new ContourError(this);
+    error = new sxmc::errors::Contour(this);
   }
   else {
     std::cerr << "LikelihoodSpace::extract_best_fit: Unknown error type"

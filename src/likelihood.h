@@ -10,13 +10,14 @@
 #include <map>
 #include <string>
 
-#include <sxmc/errors.h>
+#include <sxmc/error_estimator.h>
+#include <sxmc/interval.h>
 
 class TNtuple;
 class TH1F;
 
 /**
- * Likelihood space.
+ * Samples from a likelihood function.
  *
  * Wraps a TNtuple containing samples from the likelihood function, providing
  * statistics functions.

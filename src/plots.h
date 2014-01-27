@@ -10,7 +10,7 @@
 #include <vector>
 #include <string>
 
-#include <sxmc/errors.h>
+#include <sxmc/error_estimator.h>
 #include <sxmc/signals.h>
 
 class TCanvas;
