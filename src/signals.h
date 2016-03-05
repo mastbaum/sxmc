@@ -86,30 +86,30 @@ class Signal {
            std::vector<std::string>& sample_fields,
            std::vector<int>& weights);
 
-    std::string name;  //!< string identifier
-    std::string title;  //!< histogram title in ROOT-LaTeX format
-    std::string category;  //!< category like external, cosmogenic, etc.
+    std::string name;  //!< String identifier
+    std::string title;  //!< Histogram title in ROOT-LaTeX format
+    std::string category;  //!< Category like external, cosmogenic, etc.
                            //!< for plotting purposes
-    double nexpected;  //!< events expected in this fit
-    double sigma;  //!< fractional uncertainty
+    double nexpected;  //!< Events expected in this fit
+    double sigma;  //!< Fractional uncertainty
     double efficiency;  //!< Fraction of generated events that make it past
                         //!< cuts (not counting the efficiency correction)
-    size_t nevents;  //!< number of events in PDF
-    size_t n_mc;  //!< number of simulated events used to make pdf
+    size_t nevents;  //!< Number of events in PDF
+    size_t n_mc;  //!< Number of simulated events used to make pdf
     pdfz::Eval* histogram;  //!< PDF
 
   protected:
     /**
      * Construct the pdfz histogram object.
      */
-    void build_pdfz(std::vector<float> &samples,std::vector<int> &weights,
+    void build_pdfz(std::vector<float> &samples, std::vector<int> &weights,
                     int nfields, std::vector<Observable> &observables,
-                    std::vector<Systematic> &systematics);
+                    std::vector<Systematic>& systematics);
 
     /**
      * Compute an efficiency based on central value of systematics.
      */
-    void set_efficiency(std::vector<Systematic> &systematics);
+    void set_efficiency(std::vector<Systematic>& systematics);
 
     /**
      * Apply an exclusion region that removes part of the dataset.

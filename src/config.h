@@ -20,23 +20,25 @@ class TH2F;
 /**
  * Container for signal parameters extracted from config JSON object.
  */
-struct SignalParams {
+class SignalParams {
+public:
+  /** Default constructor, does no initialization. */
+  SignalParams() {}
+
+  /**
+   * Extract the parameters from a JSON::Value configuration object.
+   *
+   * \param params The JSON object
+   * \param scale Scaling factor applied to the expected rate and sigma
+   */
+  SignalParams(const Json::Value& params, float scale=1.0);
+
   float nexpected;  //!< Number of events expected
   float sigma;  //!< Gaussian constraint
   std::string title;  //!< Title of signal (for plotting)
   std::string category;  //!< Category (for plotting)
   std::vector<std::string> files;  //!< List of filenames with dataset
 };
-
-
-/**
- * Extract the parameters from a JSON::Value configuration object.
- *
- * \param params The JSON object
- * \param scale Scaling factor applied to the expected rate and sigma
- * \returns A SignalParams with the parameters set
- */
-SignalParams get_signal_params(const Json::Value& params, float scale=1.0);
 
 
 /**

@@ -14,18 +14,16 @@
 #include <sxmc/signals.h>
 #include <sxmc/utils.h>
 
-SignalParams get_signal_params(const Json::Value& params, float scale) {
-  SignalParams sp;
+SignalParams::SignalParams(const Json::Value& params, float scale) {
   assert(params.isMember("rate"));
-  sp.nexpected = params["rate"].asFloat() * scale;
-  sp.sigma = params.get("constraint", 0.0).asFloat() * scale;
-  sp.title = params.get("title", "Other").asString();
-  sp.category = params.get("category", "").asString();
+  nexpected = params["rate"].asFloat() * scale;
+  sigma = params.get("constraint", 0.0).asFloat() * scale;
+  title = params.get("title", "Other").asString();
+  category = params.get("category", "").asString();
   for (Json::Value::const_iterator it=params["files"].begin();
        it!=params["files"].end(); ++it) {
-    sp.files.push_back((*it).asString());
+    files.push_back((*it).asString());
   }
-  return sp;
 }
 
 
@@ -227,7 +225,7 @@ FitConfig::FitConfig(std::string filename) {
              jt!=signal_params["signals"].end(); ++jt) {
           std::string s_name = jt.key().asString();
           const Json::Value params = signal_params["signals"][s_name];
-          SignalParams sp = get_signal_params(params, scale);
+          SignalParams sp(params, scale);
           this->signals.push_back(
             Signal(s_name, sp.title, sp.nexpected, sp.sigma, sp.category,
                    this->sample_fields, this->observables,  this->cuts,
@@ -237,7 +235,7 @@ FitConfig::FitConfig(std::string filename) {
     }
     else if (signal_params.isMember("files")) {
       // Just one signal
-      SignalParams sp = get_signal_params(signal_params, scale);
+      SignalParams sp(signal_params, scale);
       this->signals.push_back(
         Signal(name, sp.title, sp.nexpected, sp.sigma, sp.category,
                this->sample_fields, this->observables,  this->cuts,
