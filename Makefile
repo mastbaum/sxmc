@@ -79,7 +79,7 @@ build_dirs:
 	@mkdir -p build
 	@mkdir -p build/jsoncpp
 	@mkdir -p bin
-	@$(foreach dir,$(SRCDIRS),mkdir -p build/$(dir))
+	@$(foreach dir,$(SRCDIRS),$(shell mkdir -p build/$(dir)))
 
 includes: include_dir
 	@find src -name *.h -type f -exec cp {} ./include/sxmc \;
