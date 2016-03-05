@@ -39,7 +39,9 @@ SpectralPlot::SpectralPlot(int _line_width, float _xmin, float _xmax,
     this->c->SetLogy();
   }
 
-  this->legend = new TLegend(0.85, 0.15, 0.985, 0.95);
+  this->c->SetRightMargin(0.25);
+
+  this->legend = new TLegend(0.85, 0.15, 0.995, 0.95);
   this->legend->SetFillColor(kWhite);
 }
 
@@ -62,6 +64,9 @@ SpectralPlot::SpectralPlot(const SpectralPlot& o) {
   if (o.logy) {
     this->c->SetLogy();
   }
+
+  this->c->SetRightMargin(o.c->GetRightMargin());
+
   this->legend = (TLegend*) o.legend->Clone("");
 }
 
@@ -159,7 +164,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
       ytitle << "Counts/" << std::setprecision(3)
         << (o->upper - o->lower) / o->bins << " " << o->units
         << "/" << live_time << " y";
-      plots.push_back(SpectralPlot(2, o->lower, o->upper, 1e-2, 1e6,
+      plots.push_back(SpectralPlot(2, o->lower, o->upper, 1e-4, 1e3,
             true, "", o->title, ytitle.str().c_str()));
     }
     all_plots[categories[j]] = plots;

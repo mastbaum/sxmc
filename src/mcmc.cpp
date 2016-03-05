@@ -213,6 +213,7 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
         std::string name = this->parameter_names[j];
         nt->Draw((name + ">>hsproj").c_str());
         TH1F* hsproj = (TH1F*) gDirectory->Get("hsproj");
+        assert(hsproj);
 
         double fit_width = hsproj->GetRMS();
 

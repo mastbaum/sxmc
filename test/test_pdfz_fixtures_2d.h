@@ -2,7 +2,7 @@
 #define __TEST_PDFZ_FIXTURES_2D__
 
 #include <gtest/gtest.h>
-#include "pdfz.h"
+#include <sxmc/pdfz.h>
 
 class EvalHist2DConstructor : public ::testing::Test {
 protected:

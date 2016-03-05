@@ -35,7 +35,7 @@ FitConfig::FitConfig(std::string filename) {
 
   std::ifstream t(filename.c_str());
   std::string data((std::istreambuf_iterator<char>(t)),
-                   std::istreambuf_iterator<char>());
+                    std::istreambuf_iterator<char>());
 
   bool parse_ok = reader.parse(data, root);
   if (!parse_ok) {

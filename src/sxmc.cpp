@@ -58,13 +58,13 @@
  * \returns A list of the upper limits
  */
 std::vector<float> ensemble(std::vector<Signal>& signals,
-                             std::vector<Systematic>& systematics,
-                             std::vector<Observable>& observables,
-                             std::vector<Observable>& cuts,
-                             unsigned steps, float burnin_fraction,
-                             float confidence, unsigned nexperiments,
-                             float live_time, const bool debug_mode,
-                             std::string output_path) {
+                            std::vector<Systematic>& systematics,
+                            std::vector<Observable>& observables,
+                            std::vector<Observable>& cuts,
+                            unsigned steps, float burnin_fraction,
+                            float confidence, unsigned nexperiments,
+                            float live_time, const bool debug_mode,
+                            std::string output_path) {
   std::vector<float> limits;
 
   for (size_t i=0; i<signals.size(); i++) {
@@ -111,7 +111,7 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
     ls->print_best_fit();
     ls->print_correlations();
 
-    // Make spectral plots
+    // Make projection plots
     plot_fit(ls->get_best_fit(), live_time, signals, systematics, observables,
              data.first, data.second, output_path);
 
