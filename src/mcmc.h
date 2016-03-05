@@ -110,8 +110,8 @@ class MCMC {
     unsigned nnllthreads;  //!< number of threads for nll partial sums
     unsigned nreducethreads; //!< number of threads to use in partial sum
                              //!< reduction kernel
-    unsigned blocksize;  //!< size of blocks for per-signal kernels
-    unsigned nblocks;  //!< number of blocks for per-signal kernels
+    //unsigned blocksize;  //!< size of blocks for per-signal kernels
+    //unsigned nblocks;  //!< number of blocks for per-signal kernels
     std::string varlist;  //!< string identifier list for ntuple indexing
     hemi::Array<double>* parameter_means;  //!< parameter central values
     hemi::Array<double>* parameter_sigma;  //!< parameter Gaussian uncertainty

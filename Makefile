@@ -9,16 +9,19 @@ OPT_CFLAGS = -g
 OPT_NVCCFLAGS = -DDEBUG 
 endif
 
+ifndef CUDART_ROOT
+$(error CUDART_ROOT is not set)
+endif
+
 JSONCPP_SRC = contrib/jsoncpp-src-0.6.0-rc2/src/lib_json
 JSONCPP_INC = contrib/jsoncpp-src-0.6.0-rc2/include
-
-INCLUDE = -Iinclude -I$(RATROOT)/include -I$(ROOTSYS)/include -I$(RATROOT)/src/stlplus -Icontrib/hemi -I/usr/local/cuda/include -I/opt/local/include -I/opt/cuda-5.0/include -I$(JSONCPP_INC)
+INCLUDE = -Iinclude -I$(CUDART_ROOT)/include -I$(ROOTSYS)/include -Icontrib/hemi -I$(JSONCPP_INC)
 CFLAGS = -DVERBOSE=true $(OPT_CFLAGS) $(INCLUDE)
 GCCFLAGS = -Wall -Werror -Wno-unused-variable -ftrapv -fdiagnostics-show-option  # -Wunused-variable errors with HEMI macros
 NOT_NVCC_CFLAGS =
 NVCCFLAGS = -gencode arch=compute_20,code=sm_20 -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=\"sm_35,compute_35\" -use_fast_math $(OPT_NVCCFLAGS)
 ROOTLIBS =  -lCore -lCint -lRIO -lMathCore -lHist -lGpad -lTree -lTree -lGraf -lm -lPhysics
-LFLAGS = -L$(RATROOT)/lib -lRATEvent_$(RATSYSTEM) -L$(ROOTSYS)/lib $(ROOTLIBS) -L/opt/local/lib
+LFLAGS = -L$(ROOTSYS)/lib $(ROOTLIBS)
 
 # Mac hacks!
 ARCH = $(shell uname)
@@ -56,10 +59,6 @@ TEST_SOURCES = $(wildcard test/*.cpp)
 TEST_OBJECTS = $(TEST_SOURCES:test/%.cpp=$(OBJ_DIR)/test/%.o)
 
 EXE = bin/sxmc
-
-ifndef RATROOT
-$(error RATROOT is not set)
-endif
 
 ifndef ROOTSYS
 $(error ROOTSYS is not set)
@@ -107,7 +106,7 @@ $(EXE): $(OBJECTS) $(JSONCPP_OBJECTS) $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o
 	$(GCC) -o $@ $^ $(CFLAGS) $(LFLAGS) $(CUDA_LFLAGS)
 
 bin/create_test_data:
-	$(GCC) -o $@ test/create_test_data.c $(shell root-config --libs) -I$(shell root-config --incdir)
+	$(GCC) -o $@ test/create_test_data.cpp $(shell root-config --libs) -I$(shell root-config --incdir)
 
 
 ###### Test Infrastructure ############

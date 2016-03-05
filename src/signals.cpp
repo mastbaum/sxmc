@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <iostream>
+#include <string>
 #include <TMath.h>
 
 #include <sxmc/signals.h>
