@@ -37,7 +37,7 @@ FitConfig::FitConfig(std::string filename) {
 
   bool parse_ok = reader.parse(data, root);
   if (!parse_ok) {
-    std::cout  << "FitConfig::FitConfig: JSON parse error:" << std::endl
+    std::cerr  << "FitConfig::FitConfig: JSON parse error:" << std::endl
                << reader.getFormattedErrorMessages();
     throw(1);
   }

@@ -1,8 +1,8 @@
-#include <assert.h>
-#include <stdio.h>
+#include <unistd.h>
+#include <cassert>
+#include <cstdio>
 #include <vector>
 #include <string>
-#include <unistd.h>
 #include <iostream>
 #include <TTree.h>
 #include <TFile.h>
@@ -18,16 +18,16 @@
 namespace sxmc {
   namespace io {
 
-int read_float_vector_ttree(const std::string &filename,
-                            std::vector<float> &data, 
-                            std::vector<unsigned int> &rank,
-                            std::vector<std::string> &ttree_fields) {
-  TFile* f;
+int read_float_vector_ttree(const std::string& filename,
+                            std::vector<float>& data, 
+                            std::vector<unsigned int>& rank,
+                            std::vector<std::string>& ttree_fields) {
+  TFile* f = NULL;
   if (filename.compare(0, 1, ".") == 0) {
-    char filePath[256];
+    char filePath[512];
     assert(getcwd(filePath, sizeof(filePath)) != NULL);
     printf("FILENAME: %s\n",
-           (std::string(filePath)+filename.substr(1)).c_str());
+           (std::string(filePath) + filename.substr(1)).c_str());
     f = TFile::Open((std::string(filePath) + filename.substr(1)).c_str());
   }
   else {
@@ -40,33 +40,36 @@ int read_float_vector_ttree(const std::string &filename,
     return -1;
   }
     
-  // get whatever ttree is in there
+  // Get the first object in the file
   TKey* k = dynamic_cast<TKey*>(f->GetListOfKeys()->First());
+  assert(k);
   TTree* t = dynamic_cast<TTree*>(f->Get(k->GetName()));
+  assert(t);
   int num_entries = t->GetEntries();
 
-  // we will now find all the branches in the ttree
-  // and read out all those that can be stored as floats
+  // Find all the branches in the TTree, read out all those that
+  // can be stored as floats
   TObjArray* oa = t->GetListOfBranches();
-  TIter next(oa);
+  assert(oa);
+  TIter branch_iter(oa);
   TBranch* temp;
   std::vector<TBranch*> temp_branches, branches;
   std::vector<EDataType> temp_types, types;
 
-  while ((temp = dynamic_cast<TBranch*>(next()))) {
+  while ((temp = dynamic_cast<TBranch*>(branch_iter()))) {
     temp_branches.push_back(temp);
     temp_types.push_back(kOther_t);
   }
 
-  bool first_file = (ttree_fields.size() == 0);
+  bool first_file = ttree_fields.size() == 0;
 
   // Make a list of all the branches that we can convert to floats
   TClass* cls;
   for (size_t i=0; i<temp_branches.size(); i++) {
     temp_branches[i]->GetExpectedType(cls, temp_types[i]);
 
-    if (temp_types[i] == 3 || temp_types[i] == 5 ||
-        temp_types[i] == 8 || temp_types[i] == 18) {
+    if (temp_types[i] == kInt_t    || temp_types[i] == kFloat_t ||
+        temp_types[i] == kDouble_t || temp_types[i] == kBool_t) {
       types.push_back(temp_types[i]);
       branches.push_back(temp_branches[i]);
       
@@ -75,7 +78,9 @@ int read_float_vector_ttree(const std::string &filename,
       }
       else {
         if (branches.back()->GetName() != ttree_fields[branches.size()-1]) {
-          // our second root file is not organized the same!
+          // Our second root file is not organized the same!
+          std::cerr << "read_float_vector_ttree: Format mismatch between "
+                       "input files!" << std::endl;
           return -1;
         }
       }
@@ -87,25 +92,27 @@ int read_float_vector_ttree(const std::string &filename,
   double* double_values = new double[branches.size()];
   bool* bool_values = new bool[branches.size()];
 
-  for (size_t i=0;i<branches.size();i++) {
+  for (size_t i=0; i<branches.size(); i++) {
     switch (types[i]) {
-      case 3:
+      case kInt_t:
         t->SetBranchAddress(branches[i]->GetName(), &int_values[i],
                             &branches[i]);
         break;
-      case 5:
+      case kFloat_t:
         t->SetBranchAddress(branches[i]->GetName(), &float_values[i],
                             &branches[i]);
         break;
-      case 8:
+      case kDouble_t:
         t->SetBranchAddress(branches[i]->GetName(), &double_values[i],
                             &branches[i]);
         break;
-      case 18:
-        t->SetBranchAddress(branches[i]->GetName(), &(bool_values[i]),
+      case kBool_t:
+        t->SetBranchAddress(branches[i]->GetName(), &bool_values[i],
                             &branches[i]);
         break;
       default:
+        std::cerr << "read_float_vector_ttree: Attempted to read a non-"
+                     "convertible field." << std::endl;
         return -1;
     }
   }
@@ -118,28 +125,25 @@ int read_float_vector_ttree(const std::string &filename,
     rank[0] += num_entries;
   }
 
-  int oldsize = data.size();
+  size_t oldsize = data.size();
   data.resize(oldsize + num_entries * branches.size());
 
-  // read in the values
+  // Read the values into the data output vector
   for (int i=0; i<num_entries; i++) {
     t->GetEntry(i);
     for (size_t j=0; j<branches.size(); j++) {
-      if (types[j] == 3) {
-        data[oldsize + i*branches.size()+j] = \
-          static_cast<float>(int_values[j]);
+      size_t index = oldsize + i * branches.size() + j;
+      if (types[j] == kInt_t) {
+        data[index] = static_cast<float>(int_values[j]);
       }
-      else if (types[j] == 5) {
-        data[oldsize + i*branches.size()+j] = \
-          static_cast<float>(float_values[j]);
+      else if (types[j] == kFloat_t) {
+        data[index] = static_cast<float>(float_values[j]);
       }
-      else if (types[j] == 8) {
-        data[oldsize + i*branches.size()+j] = \
-          static_cast<float>(double_values[j]);
+      else if (types[j] == kDouble_t) {
+        data[index] = static_cast<float>(double_values[j]);
       }
-      else if (types[j] == 18) {
-        data[oldsize + i*branches.size()+j] = \
-          static_cast<float>(bool_values[j]);
+      else if (types[j] == kBool_t) {
+        data[index] = static_cast<float>(bool_values[j]);
       }
     }
   }
