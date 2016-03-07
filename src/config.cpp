@@ -15,8 +15,15 @@
 #include <sxmc/utils.h>
 
 SignalParams::SignalParams(const Json::Value& params, float scale) {
-  assert(params.isMember("rate"));
-  nexpected = params["rate"].asFloat() * scale;
+  assert(params.isMember("rate") || params.isMember("scale"));
+  assert(!(params.isMember("rate") && params.isMember("scale")));
+  if (params.isMember("rate")) {
+    nexpected = params["rate"].asFloat() * scale;
+  }
+  else {
+    // (-) tell signals to scale by the total number of samples
+    nexpected = -scale / params["scale"].asFloat();
+  }
   sigma = params.get("constraint", 0.0).asFloat() * scale;
   title = params.get("title", "Other").asString();
   category = params.get("category", "").asString();
@@ -75,6 +82,12 @@ FitConfig::FitConfig(std::string filename) {
     o.upper = o_json["max"].asFloat();
     assert(o_json.isMember("units"));
     o.units = o_json["units"].asString();
+    o.logscale = o_json.get("logscale", false).asBool();
+    o.yrange.resize(2, -1);
+    if (o_json.isMember("yrange")) {
+      o.yrange[0] = o_json["yrange"][0].asFloat();
+      o.yrange[1] = o_json["yrange"][1].asFloat();
+    }
     if (o_json.isMember("exclude")) {
       o.exclude = true;
       o.exclude_min = o_json["exclude"][0].asFloat();

@@ -264,7 +264,7 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
     if (i % sync_interval == 0 || i == nsteps - 1 || i == burnin_steps - 1) {
       int njumps = jump_counter.readOnlyHostPtr()[0];
       int naccepted = accept_counter.readOnlyHostPtr()[0];
-      std::cout << "MCMC: Step " << i << "/" << nsteps
+      std::cout << "MCMC: Step " << i + 1 << "/" << nsteps
                 << " (" << njumps << " in buffer, "
                 << naccepted << " accepted)" << std::endl;
       for (int j=0; j<njumps; j++) {
@@ -288,7 +288,6 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
   }
 
   std::cout << "MCMC: Elapsed time: " << timer.RealTime() << std::endl;
-
 
   LikelihoodSpace* lspace = new LikelihoodSpace(nt);
 

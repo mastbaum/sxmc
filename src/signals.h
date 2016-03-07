@@ -23,6 +23,8 @@ struct Observable {
   std::string title;  //!< Title in ROOT LaTeX format, for display
   std::string field;  //!< Name of the field (e.g. "energy")
   std::string units;  //!< Units as string, used in plotting
+  bool logscale;  //!< Use log scale y in plots
+  std::vector<float> yrange;  //!< y axis range for plots
   size_t field_index;  //!< Index in the sampled data for this field
   size_t bins;  //!< Number of bins
   float lower;  //!< Lower physical bound

@@ -126,12 +126,11 @@ void Signal::apply_exclusions(std::vector<float>& samples,
 }
 
 
-// TODO: Tidy up
-void Signal::set_efficiency(std::vector<Systematic> &systematics) {
+void Signal::set_efficiency(std::vector<Systematic>& systematics) {
   hemi::Array<double> param_buffer(systematics.size(), true);
   param_buffer.writeOnlyHostPtr();
   for (size_t i=0; i<systematics.size(); i++) {
-    param_buffer.writeOnlyHostPtr()[i] = systematics[i].mean;                             
+    param_buffer.writeOnlyHostPtr()[i] = systematics[i].mean;
   }
   hemi::Array<unsigned> norms_buffer(1, true);
   norms_buffer.writeOnlyHostPtr();
@@ -140,16 +139,24 @@ void Signal::set_efficiency(std::vector<Systematic> &systematics) {
   dynamic_cast<pdfz::EvalHist*>(this->histogram)->EvalAsync(false);
   dynamic_cast<pdfz::EvalHist*>(this->histogram)->EvalFinished();
 
-  // efficiency is the number of events that make it into the histogram over the number of physical events input
-  // note that this is dependent on the systematics, and for now it is calculated with all systematics at means 
+  // Efficiency is the number of events that make it into the histogram
+  // over the number of physical events input.
+  //
+  // Note that this is dependent on the systematics, and for now it is
+  // calculated with all systematics at means.
   this->nevents = norms_buffer.readOnlyHostPtr()[0];
   this->efficiency = this->nevents / (double) (this->n_mc);
+
   // nexpected = physical events expected * efficiency
   this->nexpected *= this->efficiency;
-  // uncertainty scales by efficiency as well
+
+  // Uncertainty scales by efficiency as well
   this->sigma *= this->efficiency;
 
-  std::cout << "Signal::Signal: " << this->nevents << " events remaining. " << this->n_mc-this->nevents << " events cut out of " << this->n_mc << " events. Total efficiency: " << this->efficiency << std::endl;
+  std::cout << "Signal::set_efficiency: "
+            << this->nevents << "/" << this->n_mc << " events remain. "
+            << "Total efficiency " << 100.0 * this->efficiency << "%"
+            << std::endl;
 }
 
 
@@ -226,6 +233,12 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected,
   this->n_mc = rank[0];
   std::vector<float> samples(this->n_mc * sample_fields.size());
 
+  // If user provided a scale factor for MC generation rather than a rate,
+  // nexpected is set negative in the SignalParams.
+  if (this->nexpected < 0) {
+    this->nexpected *= -1.0 * n_mc;
+  }
+
   read_dataset_to_samples(samples, dataset, sample_fields, ttree_fields, cuts);
   apply_exclusions(samples, sample_fields, observables);
 
@@ -257,7 +270,7 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected,
 
   apply_exclusions(samples, sample_fields, weights, observables);
 
-  // build the histogram evaluator
+  // Build the histogram evaluator
   build_pdfz(samples, weights, sample_fields.size(), observables, systematics);
 
   // Evaluate histogram at mean of systematics to see how many

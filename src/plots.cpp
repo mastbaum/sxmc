@@ -5,6 +5,7 @@
 #include <sstream>
 #include <iomanip>
 #include <TCanvas.h>
+#include <TColor.h>
 #include <TH1.h>
 #include <TH1F.h>
 #include <TH2F.h>
@@ -14,15 +15,26 @@
 
 #include <sxmc/plots.h>
 
-const int ncolors = 27;
-const int colors[27] = {kRed,      kGreen,    kBlue,      kMagenta,
-                        kCyan,     kYellow,   kOrange,    kViolet+2,
-                        kRed+2,    kGreen+2,  kBlue+2,    kMagenta+2,
-                        kCyan+2,   kYellow+2, kOrange+2,  kRed-7,
-                        kGreen-7,  kBlue-7,   kMagenta-7, kCyan-7,
-                        kYellow-7, kOrange-7, kRed-6,     kAzure+1,
-                        kTeal+1,   kSpring-9, kAzure-9};
+//const int ncolors = 27;
+//const int colors[27] = {kRed,      kGreen,    kBlue,      kMagenta,
+//                        kCyan,     kYellow,   kOrange,    kViolet+2,
+//                        kRed+2,    kGreen+2,  kBlue+2,    kMagenta+2,
+//                        kCyan+2,   kYellow+2, kOrange+2,  kRed-7,
+//                        kGreen-7,  kBlue-7,   kMagenta-7, kCyan-7,
+//                        kYellow-7, kOrange-7, kRed-6,     kAzure+1,
+//                        kTeal+1,   kSpring-9, kAzure-9};
 
+// SNO+ colors
+const int ncolors = 7;
+const int colors[7] = {
+  TColor::GetColor(153, 153, 153),
+  TColor::GetColor(75,  110, 188),
+  TColor::GetColor(110, 157, 100),
+  TColor::GetColor(121, 93,  136),
+  TColor::GetColor(255, 153, 4),
+  TColor::GetColor(153, 102, 51),
+  TColor::GetColor(0,   204, 204)
+};
 
 
 SpectralPlot::SpectralPlot(int _line_width, float _xmin, float _xmax,
@@ -39,9 +51,10 @@ SpectralPlot::SpectralPlot(int _line_width, float _xmin, float _xmax,
     this->c->SetLogy();
   }
 
-  this->c->SetRightMargin(0.25);
+  this->c->SetRightMargin(0.18);
 
-  this->legend = new TLegend(0.85, 0.15, 0.995, 0.95);
+  this->legend = new TLegend(0.85, 0.1, 0.995, 0.9);
+  this->legend->SetBorderSize(0);
   this->legend->SetFillColor(kWhite);
 }
 
@@ -98,7 +111,9 @@ void SpectralPlot::add(TH1* _h, std::string title, std::string options) {
   this->histograms.push_back(h);
 
   if (this->histograms.size() == 1) {
-    h->SetAxisRange(this->ymin, this->ymax, "Y");
+    if (!(this->ymin == -1 && this->ymax == -1)) {
+      h->SetAxisRange(this->ymin, this->ymax, "Y");
+    }
     h->SetAxisRange(this->xmin, this->xmax, "X");
     h->GetXaxis()->SetLabelFont(132);
     h->GetXaxis()->SetTitleFont(132);
@@ -164,8 +179,9 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
       ytitle << "Counts/" << std::setprecision(3)
         << (o->upper - o->lower) / o->bins << " " << o->units
         << "/" << live_time << " y";
-      plots.push_back(SpectralPlot(2, o->lower, o->upper, 1e-4, 1e3,
-            true, "", o->title, ytitle.str().c_str()));
+      plots.push_back(SpectralPlot(2, o->lower, o->upper,
+                      o->yrange[0], o->yrange[1],
+                      o->logscale, "", o->title, ytitle.str().c_str()));
     }
     all_plots[categories[j]] = plots;
 
@@ -211,7 +227,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
     else if (hpdf_nd->IsA() == TH3D::Class()) {
       hpdf[0] = dynamic_cast<TH3D*>(hpdf_nd)->ProjectionX("hpdf_x");
       hpdf[1] = dynamic_cast<TH3D*>(hpdf_nd)->ProjectionY("hpdf_y");
-      hpdf[2] = dynamic_cast<TH3D*>(hpdf_nd)->ProjectionZ("hpdf_y");
+      hpdf[2] = dynamic_cast<TH3D*>(hpdf_nd)->ProjectionZ("hpdf_z");
     }
 
     std::string n = signals[i].name;
