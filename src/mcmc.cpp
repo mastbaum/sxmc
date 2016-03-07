@@ -140,7 +140,7 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
   for (size_t i=0; i<this->nparameters; i++) {
     float mean = std::max(this->parameter_means->readOnlyHostPtr()[i], 10.0);
     float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
-    float width = (sigma > 0 ? sigma : sqrt(mean));
+    float width = (sigma > 0 ? mean * sigma : sqrt(mean));
     jump_width.writeOnlyHostPtr()[i] = 0.1 * width * scale_factor;
   }
 

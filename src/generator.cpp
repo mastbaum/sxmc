@@ -11,6 +11,7 @@
 #include <sxmc/generator.h>
 #include <sxmc/signals.h>
 
+
 std::pair<std::vector<float>, std::vector<int> >
 make_fake_dataset(std::vector<Signal>& signals,
                   std::vector<Systematic>& systematics,
@@ -36,7 +37,7 @@ make_fake_dataset(std::vector<Signal>& signals,
   for (size_t i=0; i<signals.size(); i++) {
     observed[i] = \
       dynamic_cast<pdfz::EvalHist*>(signals[i].histogram)->RandomSample(
-        events, weights, params[i], syst_vals,upper, lower,
+        events, weights, params[i], syst_vals, upper, lower,
         poisson, maxsamples);
 
     std::cout << "make_fake_dataset: " << signals[i].name << ": "

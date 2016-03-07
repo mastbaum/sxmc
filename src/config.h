@@ -57,7 +57,9 @@ class FitConfig {
      */
     FitConfig(std::string filename);
 
-    virtual ~FitConfig() {}
+    virtual ~FitConfig() {
+      delete data;
+    }
 
     /** Pretty-print the fit parameters */
     void print() const;
@@ -76,6 +78,7 @@ class FitConfig {
     std::vector<Observable> cuts;  //!< Cuts applied before fit
     std::vector<std::string> sample_fields;  //!< Names of sample array fields:
                                              //!< observables and systematics
+    Signal* data;  //!< Data to fit, if any
 };
 
 #endif  // __CONFIG_H__

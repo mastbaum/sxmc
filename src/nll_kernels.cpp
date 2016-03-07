@@ -30,7 +30,7 @@ __global__ void init_device_rngs(int nthreads, unsigned long long seed,
 
 HEMI_DEV_CALLABLE_INLINE
 void pick_new_vector_device(int nthreads, RNGState* rng,
-                            const float* sigma,
+                            const float* jump_width,
                             const double* current_vector,
                             double* proposed_vector) {
   int offset = hemiGetElementOffset();
@@ -39,9 +39,9 @@ void pick_new_vector_device(int nthreads, RNGState* rng,
   for (int i=offset; i<(int)nthreads; i+=stride) {
 #ifdef HEMI_DEV_CODE
     double u = curand_normal(&rng[i]);
-    proposed_vector[i] = current_vector[i] + sigma[i] * u;
+    proposed_vector[i] = current_vector[i] + jump_width[i] * u;
 #else
-    double u = gRandom->Gaus(current_vector[i], sigma[i]);
+    double u = gRandom->Gaus(current_vector[i], jump_width[i]);
     proposed_vector[i] = u;
 #endif
   }
@@ -96,7 +96,9 @@ HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
       float v = lut[j * ne + i];
       s += pars[j] * (!isnan(v) ? v : 0);  // Handle nans from empty hists
     }
-    sum += log(s) * dataweights[i];
+    if (s > 0) {
+      sum += log(s) * dataweights[i];
+    }
   }
   if (!isnan(sum)) {
     sums[offset] = sum;
@@ -163,7 +165,7 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
 
     // Gaussian constraints
     if (sigmas[i] > 0) {
-      double x = (pars[i] - means[i]) / sigmas[i];
+      double x = (pars[i] - means[i]) / (means[i] * sigmas[i]);
       sum += x * x;
     }
   }

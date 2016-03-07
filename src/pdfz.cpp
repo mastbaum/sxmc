@@ -457,11 +457,11 @@ void EvalHist::EvalFinished() {
 
 TH1* EvalHist::CreateHistogram() {
   if (this->nobservables > 3) {
-      throw Error("Cannot EvalHist::CreateHistogram for dimensions greater than 3!");
+    throw Error("Cannot EvalHist::CreateHistogram for dimensions greater than 3!");
   }
 
   bool orig_optimization_flag = this->needs_optimization;
-  this->needs_optimization = false; // never optimize when making histogram!
+  this->needs_optimization = false;  // Never optimize when making histogram!
   this->EvalAsync(false);
   this->EvalFinished();
 
@@ -545,12 +545,37 @@ TH1* EvalHist::CreateHistogram() {
     break;
 
     default:
-        throw Error("Impossible EvalHist::CreateHistogram switch case!");
+      throw Error("Impossible EvalHist::CreateHistogram switch case!");
   }
 
   this->needs_optimization = orig_optimization_flag;
 
   return hist;
+}
+
+
+TH1D* EvalHist::CreateHistogramProjection(int observable_index) {
+  if (observable_index >= this->nobservables) {
+    throw Error("EvalHist::CreateHistogramProjection: Invalid observable index!");
+  }
+
+  bool orig_optimization_flag = this->needs_optimization;
+  this->needs_optimization = false;  // Never optimize when making histogram!
+  this->EvalAsync(false);
+  this->EvalFinished();
+
+  const double lower = this->lower.readOnlyHostPtr()[observable_index];
+  const double upper = this->upper.readOnlyHostPtr()[observable_index];
+  const int nbins = this->nbins.readOnlyHostPtr()[observable_index];
+
+  TH1D* hist = new TH1D("", "", nbins, lower, upper);
+  hist->Sumw2();
+
+  std::cerr << "EvalHist::CreateHistogramProjection: Not implemented"
+            << std::endl;
+
+  this->needs_optimization = orig_optimization_flag;
+  return NULL;
 }
 
 
@@ -785,6 +810,8 @@ int EvalHist::RandomSample(std::vector<float> &events,
   
   bool weighted = false;
   if (observed > maxsamples) {
+    std::cout << "EvalHist::RandomSample: Notice: Creating weighted samples"
+              << std::endl;
     // We need to create weighted samples
     weighted = true;
     for (int i=0; i<hist->GetNbinsX(); i++) {

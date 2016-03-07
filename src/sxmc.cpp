@@ -49,6 +49,7 @@
  * \param systematics List of Systematics applied to PDFs
  * \param observables List of Observables common to PDFs
  * \param cuts List of cuts applied to data set
+ * \param data Signal containing data to fit, or NULL to sample
  * \param steps Number of MCMC random walk steps to take
  * \param burnin_fraction Fraction of initial MCMC steps to throw out
  * \param confidence Desired confidence level for limits
@@ -61,6 +62,7 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
                             std::vector<Systematic>& systematics,
                             std::vector<Observable>& observables,
                             std::vector<Observable>& cuts,
+                            Signal* data,
                             unsigned steps, float burnin_fraction,
                             float confidence, unsigned nexperiments,
                             float live_time, const bool debug_mode,
@@ -92,14 +94,24 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
       param_names.push_back(systematics[j].name);
     }
 
-    // Make fake data
-    std::pair<std::vector<float>, std::vector<int> > data = \
-      make_fake_dataset(signals, systematics, observables, params, true);
+    std::vector<float> samples;
+    std::vector<int> weights;
+    if (!data) {
+      // Make fake data
+      std::pair<std::vector<float>, std::vector<int> > fakedata = \
+        make_fake_dataset(signals, systematics, observables, params, true);
+      samples = fakedata.first;
+      weights = fakedata.second;
+    }
+    else {
+      samples = dynamic_cast<pdfz::EvalHist*>(data->histogram)->get_samples();
+      weights.resize(samples.size(), 1);
+    }
 
     // Run MCMC
     MCMC mcmc(signals, systematics, observables);
     LikelihoodSpace* ls = \
-      mcmc(data.first, data.second, steps, burnin_fraction, debug_mode);
+      mcmc(samples, weights, steps, burnin_fraction, debug_mode);
 
     // Write out samples for debugging
     TFile f((output_path + "lspace.root").c_str(), "recreate");
@@ -113,7 +125,7 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
 
     // Make projection plots
     plot_fit(ls->get_best_fit(), live_time, signals, systematics, observables,
-             data.first, data.second, output_path);
+             samples, weights, output_path);
 
     // TODO: Compute sensitivity
 
@@ -189,9 +201,9 @@ int main(int argc, char* argv[]) {
   // Run ensemble
   std::cout << "sxmc: Running ensemble..." << std::endl;
   std::vector<float> limits = \
-    ensemble(fc.signals, fc.systematics, fc.observables, fc.cuts, fc.steps,
-             fc.burnin_fraction, fc.confidence, fc.experiments, fc.live_time,
-             fc.debug_mode, output_path);
+    ensemble(fc.signals, fc.systematics, fc.observables, fc.cuts, fc.data,
+             fc.steps, fc.burnin_fraction, fc.confidence, fc.experiments,
+             fc.live_time, fc.debug_mode, output_path);
 
   // TODO: Find average (median) limit
 

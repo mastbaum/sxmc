@@ -115,6 +115,7 @@ void SpectralPlot::add(TH1* _h, std::string title, std::string options) {
       h->SetAxisRange(this->ymin, this->ymax, "Y");
     }
     h->SetAxisRange(this->xmin, this->xmax, "X");
+    h->GetXaxis()->SetRangeUser(this->xmin, this->xmax);
     h->GetXaxis()->SetLabelFont(132);
     h->GetXaxis()->SetTitleFont(132);
     h->GetYaxis()->SetLabelFont(132);

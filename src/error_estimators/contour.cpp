@@ -1,3 +1,4 @@
+#include <iostream>
 #include <string>
 #include <TH1F.h>
 #include <TMath.h>
@@ -39,16 +40,22 @@ Interval Contour::get_interval(std::string name, float point_estimate) {
   this->contour_points->Draw((name + ">>_hp").c_str(), "", "goff");
   gEnv->SetValue("Hist.Binning.1D.x", default_nbins);
   TH1F* hp = dynamic_cast<TH1F*>(gDirectory->FindObject("_hp"));
-  assert(hp);
-  hp->SetDirectory(NULL);
 
-  // Find extrema
-  int ll_bin = hp->FindFirstBinAbove(0);
-  interval.lower = hp->GetBinLowEdge(ll_bin);
+  if (hp) {
+    hp->SetDirectory(NULL);
 
-  int ul_bin = hp->FindLastBinAbove(0);
-  interval.upper = hp->GetBinLowEdge(ul_bin) +
-                   hp->GetBinWidth(ul_bin);
+    // Find extrema
+    int ll_bin = hp->FindFirstBinAbove(0);
+    interval.lower = hp->GetBinLowEdge(ll_bin);
+
+    int ul_bin = hp->FindLastBinAbove(0);
+    interval.upper = hp->GetBinLowEdge(ul_bin) +
+                     hp->GetBinWidth(ul_bin);
+  }
+  else {
+    std::cerr << "Contour::get_interval: Error getting projection"
+              << std::endl;
+  }
 
   return interval;
 }

@@ -320,10 +320,15 @@ public:
 
   /** 
    * Dump the current PDF contents (as of the last EvalAsync/Finished call)
-   * into a new TH1 object and return it.  Obviously only works for 
-   * 1, 2 or 3 histograms.
+   * into a new TH1 object and return it. Only works for 1, 2 or 3d histograms.
   */
   virtual TH1* CreateHistogram();
+
+  /**
+   * Dump a 1D projection of the current PDF contents (as of the last
+   * EvalAsync/Finished call) into a new TH1D object and return it.
+  */
+  virtual TH1D* CreateHistogramProjection(int observable_index);
 
   /**
    *  Sets the systematics to zero and calls create histogram.
@@ -357,6 +362,15 @@ public:
     return RandomSample(events, eventweights, nexpected, syst_vals,
                         _upper, _lower, poisson, maxsamples);
   };
+
+  std::vector<float> get_samples() {
+    const float* s = samples.readOnlyHostPtr();
+    std::vector<float> sv(samples.size());
+    for (size_t i=0; i<sv.size(); i++) {
+      sv[i] = s[i];
+    }
+    return sv;
+  }
 
 protected:
     hemi::Array<float> samples;

@@ -11,6 +11,7 @@
 #include <json/reader.h>
 
 #include <sxmc/config.h>
+#include <sxmc/ttree_io.h>
 #include <sxmc/signals.h>
 #include <sxmc/utils.h>
 
@@ -59,6 +60,8 @@ FitConfig::FitConfig(std::string filename) {
 
   this->efficiency_correction = \
     experiment_params.get("efficiency_correction", 1.0).asFloat();
+
+  this->data = NULL;  // Deferred to signal loading phase
 
   //// PDF parameters
   const Json::Value pdf_params = root["pdfs"];
@@ -214,13 +217,30 @@ FitConfig::FitConfig(std::string filename) {
        it!=all_signals.end(); ++it) {
     std::string name = it.key().asString();
 
+    // Check if this is data
+    if (experiment_params.get("data", "").asString() == name) {
+      const Json::Value signal_params = all_signals[name];
+      //const float scale = this->live_time * this->efficiency_correction;
+      SignalParams sp(signal_params, 1.0);
+      std::cout << "FitConfig: Loading data: " << name << std::endl;
+      std::vector<Observable> cc = this->observables;
+      for (size_t ii=0; ii<this->cuts.size(); ii++) {
+        cc.push_back(this->cuts[ii]);
+      }
+      this->data = \
+        new Signal(name, sp.title, sp.nexpected, sp.sigma, sp.category,
+                   this->sample_fields, this->observables, cc,
+                   this->systematics, sp.files);
+      continue;
+    }
+    
     // Check if we want this signal
     if (std::find(signal_names.begin(), signal_names.end(), name) ==
         signal_names.end()) {
       continue;
     }
 
-    std::cout << "FitConfig: Loading signal " << name << std::endl;
+    std::cout << "FitConfig: Loading signal: " << name << std::endl;
 
     const Json::Value signal_params = all_signals[name];
     const float scale = this->live_time * this->efficiency_correction;
@@ -241,7 +261,7 @@ FitConfig::FitConfig(std::string filename) {
           SignalParams sp(params, scale);
           this->signals.push_back(
             Signal(s_name, sp.title, sp.nexpected, sp.sigma, sp.category,
-                   this->sample_fields, this->observables,  this->cuts,
+                   this->sample_fields, this->observables, this->cuts,
                    this->systematics, sp.files));
         }
       }
@@ -251,7 +271,7 @@ FitConfig::FitConfig(std::string filename) {
       SignalParams sp(signal_params, scale);
       this->signals.push_back(
         Signal(name, sp.title, sp.nexpected, sp.sigma, sp.category,
-               this->sample_fields, this->observables,  this->cuts,
+               this->sample_fields, this->observables, this->cuts,
                this->systematics, sp.files));
     }
     else {

@@ -60,86 +60,92 @@ struct Systematic {
  * A container for signal metadata and PDFs
  */
 class Signal {
-  public:
-    /**
-     * Construct a Signal from a list of root files
-     *
-     * \param filenames
-     */ 
-    Signal(std::string _name, std::string _title, float _nexpected,
-           float _sigma, std::string _category,
-           std::vector<std::string>& sample_fields,
-           std::vector<Observable>& observables,
-           std::vector<Observable>& cuts,
-           std::vector<Systematic>& systematics,
-           std::vector<std::string>& filenames);
- 
-    /**
-     * Construct a Signal from a list of samples and weights 
-     *
-     * \param samples
-     */ 
-    Signal(std::string _name, std::string _title, float _nexpected,
-           float _sigma, std::string _category,
-           std::vector<Observable>& observables,
-           std::vector<Observable>& cuts,
-           std::vector<Systematic>& systematics,
-           std::vector<float>& samples,
-           std::vector<std::string>& sample_fields,
-           std::vector<int>& weights);
+public:
+  /**
+   * Construct a Signal from a list of root files
+   *
+   * \param filenames
+   */ 
+  Signal(std::string _name, std::string _title, float _nexpected,
+         float _sigma, std::string _category,
+         std::vector<std::string>& sample_fields,
+         std::vector<Observable>& observables,
+         std::vector<Observable>& cuts,
+         std::vector<Systematic>& systematics,
+         std::vector<std::string>& filenames);
 
-    std::string name;  //!< String identifier
-    std::string title;  //!< Histogram title in ROOT-LaTeX format
-    std::string category;  //!< Category like external, cosmogenic, etc.
-                           //!< for plotting purposes
-    double nexpected;  //!< Events expected in this fit
-    double sigma;  //!< Fractional uncertainty
-    double efficiency;  //!< Fraction of generated events that make it past
-                        //!< cuts (not counting the efficiency correction)
-    size_t nevents;  //!< Number of events in PDF
-    size_t n_mc;  //!< Number of simulated events used to make pdf
-    pdfz::Eval* histogram;  //!< PDF
+  /**
+   * Construct a Signal from a list of samples and weights 
+   *
+   * \param samples
+   */ 
+  Signal(std::string _name, std::string _title, float _nexpected,
+         float _sigma, std::string _category,
+         std::vector<Observable>& observables,
+         std::vector<Observable>& cuts,
+         std::vector<Systematic>& systematics,
+         std::vector<float>& samples,
+         std::vector<std::string>& sample_fields,
+         std::vector<int>& weights);
 
-  protected:
-    /**
-     * Construct the pdfz histogram object.
-     */
-    void build_pdfz(std::vector<float> &samples, std::vector<int> &weights,
-                    int nfields, std::vector<Observable> &observables,
-                    std::vector<Systematic>& systematics);
+  /**
+   * Get samples and weights as arrays.
+  */
+  std::pair<std::vector<float>, std::vector<int> > get_samples();
 
-    /**
-     * Compute an efficiency based on central value of systematics.
-     */
-    void set_efficiency(std::vector<Systematic>& systematics);
+  std::string name;  //!< String identifier
+  std::string title;  //!< Histogram title in ROOT-LaTeX format
+  std::string category;  //!< Category like external, cosmogenic, etc.
+                         //!< for plotting purposes
+  double nexpected;  //!< Events expected in this fit
+  double sigma;  //!< Fractional uncertainty
+  double efficiency;  //!< Fraction of generated events that make it past
+                      //!< cuts (not counting the efficiency correction)
+  size_t nevents;  //!< Number of events in PDF
+  size_t n_mc;  //!< Number of simulated events used to make pdf
+  pdfz::Eval* histogram;  //!< PDF
 
-    /**
-     * Apply an exclusion region that removes part of the dataset.
-     */
-    void apply_exclusions(std::vector<float>& samples,
-                          std::vector<std::string>& sample_fields,
-                          std::vector<int>& weights,
-                          std::vector<Observable>& observables);
+protected:
+  /**
+   * Construct the pdfz histogram object.
+   */
+  void build_pdfz(std::vector<float> &samples, std::vector<int> &weights,
+                  int nfields, std::vector<Observable> &observables,
+                  std::vector<Systematic>& systematics);
 
-    /**
-     * Apply an exclusion region that removes part of the dataset.
-     */
-    void apply_exclusions(std::vector<float>& samples,
-                          std::vector<std::string>& sample_fields,
-                          std::vector<Observable>& observables) {
-      std::vector<int> fake;
-      apply_exclusions(samples, sample_fields, fake, observables);
-    };
+  /**
+   * Compute an efficiency based on central value of systematics.
+   */
+  void set_efficiency(std::vector<Systematic>& systematics);
 
-    /**
-     * Copy the requested sample fields from the fields of the same name
-     * in the dataset array.
-     */
-    void read_dataset_to_samples(std::vector<float>& samples,
-                                 std::vector<float>& dataset,
-                                 std::vector<std::string>& sample_fields,
-                                 std::vector<std::string>& dataset_fields,
-                                 std::vector<Observable>& cuts);
+public:
+  /**
+   * Apply an exclusion region that removes part of the dataset.
+   */
+  static void apply_exclusions(std::vector<float>& samples,
+                               std::vector<std::string>& sample_fields,
+                               std::vector<int>& weights,
+                               std::vector<Observable>& observables);
+
+  /**
+   * Apply an exclusion region that removes part of the dataset.
+   */
+  static void apply_exclusions(std::vector<float>& samples,
+                               std::vector<std::string>& sample_fields,
+                               std::vector<Observable>& observables) {
+    std::vector<int> fake;
+    apply_exclusions(samples, sample_fields, fake, observables);
+  };
+
+  /**
+   * Copy the requested sample fields from the fields of the same name
+   * in the dataset array.
+   */
+  static void read_dataset_to_samples(std::vector<float>& samples,
+                                      std::vector<float>& dataset,
+                                      std::vector<std::string>& sample_fields,
+                                      std::vector<std::string>& dataset_fields,
+                                      std::vector<Observable>& cuts);
 };
 
 #endif  // __SIGNALS_H__

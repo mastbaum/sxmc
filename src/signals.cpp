@@ -148,10 +148,8 @@ void Signal::set_efficiency(std::vector<Systematic>& systematics) {
   this->efficiency = this->nevents / (double) (this->n_mc);
 
   // nexpected = physical events expected * efficiency
+  // sigma is fractional, does not scale
   this->nexpected *= this->efficiency;
-
-  // Uncertainty scales by efficiency as well
-  this->sigma *= this->efficiency;
 
   std::cout << "Signal::set_efficiency: "
             << this->nevents << "/" << this->n_mc << " events remain. "
@@ -265,8 +263,9 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected,
     : name(_name), title(_title), category(_category), nexpected(_nexpected),
       sigma(_sigma), efficiency(1) {
   this->n_mc = 0;
-  for (size_t i=0; i<weights.size(); i++)
+  for (size_t i=0; i<weights.size(); i++) {
     this->n_mc += weights[i];
+  }
 
   apply_exclusions(samples, sample_fields, weights, observables);
 
