@@ -165,8 +165,9 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
 
     // Gaussian constraints
     if (sigmas[i] > 0) {
-      double x = (pars[i] - means[i]) / (means[i] * sigmas[i]);
-      sum += x * x;
+      double denom = i < nsignals ? means[i] * sigmas[i] : sigmas[i];
+      double x = (pars[i] - means[i]) / denom;
+      sum += 0.5 * x * x;
     }
   }
 
