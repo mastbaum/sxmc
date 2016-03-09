@@ -54,7 +54,9 @@ JSONCPP_SOURCES = $(wildcard $(JSONCPP_SRC)/*.cpp)
 JSONCPP_OBJECTS = $(JSONCPP_SOURCES:$(JSONCPP_SRC)/%.cpp=$(OBJ_DIR)/jsoncpp/%.o)
 
 # For unit test suite
-SXMC_NO_MAIN_FUNCTION_OBJECTS = $(filter-out build/sxmc.o, $(OBJECTS) $(JSONCPP_OBJECTS) build/mcmc.o build/nll_kernels.o build/pdfz.o)
+MAINS = ./build/sxmc.o ./build/bench_sxmc.o ./build/test_sxmc.o
+ALL_OBJECTS = $(OBJECTS) $(JSONCPP_OBJECTS) ./build/mcmc.o ./build/nll_kernels.o ./build/pdfz.o
+SXMC_NO_MAIN_FUNCTION_OBJECTS = $(filter-out $(MAINS), $(ALL_OBJECTS))
 TEST_SOURCES = $(wildcard test/*.cpp)
 TEST_OBJECTS = $(TEST_SOURCES:test/%.cpp=$(OBJ_DIR)/test/%.o)
 
@@ -64,12 +66,12 @@ ifndef ROOTSYS
 $(error ROOTSYS is not set)
 endif
 
-all: build_dirs includes bin/create_test_data $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o $(OBJECTS) $(JSONCPP_OBJECTS) $(EXE)
+.PHONY: all doc test includes
 
-.PHONY: doc test includes bin/create_test_data
+all: build_dirs includes $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o $(OBJECTS) $(JSONCPP_OBJECTS) $(EXE)
 
 clean:
-	-$(RM) build/*.o build/test/*.o build/jsoncpp/*.o $(EXE) include/sxmc/*
+	-$(RM) build/*.o build/test/*.o build/jsoncpp/*.o $(EXE) bin/test_sxmc bin/bench_sxmc include/sxmc/*
 
 doc:
 	cd src && doxygen Doxyfile
@@ -105,9 +107,6 @@ $(OBJ_DIR)/pdfz.o: src/pdfz.cpp includes
 $(EXE): $(OBJECTS) $(JSONCPP_OBJECTS) $(OBJ_DIR)/mcmc.o $(OBJ_DIR)/nll_kernels.o $(OBJ_DIR)/pdfz.o
 	$(GCC) -o $@ $^ $(CFLAGS) $(LFLAGS) $(CUDA_LFLAGS)
 
-bin/create_test_data:
-	$(GCC) -o $@ test/create_test_data.cpp $(shell root-config --libs) -I$(shell root-config --incdir)
-
 
 ###### Test Infrastructure ############
 test: bin/test_sxmc bin/bench_sxmc
@@ -138,10 +137,14 @@ $(OBJ_DIR)/test/%.o: test/%.cpp
 bin/test_sxmc: $(TEST_OBJECTS) $(SXMC_NO_MAIN_FUNCTION_OBJECTS) build/gtest_main.a
 	$(GCC) -o $@ $^ $(GCCFLAGS) $(LFLAGS) $(CUDA_LFLAGS)
 
+
 ## Benchmark code
 $(OBJ_DIR)/bench_sxmc.o: bench/bench_sxmc.cpp
 	$(CUDACC) -c -o $@ $< $(CFLAGS) -I$(GTEST_DIR)/include
 
 bin/bench_sxmc: $(OBJ_DIR)/bench_sxmc.o $(SXMC_NO_MAIN_FUNCTION_OBJECTS)
+	@echo $(MAINS)
+	@echo $(ALL_OBJECTS)
+	@echo $(SXMC_NO_MAIN_FUNCTION_OBJECTS)
 	$(GCC) -o $@ $^ $(GCCFLAGS) $(LFLAGS) $(CUDA_LFLAGS)
 
