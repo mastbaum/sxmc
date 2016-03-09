@@ -16,8 +16,10 @@
 #include <sxmc/utils.h>
 
 SignalParams::SignalParams(const Json::Value& params, float scale) {
+  // Must specify rate or scale, but not both
   assert(params.isMember("rate") || params.isMember("scale"));
   assert(!(params.isMember("rate") && params.isMember("scale")));
+
   if (params.isMember("rate")) {
     nexpected = params["rate"].asFloat() * scale;
   }
@@ -25,9 +27,12 @@ SignalParams::SignalParams(const Json::Value& params, float scale) {
     // (-) tell signals to scale by the total number of samples
     nexpected = -scale / params["scale"].asFloat();
   }
+
   sigma = params.get("constraint", 0.0).asFloat() * scale;
   title = params.get("title", "Other").asString();
   category = params.get("category", "").asString();
+
+  assert(params.isMember("files"));
   for (Json::Value::const_iterator it=params["files"].begin();
        it!=params["files"].end(); ++it) {
     files.push_back((*it).asString());
@@ -35,38 +40,8 @@ SignalParams::SignalParams(const Json::Value& params, float scale) {
 }
 
 
-FitConfig::FitConfig(std::string filename) {
-  Json::Reader reader;
-  Json::Value root;
-
-  std::ifstream t(filename.c_str());
-  std::string data((std::istreambuf_iterator<char>(t)),
-                    std::istreambuf_iterator<char>());
-
-  bool parse_ok = reader.parse(data, root);
-  if (!parse_ok) {
-    std::cerr  << "FitConfig::FitConfig: JSON parse error:" << std::endl
-               << reader.getFormattedErrorMessages();
-    throw(1);
-  }
-
-  //// Experiment parameters
-  const Json::Value experiment_params = root["experiment"];
-  assert(experiment_params.isMember("live_time"));
-  this->live_time = experiment_params["live_time"].asFloat();
-
-  assert(experiment_params.isMember("confidence"));
-  this->confidence = experiment_params["confidence"].asFloat();
-
-  this->efficiency_correction = \
-    experiment_params.get("efficiency_correction", 1.0).asFloat();
-
-  this->data = NULL;  // Deferred to signal loading phase
-
-  //// PDF parameters
-  const Json::Value pdf_params = root["pdfs"];
-
-  // Create list of possible observables
+std::map<std::string, Observable>
+FitConfig::get_pdf_observables(const Json::Value& pdf_params) {
   std::map<std::string, Observable> all_observables;
   for (Json::Value::const_iterator it=pdf_params["observables"].begin();
        it!=pdf_params["observables"].end(); ++it) {
@@ -87,10 +62,12 @@ FitConfig::FitConfig(std::string filename) {
     o.units = o_json["units"].asString();
     o.logscale = o_json.get("logscale", false).asBool();
     o.yrange.resize(2, -1);
+
     if (o_json.isMember("yrange")) {
       o.yrange[0] = o_json["yrange"][0].asFloat();
       o.yrange[1] = o_json["yrange"][1].asFloat();
     }
+
     if (o_json.isMember("exclude")) {
       o.exclude = true;
       o.exclude_min = o_json["exclude"][0].asFloat();
@@ -99,10 +76,16 @@ FitConfig::FitConfig(std::string filename) {
     else {
       o.exclude = false;
     }
+
     all_observables[it.key().asString()] = o;
   }
 
-  // Create list of possible systematics
+  return all_observables;
+}
+
+
+std::map<std::string, Systematic>
+FitConfig::get_pdf_systematics(const Json::Value& pdf_params) {
   std::map<std::string, Systematic> all_systematics;
   for (Json::Value::const_iterator it=pdf_params["systematics"].begin();
        it!=pdf_params["systematics"].end(); ++it) {
@@ -116,6 +99,7 @@ FitConfig::FitConfig(std::string filename) {
 
     assert(s_json.isMember("type"));
     std::string type_string = s_json["type"].asString();
+
     if (type_string == "scale") {
         s.type = pdfz::Systematic::SCALE;
     }
@@ -141,14 +125,61 @@ FitConfig::FitConfig(std::string filename) {
     all_systematics[it.key().asString()] = s;
   }
 
+  return all_systematics;
+}
+
+
+FitConfig::FitConfig(std::string filename) {
+  // Read JSON configuration file
+  Json::Reader reader;
+  Json::Value root;
+
+  std::ifstream t(filename.c_str());
+  std::string data((std::istreambuf_iterator<char>(t)),
+                    std::istreambuf_iterator<char>());
+
+  bool parse_ok = reader.parse(data, root);
+  if (!parse_ok) {
+    std::cerr  << "FitConfig::FitConfig: JSON parse error:" << std::endl
+               << reader.getFormattedErrorMessages();
+    throw(1);
+  }
+
+  //// Experiment parameters
+  const Json::Value experiment_params = root["experiment"];
+
+  assert(experiment_params.isMember("live_time"));
+  this->live_time = experiment_params["live_time"].asFloat();
+
+  assert(experiment_params.isMember("confidence"));
+  this->confidence = experiment_params["confidence"].asFloat();
+
+  this->efficiency_correction = \
+    experiment_params.get("efficiency_correction", 1.0).asFloat();
+
+  this->data = NULL;  // Deferred to signal loading phase
+
+
+  //// PDF parameters
+  const Json::Value pdf_params = root["pdfs"];
+
+  std::map<std::string, Observable> all_observables = \
+    get_pdf_observables(pdf_params);
+
+  std::map<std::string, Systematic> all_systematics = \
+    get_pdf_systematics(pdf_params);
+
+
   //// Fit parameters
   const Json::Value fit_params = root["fit"];
+
   assert(fit_params.isMember("experiments"));
   this->experiments = fit_params["experiments"].asInt();
+
   assert(fit_params.isMember("steps"));
   this->steps = fit_params["steps"].asInt();
+
   this->burnin_fraction = fit_params.get("burnin_fraction", 0.1).asFloat();
-  this->output_file = fit_params.get("output_file", "fit_spectrum").asString();
   this->debug_mode = fit_params.get("debug_mode", false).asBool();
   this->signal_name = fit_params.get("signal_name", "").asString();
 
@@ -173,13 +204,20 @@ FitConfig::FitConfig(std::string filename) {
   // Determine the order of data fields in the sampled data.
   // sample_fields is a list of column titles we want in the sampled array,
   // and field_index is an index for sample_fields
+  //
+  // This is built in the following order:
+  //
+  //   1. Fields for observables
+  //   2. Extra unobserved fields for systematics (e.g. true energy)
+  //
   for (size_t i=0; i<this->observables.size(); i++) {
     std::string field_name = this->observables[i].field;
     this->observables[i].field_index = \
       get_index_with_append<std::string>(this->sample_fields, field_name);
   }
 
-  // Add any additional observables used for systematics
+  // Add any additional observables used for systematics, and set the indices
+  // of observables used in systematics
   for (size_t i=0; i<this->systematics.size(); i++) {
     std::string field_name = this->systematics[i].observable_field;
 
@@ -193,16 +231,13 @@ FitConfig::FitConfig(std::string filename) {
     this->systematics[i].observable_field_index = index;
 
     // Add non-observable parameters
-    if (this->systematics[i].type != pdfz::Systematic::RESOLUTION_SCALE) {
-      continue;
+    if (this->systematics[i].type == pdfz::Systematic::RESOLUTION_SCALE) {
+      // Store the truth value in our sample so we can use it to manipulate the
+      // observed value correctly when we adjust this systematic
+      field_name = this->systematics[i].truth_field;
+      this->systematics[i].truth_field_index = \
+        get_index_with_append<std::string>(this->sample_fields, field_name);
     }
-
-    // Store the truth value in our sample so we can use it to manipulate the
-    // observed value correctly when we adjust this systematic
-    field_name = this->systematics[i].truth_field;
-    index = get_index_with_append<std::string>(this->sample_fields,
-                                               field_name);
-    this->systematics[i].truth_field_index = index;
   }
 
   //// Signal parameters
@@ -218,23 +253,30 @@ FitConfig::FitConfig(std::string filename) {
        it!=all_signals.end(); ++it) {
     std::string name = it.key().asString();
 
-    // Check if this is data
-    if (experiment_params.get("data", "").asString() == name) {
+    // Check if this signal is being used as fit data (and not as a PDF!)
+    std::string data_signal = experiment_params.get("data", "").asString();
+    assert(std::find(signal_names.begin(), signal_names.end(), data_signal) ==
+           signal_names.end());
+    if (data_signal == name) {
       const Json::Value signal_params = all_signals[name];
-      //const float scale = this->live_time * this->efficiency_correction;
       SignalParams sp(signal_params, 1.0);
       std::cout << "FitConfig: Loading data: " << name << std::endl;
+
+      // All active observables are treated as cuts, in order to clip the data
+      // to the PDF boundaries.
       std::vector<Observable> cc = this->observables;
       for (size_t ii=0; ii<this->cuts.size(); ii++) {
         cc.push_back(this->cuts[ii]);
       }
+
       this->data = \
         new Signal(name, sp.title, sp.nexpected, sp.sigma, sp.category,
                    this->sample_fields, this->observables, cc,
                    this->systematics, sp.files);
+
       continue;
     }
-    
+
     // Check if we want this signal
     if (std::find(signal_names.begin(), signal_names.end(), name) ==
         signal_names.end()) {
@@ -244,42 +286,15 @@ FitConfig::FitConfig(std::string filename) {
     std::cout << "FitConfig: Loading signal: " << name << std::endl;
 
     const Json::Value signal_params = all_signals[name];
+
     const float scale = this->live_time * this->efficiency_correction;
 
-    if (signal_params.isMember("signals")) {
-      // Multiple contributions to signal
-      if (signal_params.get("chain", true).asBool()) {
-        // Chained
-        std::cerr << "Chaining yet not implemented" << std::endl;
-        assert(false);
-      }
-      else {
-        // Not chained, just hanging out together
-        for (Json::Value::const_iterator jt=signal_params["signals"].begin();
-             jt!=signal_params["signals"].end(); ++jt) {
-          std::string s_name = jt.key().asString();
-          const Json::Value params = signal_params["signals"][s_name];
-          SignalParams sp(params, scale);
-          this->signals.push_back(
-            Signal(s_name, sp.title, sp.nexpected, sp.sigma, sp.category,
-                   this->sample_fields, this->observables, this->cuts,
-                   this->systematics, sp.files));
-        }
-      }
-    }
-    else if (signal_params.isMember("files")) {
-      // Just one signal
-      SignalParams sp(signal_params, scale);
-      this->signals.push_back(
-        Signal(name, sp.title, sp.nexpected, sp.sigma, sp.category,
-               this->sample_fields, this->observables, this->cuts,
-               this->systematics, sp.files));
-    }
-    else {
-      std::cerr << "FitConfig: Signal " << name
-                << "has neither files nor pdfs." << std::endl;
-      throw(1);
-    }
+    SignalParams sp(signal_params, scale);
+
+    this->signals.push_back(
+      Signal(name, sp.title, sp.nexpected, sp.sigma, sp.category,
+             this->sample_fields, this->observables, this->cuts,
+             this->systematics, sp.files));
   }
 }
 
@@ -288,8 +303,7 @@ void FitConfig::print() const {
   std::cout << "Fit:" << std::endl
     << "  Fake experiments: " << this->experiments << std::endl
     << "  MCMC steps: " << this->steps << std::endl
-    << "  Burn-in fraction: " << this->burnin_fraction << std::endl
-    << "  Output plot: " << this->output_file << std::endl;
+    << "  Burn-in fraction: " << this->burnin_fraction << std::endl;
 
   std::cout << "Experiment:" << std::endl
     << "  Live time: " << this->live_time << " y" << std::endl
