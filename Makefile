@@ -118,10 +118,10 @@ GTEST_SRCS_ = $(GTEST_DIR)/src/*.cc $(GTEST_DIR)/src/*.h $(GTEST_HEADERS)
 
 # Generic Google Test code
 build/gtest-all.o : $(GTEST_SRCS_)
-	$(CXX) -I$(GTEST_DIR)/include -I$(GTEST_DIR) $(CXXFLAGS) -o $@ -c $(GTEST_DIR)/src/gtest-all.cc
+	$(CXX) -DGTEST_USE_OWN_TR1_TUPLE=1 -I$(GTEST_DIR)/include -I$(GTEST_DIR) $(CXXFLAGS) -o $@ -c $(GTEST_DIR)/src/gtest-all.cc
 
 build/gtest_main.o : $(GTEST_SRCS_)
-	$(CXX) -I$(GTEST_DIR)/include -I$(GTEST_DIR) $(CXXFLAGS) -o $@ -c $(GTEST_DIR)/src/gtest_main.cc
+	$(CXX) -DGTEST_USE_OWN_TR1_TUPLE=1 -I$(GTEST_DIR)/include -I$(GTEST_DIR) $(CXXFLAGS) -o $@ -c $(GTEST_DIR)/src/gtest_main.cc
 
 build/gtest.a : build/gtest-all.o
 	$(AR) $(ARFLAGS) $@ $^
