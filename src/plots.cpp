@@ -24,16 +24,23 @@
 //                        kYellow-7, kOrange-7, kRed-6,     kAzure+1,
 //                        kTeal+1,   kSpring-9, kAzure-9};
 
-// SNO+ colors
-const int ncolors = 7;
-const int colors[7] = {
-  TColor::GetColor(153, 153, 153),
-  TColor::GetColor(75,  110, 188),
-  TColor::GetColor(110, 157, 100),
-  TColor::GetColor(121, 93,  136),
-  TColor::GetColor(255, 153, 4),
-  TColor::GetColor(153, 102, 51),
-  TColor::GetColor(0,   204, 204)
+// SNO+ "Laura" colors
+//const int ncolors = 7;
+//const int colors[7] = {
+//  TColor::GetColor(153, 153, 153),
+//  TColor::GetColor(75,  110, 188),
+//  TColor::GetColor(110, 157, 100),
+//  TColor::GetColor(121, 93,  136),
+//  TColor::GetColor(255, 153, 4),
+//  TColor::GetColor(153, 102, 51),
+//  TColor::GetColor(0,   204, 204)
+//};
+
+const int ncolors = 16;
+const int colors[16] = {
+  kGray+1,   kAzure,    kSpring-6, kRed+1,     kAzure+1,  kOrange+1,
+  kViolet+1, kOrange-7, kCyan+1,   kMagenta+1, kSpring+4, kMagenta+3,
+  kViolet,   kViolet-9, kBlue-6,   kGreen-6  
 };
 
 
@@ -46,6 +53,7 @@ SpectralPlot::SpectralPlot(int _line_width, float _xmin, float _xmax,
       xmin(_xmin), xmax(_xmax), ymin(_ymin), ymax(_ymax),
       title(_title), xtitle(_xtitle), ytitle(_ytitle) {
   this->c = new TCanvas();
+  this->c->SetCanvasSize(500, 500);
 
   if (this->logy) {
     this->c->SetLogy();
@@ -73,6 +81,7 @@ SpectralPlot::SpectralPlot(const SpectralPlot& o) {
     this->histograms.push_back(o.histograms[i]);
   }
   this->c = new TCanvas();
+  this->c->SetCanvasSize(500, 500);
 
   if (o.logy) {
     this->c->SetLogy();
@@ -139,7 +148,10 @@ void SpectralPlot::save(std::string filename) {
   this->legend->SetTextFont(132);
   this->legend->Draw();
   this->c->Update();
-  this->c->SaveAs(filename.c_str(), "q");
+  this->c->SaveAs((filename + ".pdf").c_str(), "q");
+  this->c->SaveAs((filename + ".png").c_str(), "q");
+  this->c->SaveAs((filename + ".tex").c_str(), "q");
+  this->c->SaveAs((filename + ".C").c_str(), "q");
 }
 
 
@@ -275,6 +287,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
         all_plots["full"][i].histograms[0], "hdata");
 
     hdata->SetMarkerStyle(20);
+    hdata->SetMarkerSize(0.7);
     hdata->SetLineColor(kBlack);
 
     for (size_t idata=0; idata<data.size() / observables.size(); idata++) {
@@ -301,10 +314,10 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
       all_plots["full"][i].add(all_totals["full"][i], "Fit", "hist");
     }
 
-    all_plots["full"][i].add(hdata, "Fake Data");
+    all_plots["full"][i].add(hdata, "Data");
 
     std::string path = \
-      output_path + observables[i].name + "_spectrum_full.pdf";
+      output_path + observables[i].name + "_spectrum_full";
     all_plots["full"][i].save(path);
 
     for (size_t j=0; j<categories.size(); j++) {
@@ -312,7 +325,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
         continue;
       }
       path = (output_path + observables[i].name +
-              "_spectrum_" + categories[j] + ".pdf");
+              "_spectrum_" + categories[j]);
       all_plots[categories[j]][i].save(path);
     }
   }

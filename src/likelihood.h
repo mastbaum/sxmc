@@ -31,7 +31,7 @@ class LikelihoodSpace {
      *
      * \param samples A set of samples of the likelihood space
      */
-    LikelihoodSpace(TNtuple* samples);
+    LikelihoodSpace(TNtuple* samples, float cl=0.68);
 
     /** Destructor. */
     virtual ~LikelihoodSpace();
@@ -69,7 +69,7 @@ class LikelihoodSpace {
      * \returns A map from parameter names to Intervals
      */
     std::map<std::string, Interval>
-    extract_best_fit(float& ml, ErrorType error_type=ERROR_CONTOUR);
+    extract_best_fit(float& ml, float cl, ErrorType error_type=ERROR_CONTOUR);
 
     /**
      * Get a pointer to the TNtuple of samples.

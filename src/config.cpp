@@ -150,6 +150,7 @@ FitConfig::FitConfig(std::string filename) {
   this->burnin_fraction = fit_params.get("burnin_fraction", 0.1).asFloat();
   this->output_file = fit_params.get("output_file", "fit_spectrum").asString();
   this->debug_mode = fit_params.get("debug_mode", false).asBool();
+  this->signal_name = fit_params.get("signal_name", "").asString();
 
   // Find observables we want to fit for
   for (Json::Value::const_iterator it=fit_params["observables"].begin();

@@ -57,6 +57,7 @@ Interval Contour::get_interval(std::string name, float point_estimate) {
               << std::endl;
   }
 
+  delete hp;
   return interval;
 }
 

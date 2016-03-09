@@ -72,6 +72,7 @@ class FitConfig {
     float burnin_fraction;  //!< Fraction of steps to use for burn-in period
     bool debug_mode;  //!< Enable/disable debugging mode (accept/save all)
     std::string output_file;  //!< Base filename for output
+    std::string signal_name;  //!< Name of the signal of interest (if any)
     std::vector<Signal> signals;  //!< Signal histograms and metadata
     std::vector<Systematic> systematics;  //!< Systematics used in PDFs
     std::vector<Observable> observables;  //!< Observables used in PDFs

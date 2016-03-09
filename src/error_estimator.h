@@ -32,7 +32,7 @@ class ErrorEstimator {
      * \param lspace The likelihood space
      * \param cl Confidence level
      */
-    ErrorEstimator(LikelihoodSpace* _lspace, float _cl=0.68)
+    ErrorEstimator(LikelihoodSpace* _lspace, float _cl=0.682)
         : lspace(_lspace), cl(_cl) {}
  
     /** Destructor. */

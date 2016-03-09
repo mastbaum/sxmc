@@ -6,8 +6,9 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
-#include <vector>
+#include <algorithm>
 #include <string>
+#include <vector>
 
 class TNtuple;
 
@@ -55,6 +56,26 @@ size_t get_index_with_append(std::vector<T>& v, T o) {
   }
   return index;
 }
+
+/**
+ * Compute the median of a vector
+ */
+template<typename T>
+T median(std::vector<T> v) {
+  T median;
+  std::sort(v.begin(), v.end());
+  size_t half = v.size() / 2;
+
+  if (v.size() % 2 == 0) {
+    median = 1.0 * (v[half - 1] + v[half]) / 2;
+  }
+  else {
+    median = v[half];
+  }
+
+  return median;
+}
+
 
 #endif  // __UTILS_H__
 

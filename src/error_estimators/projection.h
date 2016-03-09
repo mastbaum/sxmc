@@ -20,7 +20,7 @@ namespace sxmc {
  * 1D projection error estimator.
  *
  * Error estimator which uses a 1D projection of the likelihood space to
- * determine uncertainties. Attempts to put a fraction (1-cl) in both the
+ * determine uncertainties. Attempts to put a fraction (1-cl)/2 in both the
  * upper and lower tails. If the mean is less than twice the RMS, push up the
  * upper limit as necessary to assure coverage and report an upper limit.
  */

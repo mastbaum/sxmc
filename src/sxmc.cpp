@@ -34,11 +34,13 @@
 #include <TError.h>
 
 #include <sxmc/config.h>
+#include <sxmc/error_estimator.h>
 #include <sxmc/generator.h>
 #include <sxmc/mcmc.h>
 #include <sxmc/utils.h>
 #include <sxmc/likelihood.h>
 #include <sxmc/plots.h>
+#include <sxmc/utils.h>
 
 /**
  * Run an ensemble of independent fake experiments
@@ -66,7 +68,7 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
                             unsigned steps, float burnin_fraction,
                             float confidence, unsigned nexperiments,
                             float live_time, const bool debug_mode,
-                            std::string output_path) {
+                            std::string output_path, std::string signal_name) {
   std::vector<float> limits;
 
   for (size_t i=0; i<signals.size(); i++) {
@@ -127,7 +129,26 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
     plot_fit(ls->get_best_fit(), live_time, signals, systematics, observables,
              samples, weights, output_path);
 
-    // TODO: Compute sensitivity
+    // Build a list of upper limits
+    float ml;
+    std::map<std::string, Interval> best_fit = \
+      ls->extract_best_fit(ml, 0.9, ERROR_PROJECTION);
+
+    if (signal_name != "" && best_fit.find(signal_name) != best_fit.end()) {
+      Interval bfi = best_fit[signal_name];
+      std::cout << "ensemble: Signal "
+                << signal_name << ": " << bfi.str() << std::endl;
+
+      if (!bfi.one_sided) {
+        std::cerr << "ensemble: Warning: Two-sided limit!" << std::endl;
+      }
+
+      std::cout << "ensemble: lower = " << bfi.lower << ", "
+                << "upper = " << bfi.upper << ", "
+                << "coverage = " << bfi.coverage << std::endl;
+
+      limits.push_back(bfi.upper);
+    }
 
     delete ls;
   }
@@ -203,9 +224,14 @@ int main(int argc, char* argv[]) {
   std::vector<float> limits = \
     ensemble(fc.signals, fc.systematics, fc.observables, fc.cuts, fc.data,
              fc.steps, fc.burnin_fraction, fc.confidence, fc.experiments,
-             fc.live_time, fc.debug_mode, output_path);
+             fc.live_time, fc.debug_mode, output_path, fc.signal_name);
 
-  // TODO: Find average (median) limit
+  std::cout << "main: Upper limits: ";
+  for (size_t i=0; i<limits.size(); i++) {
+    std::cout << limits[i] << ", ";
+  }
+  std::cout << std::endl;
+  std::cout << "main: Median upper limit: " << median(limits) << std::endl;
 
   return 0;
 }
