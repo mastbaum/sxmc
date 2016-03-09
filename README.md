@@ -7,12 +7,12 @@ Documentation
 -------------
 `sxmc` includes both a User's Guide and thorough documentation of the code.
 
-To build the User's Guide (requires [Sphinx](http://sphinx.pocoo.org):
+To build the User's Guide (requires [Sphinx](http://sphinx.pocoo.org)):
 
     $ cd doc
     $ make html
 
-To build the code documentation (required [Doxygen](http://doxygen.org):
+To build the code documentation (requires [Doxygen](http://doxygen.org)):
 
     $ make doc
 
