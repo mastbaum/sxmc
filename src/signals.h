@@ -1,3 +1,6 @@
+#ifndef __SIGNALS_H__
+#define __SIGNALS_H__
+
 /**
  * \file signals.h
  *
@@ -5,9 +8,6 @@
  *
  * (Not to be confused with signal.h, which defines UNIX signals.)
  */
-
-#ifndef __SIGNALS_H__
-#define __SIGNALS_H__
 
 #include <string>
 #include <vector>
@@ -17,7 +17,7 @@
  * \struct Observable
  *
  * A container for observable metadata
- */
+*/
 struct Observable {
   std::string name;  //!< Name of the observable
   std::string title;  //!< Title in ROOT LaTeX format, for display
@@ -39,7 +39,7 @@ struct Observable {
  * \struct Systematic
  *
  * A container for systematic parameter metadata
- */
+*/
 struct Systematic {
   std::string name;  //!< Name of the systematic parameter
   std::string title;  //!< Title in ROOT LaTeX format, for display
@@ -58,14 +58,23 @@ struct Systematic {
  * \class Signal
  *
  * A container for signal metadata and PDFs
- */
+*/
 class Signal {
 public:
   /**
-   * Construct a Signal from a list of root files
+   * Construct a Signal from a list of ROOT files.
    *
-   * \param filenames
-   */ 
+   * \param _name - A string identifier
+   * \param _title - A title for plotting (ROOT LaTeX)
+   * \oaram _nexpected - The expected number of events
+   * \param _sigma - A Gaussian constraint on nexpected
+   * \param _category - A category name, used to group signals for plotting
+   * \param sample_fields - The names of the fields for the data samples
+   * \param observables - A list of observables used in the fit
+   * \param cuts - A list of observables to be applied as cuts
+   * \param systematics - A list of systematics to be used in the fit
+   * \param filenames - A list of ROOT file names with the PDF data
+  */
   Signal(std::string _name, std::string _title, float _nexpected,
          float _sigma, std::string _category,
          std::vector<std::string>& sample_fields,
@@ -75,9 +84,19 @@ public:
          std::vector<std::string>& filenames);
 
   /**
-   * Construct a Signal from a list of samples and weights 
+   * Construct a Signal from a list of samples and weights.
    *
-   * \param samples
+   * \param _name - A string identifier
+   * \param _title - A title for plotting (ROOT LaTeX)
+   * \oaram _nexpected - The expected number of events
+   * \param _sigma - A Gaussian constraint on nexpected
+   * \param _category - A category name, used to group signals for plotting
+   * \param observables - A list of observables used in the fit
+   * \param cuts - A list of observables to be applied as cuts
+   * \param systematics - A list of systematics to be used in the fit
+   * \param samples - The vector of data samples for the PDF
+   * \param sample_fields - The names of the fields for the data samples
+   * \param weights - The vector of sample weights for the PDF
    */ 
   Signal(std::string _name, std::string _title, float _nexpected,
          float _sigma, std::string _category,
@@ -89,7 +108,7 @@ public:
          std::vector<int>& weights);
 
   /**
-   * Get samples and weights as arrays.
+   * Get samples and weights as a pair of arrays.
   */
   std::pair<std::vector<float>, std::vector<int> > get_samples();
 
@@ -108,19 +127,34 @@ public:
 protected:
   /**
    * Construct the pdfz histogram object.
+   *
+   * \param samples - The vector of data samples for the PDF
+   * \param weights - The vector of sample weights for the PDF
+   * \param nfields - The number of fields (columns) in the sample array
+   * \param observables - A list of observables used in the fit
+   * \param systematics - A list of systematics to be used in the fit
    */
-  void build_pdfz(std::vector<float> &samples, std::vector<int> &weights,
-                  int nfields, std::vector<Observable> &observables,
+  void build_pdfz(std::vector<float>& samples, std::vector<int>& weights,
+                  int nfields, std::vector<Observable>& observables,
                   std::vector<Systematic>& systematics);
 
   /**
    * Compute an efficiency based on central value of systematics.
+   *
+   * \param systematics - A list of systematics to be used in the fit
    */
   void set_efficiency(std::vector<Systematic>& systematics);
 
 public:
   /**
-   * Apply an exclusion region that removes part of the dataset.
+   * Apply an exclusion region that removes part of the dataset (with weights).
+   *
+   * Used e.g. to remove a blinded signal region.
+   *
+   * \param samples - The vector of data samples for the PDF
+   * \param sample_fields - The names of the fields for the data samples
+   * \param weights - The vector of sample weights for the PDF
+   * \param observables - A list of observables used in the fit
    */
   static void apply_exclusions(std::vector<float>& samples,
                                std::vector<std::string>& sample_fields,
@@ -129,6 +163,12 @@ public:
 
   /**
    * Apply an exclusion region that removes part of the dataset.
+   *
+   * Used e.g. to remove a blinded signal region.
+   *
+   * \param samples - The vector of data samples for the PDF
+   * \param sample_fields - The names of the fields for the data samples
+   * \param observables - A list of observables used in the fit
    */
   static void apply_exclusions(std::vector<float>& samples,
                                std::vector<std::string>& sample_fields,
@@ -140,6 +180,12 @@ public:
   /**
    * Copy the requested sample fields from the fields of the same name
    * in the dataset array.
+   *
+   * \param samples - The vector of data samples for the PDF (by reference)
+   * \param dataset - The dataset to load in, as a float array
+   * \param sample_fields - The names of the fields for the samples array
+   * \param sample_fields - The names of the fields in the dataset array
+   * \param cuts - A list of observables to be applied as cuts
    */
   static void read_dataset_to_samples(std::vector<float>& samples,
                                       std::vector<float>& dataset,

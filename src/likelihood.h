@@ -1,11 +1,11 @@
+#ifndef __LIKELIHOOD_H__
+#define __LIKELIHOOD_H__
+
 /**
  * \file likelihood.h
  *
  * Utilities for working with likelihood functions.
- */
-
-#ifndef __LIKELIHOOD_H__
-#define __LIKELIHOOD_H__
+*/
 
 #include <map>
 #include <string>
@@ -21,7 +21,7 @@ class TH1F;
  *
  * Wraps a TNtuple containing samples from the likelihood function, providing
  * statistics functions.
- */
+*/
 class LikelihoodSpace {
   public:
     /**
@@ -29,18 +29,19 @@ class LikelihoodSpace {
      *
      * Note: The instance takes over ownership of the samples TNtuple!
      *
-     * \param samples A set of samples of the likelihood space
-     */
+     * \param samples - A set of samples of the likelihood space
+     * \param cl - Confidence level for error estimation
+    */
     LikelihoodSpace(TNtuple* samples, float cl=0.68);
 
     /** Destructor. */
     virtual ~LikelihoodSpace();
 
     /** Get the parameters and uncertainties for the maximum L point. */
-    std::map<std::string, Interval> get_best_fit();
+    std::map<std::string, Interval> get_best_fit() const { return ml_params; }
 
     /** Print the parameters for the maximum-likelihood point. */
-    void print_best_fit();
+    void print_best_fit() const;
 
     /** Print the correlation matrix for all of the parameters. */
     void print_correlations();
@@ -50,7 +51,7 @@ class LikelihoodSpace {
      *
      * \param name Name of dimension to project out
      * \returns ROOT TH1F with projected histogram
-     */
+    */
     TH1F* get_projection(std::string name);
 
     /**
@@ -58,16 +59,17 @@ class LikelihoodSpace {
      *
      * \param delta Number of likelihood units from max to include
      * \returns TNtuple with requested samples
-     */
+    */
     TNtuple* get_contour(float delta);
 
     /**
      * Extract the best-fit parameters and uncertainties.
      *
      * \param[out] ml The likelihood at the maximum (negative for NLL)
+     * \parm cl - Confidence level for the error estimate
      * \param error_type Type of uncertainty calculation to use
      * \returns A map from parameter names to Intervals
-     */
+    */
     std::map<std::string, Interval>
     extract_best_fit(float& ml, float cl, ErrorType error_type=ERROR_CONTOUR);
 
@@ -75,7 +77,7 @@ class LikelihoodSpace {
      * Get a pointer to the TNtuple of samples.
      *
      * \returns A pointer to the samples
-     */
+    */
     const TNtuple* get_samples() { return samples; }
 
   private:

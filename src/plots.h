@@ -1,11 +1,11 @@
+#ifndef __PLOTS_H__
+#define __PLOTS_H__
+
 /**
  * \file plots.h
  *
  * Utilities for generating plots.
  */
-
-#ifndef __PLOTS_H__
-#define __PLOTS_H__
 
 #include <vector>
 #include <string>
@@ -43,7 +43,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
 
 
 /**
- * Convenience class for making 1D spectral plots.
+ * Convenience class for making 1D spectrum plots.
  */
 class SpectralPlot {
   public:

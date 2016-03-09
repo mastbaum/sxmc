@@ -3,7 +3,7 @@
 
 #include <sxmc/interval.h>
 
-std::string Interval::str() {
+std::string Interval::str() const {
   float lower_error = this->point_estimate - this->lower;
   float upper_error = this->upper - this->point_estimate;
 

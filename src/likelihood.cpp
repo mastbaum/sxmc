@@ -26,14 +26,9 @@ LikelihoodSpace::~LikelihoodSpace() {
 }
 
 
-std::map<std::string, Interval> LikelihoodSpace::get_best_fit() {
-  return ml_params;
-}
-
-
-void LikelihoodSpace::print_best_fit() {
+void LikelihoodSpace::print_best_fit() const {
   std::cout << "-- Best fit --" << std::endl;
-  std::map<std::string, Interval>::iterator it;
+  std::map<std::string, Interval>::const_iterator it;
   for (it=this->ml_params.begin(); it!=ml_params.end(); ++it) {
     if (it->first == "likelihood") {
       continue;

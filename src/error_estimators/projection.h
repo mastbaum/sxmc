@@ -1,9 +1,9 @@
+#ifndef __ERRORS_PROJECTION_H__
+#define __ERRORS_PROJECTION_H__
+
 /**
  * \file projection.h
  */
-
-#ifndef __ERRORS_PROJECTION_H__
-#define __ERRORS_PROJECTION_H__
 
 #include <string>
 
@@ -17,6 +17,8 @@ namespace sxmc {
   namespace errors {
 
 /**
+ * \class sxmc::errors::Projection
+ *
  * 1D projection error estimator.
  *
  * Error estimator which uses a 1D projection of the likelihood space to
@@ -35,8 +37,16 @@ class Projection : public ErrorEstimator {
     Projection(LikelihoodSpace* _lspace, float _cl=0.68)
         : ErrorEstimator(_lspace, _cl) {}
 
+    /** Destructor */
     virtual ~Projection() {};
 
+    /**
+     * Get the interval for a given parameter.
+     *
+     * \param name - The name of the parameter
+     * \param point_estimate - The best-fit point
+     * \returns An Interval with the error estimate
+    */
     virtual Interval get_interval(std::string name, float point_estimate);
 };
 

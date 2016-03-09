@@ -1,10 +1,10 @@
+#ifndef __NLL_H__
+#define __NLL_H__
+
 /**
  * \file nll_kernels.h
  * \brief CUDA/HEMI kernels supporting NLL calculation
- */
-
-#ifndef __NLL_H__
-#define __NLL_H__
+*/
 
 #include <cuda.h>
 #include <hemi/hemi.h>
@@ -21,7 +21,7 @@
 /**
  * \typedef RNGState
  * \brief Defines RNG for CURAND, ignored in CPU mode
- */
+*/
 #ifdef __CUDACC__
 typedef curandStateXORWOW RNGState;
 #else
@@ -29,6 +29,7 @@ typedef int RNGState;
 #endif
 
 class TNtuple;
+
 
 #ifdef __CUDACC__
 /**
@@ -39,7 +40,7 @@ class TNtuple;
  * \param nthreads Number of threads (same as the number of states)
  * \param seed Random seed shared by all generators
  * \param state Array of CUDA RNG states
- */
+*/
 __global__ void init_device_rngs(int nthreads, unsigned long long seed,
                                  curandState* state);
 #endif
@@ -55,7 +56,7 @@ __global__ void init_device_rngs(int nthreads, unsigned long long seed,
  * \param sigma Standard deviations to sample for each dimension
  * \param current_vector Vector of current parameters
  * \param proposed_vector Output vector of proposed parameters
- */
+*/
 HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
                              const float* sigma,
                              const double* current_vector,
@@ -81,7 +82,7 @@ HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
  * \param accepted Number of accepted steps
  * \param counter The number of steps in the buffer
  * \param jump_buffer The step buffer
- */
+*/
 HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
                           const double* nll_proposed, double* v_current,
                           const double* v_proposed, unsigned nparameters,
@@ -99,7 +100,7 @@ HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
  * \param ne Number of events in the data
  * \param ns Number of signals
  * \param sums Output sums for subsets of events
- */
+*/
 HEMI_KERNEL(nll_event_chunks)(const float* lut, const int* dataweights,
                               const double* pars, const size_t ne,
                               const size_t ns, double* sums);
@@ -113,7 +114,7 @@ HEMI_KERNEL(nll_event_chunks)(const float* lut, const int* dataweights,
  * \param nthreads Number of threads == number of sums to total
  * \param sums The partial sums
  * \param total_sum Output: the total sum
- */
+*/
 HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
                               double* total_sum);
 
@@ -131,7 +132,7 @@ HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
  * \param sigmas Gaussian constraint sigma, same units as means
  * \param events_total Sum of event term contribution
  * \param nll The total NLL
- */
+*/
 HEMI_KERNEL(nll_total)(const size_t nparameters, const double* pars,
                        const size_t nsignals,
                        const double* means,
@@ -162,7 +163,7 @@ HEMI_KERNEL(nll_total)(const size_t nparameters, const double* pars,
  * \param nparameters The number of parameters (dimensions in the L space)
  * \param sigma The jump distribution widths in each dimension
  * \param debug_mode Enable debugging mode, where every step is accepted
- */
+*/
 HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
                                         const double* sums, const size_t ns,
                                         const double* means,
