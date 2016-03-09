@@ -3,12 +3,30 @@ Signal Extraction with MCMC
 A GPU-accelerated unbinned maximum likelihood fit using a Markov Chain Monte
 Carlo, intended for calculating confidence intervals or limits.
 
-Building
---------
+Documentation
+-------------
+`sxmc` includes both a User's Guide and thorough documentation of the code.
+
+To build the User's Guide (requires [Sphinx](http://sphinx.pocoo.org)):
+
+    $ cd doc
+    $ make html
+
+To build the code documentation (requires [Doxygen](http://doxygen.org)):
+
+    $ make doc
+
+The output is placed into the `doc/html` directory.
+
+Getting Started
+---------------
 `sxmc` requires the following libraries:
 
 * [ROOT](http://root.cern.ch)
-* [Doxygen](http://doxygen.org) (if building documentation)
+* [CUDA Runtime](https://developer.nvidia.com/cuda-downloads)
+
+Set the environment variable `CUDART_ROOT` to the path to the CUDA runtime,
+where CUDA headers can be found.
 
 It also uses [hemi](https://github.com/harrism/hemi), which is included as a
 git submodule. After cloning `sxmc`, run:
@@ -16,8 +34,9 @@ git submodule. After cloning `sxmc`, run:
     $ git submodule init
     $ git submodule update
 
-`sxmc` runs much faster with the help of a CUDA-enabled GPU. To build with GPU
-support, set `CUDA_ROOT` to point to your installation of the CUDA tools:
+`sxmc` can run without any special hardware, but runs much faster with the
+help of a CUDA-enabled GPU. To build with GPU support, set `CUDA_ROOT` to
+point to your installation of the CUDA tools, for example:
 
     $ CUDA_ROOT=/usr/local/cuda make
 
@@ -34,18 +53,8 @@ using GPU support, pass the `OPTIMIZE=1` flag to make:
 
     $ make OPTIMIZE=1
 
-Documentation
--------------
-The code is fully documented for Doxygen. To view HTML documentation online,
-see [here](http://mastbaum.github.io/sxmc/doc/html). To build HTML and LaTeX
-documentation yourself, run
-
-    $ make doc
-
-The output is placed into the `doc` directory.
-
-Usage
------
+Basic Usage
+-----------
 1. Create ROOT data files: The data used to build the PDFs is stored in
    TNtuples. The branch names match those used in the configuration file.
 
