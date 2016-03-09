@@ -1,5 +1,6 @@
 #ifndef __PDFZ_H__
 #define __PDFZ_H__
+
 /**
  * \file pdfz.h
  *
@@ -10,26 +11,25 @@
  * probability density function over a finite volume.
  *
  * These classes are designed to be incorporated into a larger GPU-based
- * program using Hemi to manage GPU buffers.  As a result, the API is
+ * program using Hemi to manage GPU buffers. As a result, the API is
  * designed to minimizes unnecessary copying of data between the CPU and GPU
  * by instead registering pointers to Hemi arrays before evaluation.
  * Additionally, to make better use of CUDA devices with compute 
  * capability 2.0 and greater, each evaluator object has its own CUDA
- * stream.  Kernels on different streams can run in parallel, so when
+ * stream. Kernels on different streams can run in parallel, so when
  * there are many PDFs to evaluate, the best approach is to call the 
  * EvalAsync() method on each evaluator object first, then call EvalFinished()
  * to block until the calculation is complete.
  *
  * The evaluator object computes the value of the PDF only at specific
- * "evaluation points".  As part of the evaluation step, the samples can be 
+ * "evaluation points". As part of the evaluation step, the samples can be 
  * transformed on the fly to mimic various systematic uncertainties,
- * like scale, offset or resolution.  A parameter buffer is used to control
- * these systematic transformations.  In addition, a normalization buffer
+ * like scale, offset or resolution. A parameter buffer is used to control
+ * these systematic transformations. In addition, a normalization buffer
  * is updated during evaluation to record the total number of samples
  * that were within the PDF domain after the systematic transformations 
- * were applied.  This can be used to calculate an efficiency correction
+ * were applied. This can be used to calculate an efficiency correction
  * in certain kinds of applications.
- * 
  *
  * Example usage
  * -------------
@@ -41,7 +41,7 @@
  *     const int nparams = 2; // two systematic parameters
  *
  *     std::vector<float> samples(nsamples * nfields);
- *     this->weights.copyFromHost(&_weights.front(), _weights.size());
+ *     std::vector<int> weights(nsamples, 1);
  *     std::vector<double> lower(nobs);
  *     std::vector<double> upper(nobs);
  *     std::vector<float> eval_points(neval_points * nobs);
@@ -58,7 +58,8 @@
  *     std::vector<int> nbins(2, 10); // 10 bins in each dimension
  *   
  *     // Setup evaluator
- *     pdfz::EvalHist pdf(samples, nfields, nobs, lower, upper, nbins);
+ *     pdfz::EvalHist pdf(samples, weights, nfields, nobs,
+ *                        lower, upper, nbins);
  *     pdf.SetEvalPoints(eval_points);
  *     pdf.SetPDFValueBuffer(&pdf_values, 0, 1);  // no offset, unit stride
  *     pdf.SetNormalizationBuffer(&normalizations, 0);
@@ -74,7 +75,7 @@
  *     // Do it!
  *     pdf.EvalAsync();
  *     pdf.EvalFinished();
- */
+*/
 
 #include <string>
 #include <vector>
@@ -88,7 +89,7 @@
 namespace pdfz {
 
 /**
- * \struct Error
+ * \struct pdfz::Error
  * \brief Generic PDF-related exception
 */
 struct Error {
@@ -100,8 +101,8 @@ struct Error {
 
 
 /** 
- * \struct Systematic
- * \brief  Base struct used to describe a systematic uncertainty
+ * \struct pdfz::Systematic
+ * \brief Base struct used to describe a systematic uncertainty
 */
 struct Systematic {
   enum Type {
@@ -121,8 +122,8 @@ struct Systematic {
 
 
 /** 
- * \struct ShiftSystematic
- * \brief  Offset an observable.
+ * \struct pdfz::ShiftSystematic
+ * \brief Offset an observable.
  *
  * Transform x' = x + p
 */
@@ -136,7 +137,7 @@ ShiftSystematic(int _obs, int _par)
 
 
 /**
- * \struct ScaleSystematic
+ * \struct pdfz::ScaleSystematic
  * \brief Rescale an observable.
  *
  * Transform x' = x * (1 + p)
@@ -151,7 +152,7 @@ ScaleSystematic(int _obs, int _par)
 
 
 /**
- * \struct ResolutionScaleSystematic
+ * \struct pdfz::ResolutionScaleSystematic
  * \brief Fractionally alter the resolution of an observable by rescaling
  *        its distance from a "true" value.
  *
@@ -174,6 +175,10 @@ struct CudaState; // Hide CUDA-related state from callers
 struct SystematicDescriptor; // Also hide representation of systematics
 
 
+/**
+ * \class pdfz::Eval
+ * \brief Base class for histogram evaluators.
+*/
 class Eval {
 public:
   /**
@@ -294,7 +299,10 @@ protected:
 };
 
 
-/** Evaluate a PDF using an N-dimensional histogram */
+/**
+ * \class pdfz::EvalHist
+ * \brief Evaluate a PDF using an N-dimensional histogram
+*/
 class EvalHist : public Eval {
 public:
   /**
@@ -391,17 +399,20 @@ protected:
 };
 
 
-/** Evaluate a PDF using a kernel density estimator */
-class EvalKernel : public Eval {
-  /**
-   * See Eval::Eval() for description of parameters.  
-   * ``bandwidth scale`` gives rescales the bandwidths in each dimension
-   * by the given value.  Pass an array of 1.0f to use the default
-   * bandwidth calculation.
+/**
+ * \class pdfz::EvalKernel
+ * \brief Evaluate a PDF using a kernel density estimator
+ *
+ * See Eval::Eval() for description of parameters.
+ *
+ * ``bandwidth scale`` gives rescales the bandwidths in each dimension
+ * by the given value. Pass an array of 1.0f to use the default
+ * bandwidth calculation.
 
-   * Raises all exceptions of PDFEval(), as well as pdfz::Error if 
-   * bandwidth_scale.size() != nobs.
-  */
+ * Raises all exceptions of PDFEval(), as well as pdfz::Error if
+ * bandwidth_scale.size() != nobs.
+*/
+class EvalKernel : public Eval {
   EvalKernel(const std::vector<float> &samples, int nfields, int nobservables,
              const std::vector<double> &lower,
              const std::vector<double> &upper,
