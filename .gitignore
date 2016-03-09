@@ -1,5 +1,6 @@
 build/*
-doc
+doc/html
+doc/latex
 test_sxmc
 *.swp
 include/*
