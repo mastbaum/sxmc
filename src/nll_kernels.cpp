@@ -85,6 +85,8 @@ HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
                               const int* __restrict__ dataweights,
                               const double* __restrict__ pars,
                               const size_t ne, const size_t ns,
+                              const unsigned* norms,
+                              const unsigned* norms_nominal,
                               double* sums) {
   int offset = hemiGetElementOffset();
   int stride = hemiGetElementStride();
@@ -94,7 +96,9 @@ HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
     double s = 0;
     for (size_t j=0; j<ns; j++) {
       float v = lut[j * ne + i];
-      s += pars[j] * (!isnan(v) ? v : 0);  // Handle nans from empty hists
+      // Efficiency correction due to systematics
+      float se = 1.0 * norms[j] / norms_nominal[j];
+      s += pars[j] * se * (!isnan(v) ? v : 0);  // Handle nans from empty hists
     }
     if (s > 0) {
       sum += log(s) * dataweights[i];
@@ -142,6 +146,7 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
                       const double* means,
                       const double* sigmas,
                       const double* events_total,
+                      const unsigned* norms, const unsigned* norms_nominal,
                       double* nll) {
   // Total from sum over events, once
   double sum = -events_total[0];
@@ -160,7 +165,9 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
 
     // Normalization constraints
     if (i < nsignals) {
-      sum += pars[i];
+      // Efficiency correction due to systematics
+      float se = 1.0 * norms[i] / norms_nominal[i];
+      sum += pars[i] * se;
     }
 
     // Gaussian constraints
@@ -203,8 +210,10 @@ HEMI_KERNEL(nll_total)(const size_t npars, const double* pars,
                        const size_t nsignals,
                        const double* means, const double* sigmas,
                        const double* events_total,
+                       const unsigned* norms, const unsigned* norms_nominal,
                        double* nll) {
-  nll_total_device(npars, nsignals, pars, means, sigmas, events_total, nll);
+  nll_total_device(npars, nsignals, pars, means, sigmas, events_total,
+                   norms, norms_nominal, nll);
 }
 
 
@@ -219,6 +228,8 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
                                         int* accepted, int* counter,
                                         float* jump_buffer, int nparameters,
                                         const float* sigma,
+                                        const unsigned* norms,
+                                        const unsigned* norms_nominal,
                                         const bool debug_mode) {
   double total_sum;
 
@@ -230,7 +241,7 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
 
   if (hemiGetElementOffset() == 0) {
     nll_total_device(nparameters, ns, v_proposed, means, sigmas, &total_sum,
-                     nll_proposed);
+                     norms, norms_nominal, nll_proposed);
 
     jump_decider_device(rng, nll_current, nll_proposed, v_current, v_proposed,
                         nparameters, accepted, counter, jump_buffer,

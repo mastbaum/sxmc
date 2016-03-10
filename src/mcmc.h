@@ -97,6 +97,7 @@ protected:
    */
   void nll(const float* lut, const int* dataweights, size_t nevents,
            const double* v, double* nll,
+           const unsigned* norms, const unsigned* norms_nominal,
            double* event_partial_sums,
            double* event_total_sum);
 

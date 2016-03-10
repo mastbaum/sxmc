@@ -220,6 +220,7 @@ EvalHist::~EvalHist() {
   delete this->bins;
 }
 
+
 void EvalHist::SetEvalPoints(const std::vector<float>& points) {
   if (points.size() % this->nobservables != 0) {
     throw Error("Number of entries in evaluation points array not divisible by number of observables.");
@@ -276,8 +277,8 @@ void EvalHist::SetEvalPoints(const std::vector<float>& points) {
 
 ///// EvalHist kernels
 HEMI_DEV_CALLABLE_INLINE
-void apply_systematic(const SystematicDescriptor *syst,
-                      double *fields, const double *parameters,
+void apply_systematic(const SystematicDescriptor* syst,
+                      double* fields, const double* parameters,
                       const int param_stride) {
   switch (syst->type) {
     case Systematic::SHIFT:
@@ -421,7 +422,7 @@ void EvalHist::EvalAsync(bool do_eval_pdf) {
                      this->bin_nthreads_per_block, 0,
                      this->cuda_state->stream,
                      (int) this->samples.size(), this->samples.readOnlyPtr(),
-                     this->weights.readOnlyPtr(), 
+                     this->weights.readOnlyPtr(),
                      this->nobservables, this->nfields,
                      this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
                      this->lower.readOnlyPtr(), this->upper.readOnlyPtr(),
@@ -430,10 +431,11 @@ void EvalHist::EvalAsync(bool do_eval_pdf) {
                      this->param_stride, this->bins->ptr(),
                      this->norm_buffer->writeOnlyPtr() + this->norm_offset);
 
-  if (this->read_bins == 0 || !do_eval_pdf)
-    // This can happen if someone wants to create a histogram
-    // with no eval points.
+  // This can happen if someone wants to create a histogram
+  // with no eval points.
+  if (this->read_bins == 0 || !do_eval_pdf) {
     return;
+  }
 
   HEMI_KERNEL_LAUNCH(eval_pdf, this->eval_nblocks,
                      this->eval_nthreads_per_block, 0,
@@ -641,27 +643,28 @@ void EvalHist::OptimizeBin() {
       int block_size = block_sizes[iblock];
 
       // Skip obviously too-large launch configurations
-      if (grid_size * block_size >= 2 * nsamples)
+      if (grid_size * block_size >= 2 * nsamples) {
           continue;
+      }
 
       timer.Start();
       for (int irep=0; irep<nreps; irep++) {
-          HEMI_KERNEL_LAUNCH(bin_samples, grid_size, block_size, 0,
-                             this->cuda_state->stream,
-                             (int) this->samples.size(),
-                             this->samples.readOnlyPtr(),
-                             this->weights.readOnlyPtr(), 
-                             this->nobservables, this->nfields,
-                             this->bin_stride.readOnlyPtr(),
-                             this->nbins.readOnlyPtr(),
-                             this->lower.readOnlyPtr(),
-                             this->upper.readOnlyPtr(),
-                             nsyst, syst_ptr,
-                             (this->param_buffer->readOnlyPtr() +
-                              this->param_offset),
-                             this->param_stride, this->bins->ptr(),
-                             (this->norm_buffer->writeOnlyPtr() +
-                              this->norm_offset));
+        HEMI_KERNEL_LAUNCH(bin_samples, grid_size, block_size, 0,
+                           this->cuda_state->stream,
+                           (int) this->samples.size(),
+                           this->samples.readOnlyPtr(),
+                           this->weights.readOnlyPtr(),
+                           this->nobservables, this->nfields,
+                           this->bin_stride.readOnlyPtr(),
+                           this->nbins.readOnlyPtr(),
+                           this->lower.readOnlyPtr(),
+                           this->upper.readOnlyPtr(),
+                           nsyst, syst_ptr,
+                           (this->param_buffer->readOnlyPtr() +
+                            this->param_offset),
+                           this->param_stride, this->bins->ptr(),
+                           (this->norm_buffer->writeOnlyPtr() +
+                            this->norm_offset));
       }
 
       checkCuda(cudaStreamSynchronize(this->cuda_state->stream));

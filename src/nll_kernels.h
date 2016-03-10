@@ -99,11 +99,16 @@ HEMI_KERNEL(jump_decider)(RNGState* rng, double* nll_current,
  * \param pars Event rates (normalizations) for each signal
  * \param ne Number of events in the data
  * \param ns Number of signals
+ * \param norms The number of events in the PDF range (with systematics)
+ * \param norms_nominal The number of events nominally in the PDF
  * \param sums Output sums for subsets of events
 */
 HEMI_KERNEL(nll_event_chunks)(const float* lut, const int* dataweights,
                               const double* pars, const size_t ne,
-                              const size_t ns, double* sums);
+                              const size_t ns,
+                              const unsigned* norms,
+                              const unsigned* norms_nominal,
+                              double* sums);
 
 
 /**
@@ -131,6 +136,8 @@ HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
  * \param means Expected rates and means of systematics
  * \param sigmas Gaussian constraint sigma, same units as means
  * \param events_total Sum of event term contribution
+ * \param norms The number of events in the PDF range (with systematics)
+ * \param norms_nominal The number of events nominally in the PDF
  * \param nll The total NLL
 */
 HEMI_KERNEL(nll_total)(const size_t nparameters, const double* pars,
@@ -138,6 +145,8 @@ HEMI_KERNEL(nll_total)(const size_t nparameters, const double* pars,
                        const double* means,
                        const double* sigmas,
                        const double* events_total,
+                       const unsigned* norms,
+                       const unsigned* norms_nominal,
                        double* nll);
 
 
@@ -162,6 +171,8 @@ HEMI_KERNEL(nll_total)(const size_t nparameters, const double* pars,
  * \param jump_buffer The buffer of steps (vectors and likelihoods)
  * \param nparameters The number of parameters (dimensions in the L space)
  * \param sigma The jump distribution widths in each dimension
+ * \param norms The number of events in the PDF range (with systematics)
+ * \param norms_nominal The number of events nominally in the PDF
  * \param debug_mode Enable debugging mode, where every step is accepted
 */
 HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
@@ -175,6 +186,8 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
                                         int* accepted, int* counter,
                                         float* jump_buffer, int nparameters,
                                         const float* sigma,
+                                        const unsigned* norms,
+                                        const unsigned* norms_nominal,
                                         const bool debug_mode=false);
 
 #endif  // __NLL_H__

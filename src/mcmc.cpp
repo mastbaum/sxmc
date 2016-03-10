@@ -123,6 +123,10 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
   hemi::Array<unsigned> normalizations(this->nsignals, true);
   normalizations.writeOnlyHostPtr();
 
+  // Buffer for baseline normalizations with nominal systematics
+  hemi::Array<unsigned> normalizations_nominal(this->nsignals, true);
+  normalizations_nominal.writeOnlyHostPtr();
+
   // Buffers for nll values at current and proposed parameter vectors
   hemi::Array<double> current_nll(1, true);
   current_nll.writeOnlyHostPtr();
@@ -176,16 +180,18 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
     pdfz::Eval* p = this->pdfs[i];
     p->SetEvalPoints(data);
     p->SetPDFValueBuffer(&lut, i * nevents, 1);
-    p->SetNormalizationBuffer(&normalizations, i);
+    p->SetNormalizationBuffer(&normalizations_nominal, i);
     p->SetParameterBuffer(&current_vector, this->nsignals);
     p->EvalAsync();
     p->EvalFinished();
+    p->SetNormalizationBuffer(&normalizations, i);
     p->SetParameterBuffer(&proposed_vector, this->nsignals);
   }
 
   // Calculate nll with initial parameters
   nll(lut.readOnlyPtr(), dataweights.readOnlyPtr(), nevents,
       current_vector.readOnlyPtr(), current_nll.writeOnlyPtr(),
+      normalizations.readOnlyPtr(), normalizations_nominal.readOnlyPtr(),
       event_partial_sums.ptr(), event_total_sum.ptr());
 
   HEMI_KERNEL_LAUNCH(pick_new_vector, 1, 64, 0, 0,
@@ -208,8 +214,12 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
         pdfs[i]->EvalFinished();
       }
     }
+    else {
+      normalizations.copyFromDevice(normalizations_nominal.readOnlyPtr(),
+                                    normalizations_nominal.size());
+    }
 
-    // Re-tune jump distribution based on burn-in phase
+    // Re-tune jump distribution based on burn-in phase steps
     if (i == burnin_steps || i == 2 * burnin_steps) {
       std::cout << "MCMC: Burn-in phase completed after " << burnin_steps
                 << " steps" << std::endl;
@@ -232,6 +242,7 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
 
         hsproj->Delete();
       }
+
       // Save all steps when in debug mode
       if (!debug_mode) {
         nt->Reset();
@@ -244,6 +255,8 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
                        lut.readOnlyPtr(), dataweights.readOnlyPtr(),
                        proposed_vector.readOnlyPtr(),
                        nevents, this->nsignals,
+                       normalizations.readOnlyPtr(),
+                       normalizations_nominal.readOnlyPtr(),
                        event_partial_sums.ptr());
 
     // Accept/reject the jump, add current position to the buffer
@@ -264,6 +277,8 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
                        jump_buffer.writeOnlyPtr(),
                        this->nparameters,
                        jump_width.readOnlyPtr(),
+                       normalizations.readOnlyPtr(),
+                       normalizations_nominal.readOnlyPtr(),
                        debug_mode);
 
     // Flush the jump buffer periodically
@@ -304,12 +319,14 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
 
 
 void MCMC::nll(const float* lut, const int* dataweights, size_t nevents,
-               const double* v, double* nll, double* event_partial_sums,
-               double* event_total_sum) {
+               const double* v, double* nll,
+               const unsigned* norms, const unsigned* norms_nominal,
+               double* event_partial_sums, double* event_total_sum) {
   // Partial sums of event term
   HEMI_KERNEL_LAUNCH(nll_event_chunks,
                      this->nnllblocks, this->nllblocksize, 0, 0,
                      lut, dataweights, v, nevents, this->nsignals,
+                     norms, norms_nominal,
                      event_partial_sums);
 
   // Total of event term
@@ -322,6 +339,6 @@ void MCMC::nll(const float* lut, const int* dataweights, size_t nevents,
                      this->nparameters, v, this->nsignals,
                      this->parameter_means->readOnlyPtr(),
                      this->parameter_sigma->readOnlyPtr(),
-                     event_total_sum, nll);
+                     event_total_sum, norms, norms_nominal, nll);
 }
 
