@@ -188,6 +188,9 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
     p->SetParameterBuffer(&proposed_vector, this->nsignals);
   }
 
+  normalizations.copyFromDevice(normalizations_nominal.readOnlyPtr(),
+                                normalizations_nominal.size());
+
   // Calculate nll with initial parameters
   nll(lut.readOnlyPtr(), dataweights.readOnlyPtr(), nevents,
       current_vector.readOnlyPtr(), current_nll.writeOnlyPtr(),
@@ -213,10 +216,6 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
       for (size_t i=0; i<this->pdfs.size(); i++) {
         pdfs[i]->EvalFinished();
       }
-    }
-    else {
-      normalizations.copyFromDevice(normalizations_nominal.readOnlyPtr(),
-                                    normalizations_nominal.size());
     }
 
     // Re-tune jump distribution based on burn-in phase steps
