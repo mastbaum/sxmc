@@ -29,6 +29,7 @@ SignalParams::SignalParams(const Json::Value& params, float scale) {
   }
 
   sigma = params.get("constraint", 0.0).asFloat() * scale;
+  fixed = params.get("fixed", false).asBool();
   title = params.get("title", "Other").asString();
   category = params.get("category", "").asString();
 
@@ -100,11 +101,11 @@ FitConfig::get_pdf_systematics(const Json::Value& pdf_params) {
     assert(s_json.isMember("type"));
     std::string type_string = s_json["type"].asString();
 
-    if (type_string == "scale") {
-        s.type = pdfz::Systematic::SCALE;
-    }
-    else if (type_string == "shift") {
+    if (type_string == "shift") {
         s.type = pdfz::Systematic::SHIFT;
+    }
+    else if (type_string == "scale") {
+        s.type = pdfz::Systematic::SCALE;
     }
     else if (type_string == "resolution_scale") {
         s.type = pdfz::Systematic::RESOLUTION_SCALE;
@@ -117,9 +118,56 @@ FitConfig::get_pdf_systematics(const Json::Value& pdf_params) {
       throw(1);
     }
 
+    // Parameter means and standard deviations can be a number or an array,
+    // where the latter becomes coefficients in a power series expansion in
+    // the observable.
     assert(s_json.isMember("mean"));
-    s.mean = s_json["mean"].asFloat();
-    s.sigma = s_json.get("sigma", 0.0).asFloat();
+    short npars = s_json["mean"].isArray() ? s_json["mean"].size() : 1;
+    double* means = NULL;
+    double* sigmas = NULL;
+
+    if (s_json["mean"].isArray()) {
+      short npars = s_json["mean"].size();
+      means = new double[npars];
+      for (short i=0; i<npars; i++) {
+        means[i] = s_json["mean"][i].asDouble();
+      }
+    }
+    else {
+      means = new double[1];
+      means[0] = s_json["mean"].asDouble();
+    }
+
+    if (s_json.isMember("sigma")) {
+      // Constraints for all parameters or no parameters
+      assert(s_json["sigma"].isArray() == s_json["mean"].isArray());
+
+      if (s_json["sigma"].isArray()) {
+        // Constraints on each of multiple parameters
+        assert(s_json["sigma"].size() == (unsigned) npars);
+        sigmas = new double[npars];
+        for (short i=0; i<npars; i++) {
+          sigmas[i] = s_json["sigma"][i].asDouble();
+        }
+      }
+      else {
+        // A constraint on a scalar parameter
+        sigmas = new double[1];
+        sigmas[0] = s_json["sigma"].asDouble();
+      }
+    }
+    else {
+      // No constraints specified, set them all to zero
+      for (short i=0; i<npars; i++) {
+        sigmas[i] = 0;
+      }
+    }
+
+    s.npars = npars;
+    s.means = means;
+    s.sigmas = sigmas;
+
+    // Fixing a systematic is all-or-nothing
     s.fixed = s_json.get("fixed", false).asBool();
 
     all_systematics[it.key().asString()] = s;
@@ -159,7 +207,6 @@ FitConfig::FitConfig(std::string filename) {
 
   this->data = NULL;  // Deferred to signal loading phase
 
-
   //// PDF parameters
   const Json::Value pdf_params = root["pdfs"];
 
@@ -168,7 +215,6 @@ FitConfig::FitConfig(std::string filename) {
 
   std::map<std::string, Systematic> all_systematics = \
     get_pdf_systematics(pdf_params);
-
 
   //// Fit parameters
   const Json::Value fit_params = root["fit"];
@@ -247,6 +293,17 @@ FitConfig::FitConfig(std::string filename) {
     signal_names.push_back((*it).asString());
   }
 
+  std::vector<std::string> data_signals;
+  if (experiment_params.isMember("data")) {
+    for (unsigned k=0; k<experiment_params["data"].size(); k++) {
+      std::string dsname = experiment_params["data"][k].asString();
+      assert(std::find(signal_names.begin(), signal_names.end(), dsname) ==
+             signal_names.end());
+      data_signals.push_back(dsname);
+    }
+    this->data = new std::vector<Signal>;
+  }
+
   // Loop over all possible signals
   const Json::Value all_signals = root["signals"];
   for (Json::Value::const_iterator it=all_signals.begin();
@@ -254,10 +311,8 @@ FitConfig::FitConfig(std::string filename) {
     std::string name = it.key().asString();
 
     // Check if this signal is being used as fit data (and not as a PDF!)
-    std::string data_signal = experiment_params.get("data", "").asString();
-    assert(std::find(signal_names.begin(), signal_names.end(), data_signal) ==
-           signal_names.end());
-    if (data_signal == name) {
+    if (std::find(data_signals.begin(), data_signals.end(), name) !=
+                  data_signals.end()) {
       const Json::Value signal_params = all_signals[name];
       SignalParams sp(signal_params, 1.0);
       std::cout << "FitConfig: Loading data: " << name << std::endl;
@@ -269,10 +324,10 @@ FitConfig::FitConfig(std::string filename) {
         cc.push_back(this->cuts[ii]);
       }
 
-      this->data = \
-        new Signal(name, sp.title, sp.nexpected, sp.sigma, sp.category,
-                   this->sample_fields, this->observables, cc,
-                   this->systematics, sp.files);
+      this->data->push_back(
+        Signal(name, sp.title, sp.nexpected, sp.sigma, sp.category,
+               this->sample_fields, this->observables, cc,
+               this->systematics, sp.files));
 
       continue;
     }
@@ -294,7 +349,7 @@ FitConfig::FitConfig(std::string filename) {
     this->signals.push_back(
       Signal(name, sp.title, sp.nexpected, sp.sigma, sp.category,
              this->sample_fields, this->observables, this->cuts,
-             this->systematics, sp.files));
+             this->systematics, sp.files, sp.fixed));
   }
 }
 
@@ -354,14 +409,16 @@ void FitConfig::print() const {
       if (it->type == pdfz::Systematic::RESOLUTION_SCALE) {
         std::cout << "    Truth: " << it->truth_field << std::endl;
       }
-      std::cout << "    Mean: "<< it->mean << std::endl
-                << "    Constraint: ";
-      if (it->sigma != 0) {
-        std::cout << it->sigma << std::endl;
+      std::cout << "    Means: ";
+      for (size_t i=0; i<it->npars; i++) {
+        std::cout << "(" << i << ") " << it->means[i] << " ";
       }
-      else {
-        std::cout << "none" << std::endl;
+      std::cout << std::endl;
+      std::cout << "    Constraints: ";
+      for (size_t i=0; i<it->npars; i++) {
+        std::cout << "(" << i << ") " << it->sigmas[i] << " ";
       }
+      std::cout << std::endl;
       std::cout << "    Fixed: ";
       if (it->fixed) {
         std::cout << "yes" << std::endl;

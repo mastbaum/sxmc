@@ -1,8 +1,9 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <sstream>
 #include <string>
-#include <assert.h>
+#include <cassert>
 #include <hemi/hemi.h>
 #include <TH1D.h>
 #include <TH1F.h>
@@ -39,19 +40,41 @@ MCMC::MCMC(const std::vector<Signal>& signals,
   this->nnllthreads = this->nnllblocks * this->nllblocksize;
   this->nreducethreads = 128;
 
+  // Total number of systematic parameters
+  size_t npars = 0;
+  for (size_t i=0; i<systematics.size(); i++) {
+    npars += systematics[i].npars;
+  }
+
   // Set mean/expectation and sigma for all parameters
-  this->nparameters = this->nsignals + this->nsystematics;
+  this->nparameters = this->nsignals + npars;
   this->parameter_means = new hemi::Array<double>(this->nparameters, true);
   this->parameter_sigma = new hemi::Array<double>(this->nparameters, true);
+  this->parameter_fixed.resize(this->nparameters);
   for (size_t i=0; i<this->nsignals; i++) {
     this->parameter_means->writeOnlyHostPtr()[i] = signals[i].nexpected;
     this->parameter_sigma->writeOnlyHostPtr()[i] = signals[i].sigma;
+    this->parameter_fixed[i] = signals[i].fixed;
   }
-  for (size_t i=0; i<this->nsystematics; i++) {
-    this->parameter_means->writeOnlyHostPtr()[this->nsignals + i] = \
-      systematics[i].mean;
-    this->parameter_sigma->writeOnlyHostPtr()[this->nsignals + i] = \
-      systematics[i].sigma;
+
+  this->systematics_fixed = true;
+
+  size_t k = this->nsignals;
+  for (size_t i=0; i<systematics.size(); i++) {
+    if (!systematics[i].fixed) {
+      this->systematics_fixed = false;
+    }
+    for (size_t j=0; j<systematics[i].npars; j++) {
+      this->parameter_means->writeOnlyHostPtr()[k] = systematics[i].means[j];
+      this->parameter_sigma->writeOnlyHostPtr()[k] = systematics[i].sigmas[j];
+      this->parameter_fixed[k] = systematics[i].fixed;
+      k++;
+    }
+  }
+
+  if (systematics.size() > 0 && this->systematics_fixed) {
+    std::cout << "MCMC::MCMC: All systematics are fixed, will not reevaluate "
+              << "PDFs." << std::endl;
   }
 
   // References to pdfz::Eval histograms
@@ -66,8 +89,12 @@ MCMC::MCMC(const std::vector<Signal>& signals,
     this->parameter_names.push_back(signals[i].name);
   }
   for (size_t i=0; i<systematics.size(); i++) {
-    this->varlist += (systematics[i].name + ":");
-    this->parameter_names.push_back(systematics[i].name);
+    for (size_t j=0; j<systematics[i].npars; j++) {
+      std::ostringstream oss;
+      oss << systematics[i].name << "_" << j;
+      this->varlist += (oss.str() + ":");
+      this->parameter_names.push_back(oss.str());
+    }
   }
   this->varlist += "likelihood";
   this->parameter_names.push_back("likelihood");
@@ -145,6 +172,10 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
     float mean = std::max(this->parameter_means->readOnlyHostPtr()[i], 10.0);
     float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
     float width;
+    if (this->parameter_fixed[i]) {
+      width = -1;
+      continue;
+    }
     if (i < nsignals) {
       width = (sigma > 0 ? mean * sigma : sqrt(mean));
     }
@@ -152,7 +183,10 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
       width = (sigma > 0 ? sigma : sqrt(mean));
     }
     jump_width.writeOnlyHostPtr()[i] = 0.1 * width * scale_factor;
+    std::cout << "MCMC: Intial jump sigma: " << this->parameter_names[i]
+              << ": " << jump_width.readOnlyHostPtr()[i] << std::endl;
   }
+  jump_width.writeOnlyHostPtr();
 
   // Buffers for computing event term in nll
   hemi::Array<double> event_partial_sums(this->nnllthreads, true);
@@ -209,12 +243,12 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
   for (unsigned i=0; i<nsteps; i++) {
     // If systematics are varying, re-evaluate the pdfs
     // At some point, need to look for ways of doing this less often
-    if (this->nsystematics > 0) {
-      for (size_t i=0; i<this->pdfs.size(); i++) {
-        pdfs[i]->EvalAsync();
+    if (this->nsystematics > 0 && !this->systematics_fixed) {
+      for (size_t j=0; j<this->pdfs.size(); j++) {
+        pdfs[j]->EvalAsync();
       }
-      for (size_t i=0; i<this->pdfs.size(); i++) {
-        pdfs[i]->EvalFinished();
+      for (size_t j=0; j<this->pdfs.size(); j++) {
+        pdfs[j]->EvalFinished();
       }
     }
 
@@ -224,15 +258,22 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
                 << " steps" << std::endl;
 
       // Rescale jumps in each dimension based on RMS during burn-in
+      std::cout << "MCMC: Rescaling jump sigma" << std::endl;
       for (size_t j=0; j<this->nparameters; j++) {
         std::string name = this->parameter_names[j];
+
+        if (this->parameter_fixed[j]) {
+          std::cout << " " << name << ": fixed" << std::endl;
+          continue;
+        }
+
         nt->Draw((name + ">>hsproj").c_str());
         TH1F* hsproj = (TH1F*) gDirectory->Get("hsproj");
         assert(hsproj);
 
         double fit_width = hsproj->GetRMS();
 
-        std::cout << "MCMC: Rescaling jump sigma: " << name << ": "
+        std::cout << " " << name << ": "
                   << jump_width.readOnlyHostPtr()[j] << " -> ";
 
         jump_width.writeOnlyHostPtr()[j] = scale_factor * fit_width;
@@ -241,6 +282,8 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
 
         hsproj->Delete();
       }
+
+      jump_width.writeOnlyHostPtr();
 
       // Save all steps when in debug mode
       if (!debug_mode) {
@@ -281,7 +324,8 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
                        debug_mode);
 
     // Flush the jump buffer periodically
-    if (i % sync_interval == 0 || i == nsteps - 1 || i == burnin_steps - 1) {
+    if (i % sync_interval == 0 || i == nsteps - 1 ||
+        i == burnin_steps - 1 || i == 2 * burnin_steps - 1) {
       int njumps = jump_counter.readOnlyHostPtr()[0];
       int naccepted = accept_counter.readOnlyHostPtr()[0];
       std::cout << "MCMC: Step " << i + 1 << "/" << nsteps

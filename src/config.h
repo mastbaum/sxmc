@@ -34,6 +34,7 @@ public:
 
   float nexpected;  //!< Number of events expected
   float sigma;  //!< Gaussian constraint
+  bool fixed;  //!< Rate is fixed
   std::string title;  //!< Title of signal (for plotting)
   std::string category;  //!< Category (for plotting)
   std::vector<std::string> files;  //!< List of filenames with dataset
@@ -94,7 +95,7 @@ public:
   std::vector<Observable> cuts;  //!< Cuts applied before fit
   std::vector<std::string> sample_fields;  //!< Names of sample array fields:
                                            //!< observables and systematics
-  Signal* data;  //!< Data to fit, if any
+  std::vector<Signal>* data;  //!< Data to fit, if any
 };
 
 #endif  // __CONFIG_H__

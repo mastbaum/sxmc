@@ -1,3 +1,4 @@
+#include <iostream>
 #include <vector>
 #include <map>
 #include <algorithm>
@@ -36,11 +37,19 @@
 //  TColor::GetColor(0,   204, 204)
 //};
 
-const int ncolors = 16;
-const int colors[16] = {
-  kGray+1,   kAzure,    kSpring-6, kRed+1,     kAzure+1,  kOrange+1,
-  kViolet+1, kOrange-7, kCyan+1,   kMagenta+1, kSpring+4, kMagenta+3,
-  kViolet,   kViolet-9, kBlue-6,   kGreen-6  
+//const int ncolors = 16;
+//const int colors[16] = {
+//  kGray+1,   kAzure,    kSpring-6, kRed+1,     kAzure+1,  kOrange+1,
+//  kViolet+1, kOrange-7, kCyan+1,   kMagenta+1, kSpring+4, kMagenta+3,
+//  kViolet,   kViolet-9, kBlue-6,   kGreen-6  
+//};
+
+const int ncolors = 6;
+const int colors[6] = {
+  kBlue, kBlack, kRed, kGreen+1, kGray+1, kOrange+1
+};
+const int styles[6] = {
+  1, 1, 2, 1, 1, 1
 };
 
 
@@ -203,12 +212,21 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
   }
 
   // Extract best-fit parameter values
+  std::cout << "plot_fit: Best fit" << std::endl;
   std::vector<float> params;
   for (size_t i=0; i<signals.size(); i++) {
     params.push_back(best_fit[signals[i].name].point_estimate);
+    std::cout << " " << signals[i].name << ": "
+              << best_fit[signals[i].name].point_estimate << std::endl;
   }
   for (size_t i=0; i<systematics.size(); i++) {
-    params.push_back(best_fit[systematics[i].name].point_estimate);
+    for (size_t j=0; j<systematics[i].npars; j++) {
+      std::ostringstream oss;
+      oss << systematics[i].name << "_" << j;
+      params.push_back(best_fit[oss.str()].point_estimate);
+      std::cout << " " << oss.str() << ": "
+                << best_fit[oss.str()].point_estimate << std::endl;
+    }
   }
 
   hemi::Array<unsigned> norms_buffer(signals.size(), true);
@@ -247,6 +265,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
 
     for (size_t j=0; j<observables.size(); j++) {
       hpdf[j]->SetLineColor(colors[i % ncolors]);
+      hpdf[j]->SetLineStyle(styles[i % ncolors]);
       if (all_totals["full"][j] == NULL) {
         std::string hfname = "fit_total_" + signals[i].name;
         all_totals["full"][j] = (TH1D*) hpdf[j]->Clone(hfname.c_str());
@@ -300,6 +319,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
       }
       if (all_totals[categories[j]][i] != NULL) {
         all_totals[categories[j]][i]->SetLineColor(colors[j+1]);
+        all_totals[categories[j]][i]->SetLineStyle(styles[j+1]);
         TH1D* t = \
           (TH1D*) all_totals[categories[j]][i]->Clone(categories[j].c_str());
         t->SetLineStyle(2);
@@ -311,6 +331,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
 
     if (all_totals["full"][i] != NULL) {
       all_totals["full"][i]->SetLineColor(kRed);
+      all_totals["full"][i]->SetLineStyle(1);
       all_plots["full"][i].add(all_totals["full"][i], "Fit", "hist");
     }
 

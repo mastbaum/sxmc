@@ -42,7 +42,8 @@ struct SystematicDescriptor {
   short type;
   short obs;
   short extra_field;
-  short par;
+  short npars;
+  short* pars;
 };
 
 
@@ -128,21 +129,24 @@ void Eval::AddSystematic(const Systematic& syst) {
       dynamic_cast<const ShiftSystematic&>(syst);
     desc.obs = shift.obs;
     desc.extra_field = 0;
-    desc.par = shift.par;
+    desc.npars = shift.pars->size();
+    desc.pars = shift.pars->devicePtr();
   }
   else if (syst.type == Systematic::SCALE) {
     const ScaleSystematic& scale = \
       dynamic_cast<const ScaleSystematic&>(syst);
     desc.obs = scale.obs;
     desc.extra_field = 0;
-    desc.par = scale.par;
+    desc.npars = scale.pars->size();
+    desc.pars = scale.pars->devicePtr();
   }
   else if (syst.type == Systematic::RESOLUTION_SCALE) {
     const ResolutionScaleSystematic &res = \
       dynamic_cast<const ResolutionScaleSystematic&>(syst);
     desc.obs = res.obs;
     desc.extra_field = res.true_obs;
-    desc.par = res.par;
+    desc.npars = res.pars->size();
+    desc.pars = res.pars->devicePtr();
   }
   else {
     throw Error("Unknown systematic type");
@@ -280,18 +284,22 @@ HEMI_DEV_CALLABLE_INLINE
 void apply_systematic(const SystematicDescriptor* syst,
                       double* fields, const double* parameters,
                       const int param_stride) {
+  double p = 0;
+  for (short i=0; i<syst->npars; i++) {
+    p += (parameters[syst->pars[i] * param_stride] *
+          pow(fields[syst->obs], (double) i));
+  }
   switch (syst->type) {
     case Systematic::SHIFT:
-    fields[syst->obs] += parameters[syst->par * param_stride];
-    break;
+      fields[syst->obs] += p;
+      break;
     case Systematic::SCALE:
-    fields[syst->obs] *= (1 + parameters[syst->par * param_stride]);
-    break;
+      fields[syst->obs] *= (1 + p);
+      break;
     case Systematic::RESOLUTION_SCALE:
-    fields[syst->obs] += \
-      (parameters[syst->par * param_stride] *
-       (fields[syst->obs] - fields[syst->extra_field]));
-    break;
+      fields[syst->obs] += \
+        (p * (fields[syst->obs] - fields[syst->extra_field]));
+      break;
   }
 }
 
@@ -621,7 +629,7 @@ void EvalHist::OptimizeBin() {
 
   // Handle missing systematics case
   int nsyst = 0;
-  const SystematicDescriptor *syst_ptr = NULL;
+  const SystematicDescriptor* syst_ptr = NULL;
   if (this->syst) {
     nsyst = this->syst->size();
     syst_ptr = this->syst->readOnlyPtr();

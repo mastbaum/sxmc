@@ -18,7 +18,7 @@ if __name__ == '__main__':
     names = [branch.GetName() for branch in ls.GetListOfBranches()]
     print names
 
-    panes_y = int(math.sqrt(len(names)))
+    panes_y = int(math.sqrt(len(names))+1)
     panes_x = int(math.ceil(math.sqrt(len(names))))
 
     c = ROOT.TCanvas()

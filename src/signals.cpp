@@ -127,11 +127,25 @@ void Signal::apply_exclusions(std::vector<float>& samples,
 
 
 void Signal::set_efficiency(std::vector<Systematic>& systematics) {
-  hemi::Array<double> param_buffer(systematics.size(), true);
-  param_buffer.writeOnlyHostPtr();
-  for (size_t i=0; i<systematics.size(); i++) {
-    param_buffer.writeOnlyHostPtr()[i] = systematics[i].mean;
+  size_t nsys = systematics.size();
+
+  // Determine the total number of systematic parameters
+  size_t npars = 0;
+  for (size_t i=0; i<nsys; i++) {
+    npars += systematics[i].npars;
   }
+
+  // Allocate and fill the parameter buffer
+  hemi::Array<double> param_buffer(npars, true);
+  param_buffer.writeOnlyHostPtr();
+
+  size_t k = 0;
+  for (size_t i=0; i<nsys; i++) {
+    for (size_t j=0; j<systematics[i].npars; j++) {
+      param_buffer.writeOnlyHostPtr()[k++] = systematics[i].means[j];
+    }
+  }
+
   hemi::Array<unsigned> norms_buffer(1, true);
   norms_buffer.writeOnlyHostPtr();
   this->histogram->SetNormalizationBuffer(&norms_buffer);
@@ -160,8 +174,8 @@ void Signal::set_efficiency(std::vector<Systematic>& systematics) {
 
 void Signal::build_pdfz(std::vector<float> &samples,
                         std::vector<int> &weights, int nfields,
-                        std::vector<Observable> &observables,
-                        std::vector<Systematic> &systematics) {
+                        std::vector<Observable>& observables,
+                        std::vector<Systematic>& systematics) {
   // Build bin and limit arrays
   std::vector<double> lower(observables.size());
   std::vector<double> upper(observables.size());
@@ -182,23 +196,31 @@ void Signal::build_pdfz(std::vector<float> &samples,
     new pdfz::EvalHist(samples, weights, nfields, observables.size(),
                        lower, upper, nbins);
 
+  short pidx = 0;  // Systematic parameter index
+
   for (size_t i=0; i<systematics.size(); i++) {
     Systematic* syst = &systematics[i];
+
+    // Indices for these systematic parameters
+    hemi::Array<short>* pars = new hemi::Array<short>(syst->npars, true);
+    for (unsigned i=0; i<syst->npars; i++) {
+      pars->writeOnlyHostPtr()[i] = pidx++;
+    }
 
     size_t o_field = syst->observable_field_index;
     size_t t_field = syst->truth_field_index;
 
     if (syst->type == pdfz::Systematic::SHIFT) {
       this->histogram->AddSystematic(
-        pdfz::ShiftSystematic(o_field, i));
+        pdfz::ShiftSystematic(o_field, pars));
     }
     else if (syst->type == pdfz::Systematic::SCALE) {
       this->histogram->AddSystematic(
-        pdfz::ScaleSystematic(o_field, i));
+        pdfz::ScaleSystematic(o_field, pars));
     }
     else if (syst->type == pdfz::Systematic::RESOLUTION_SCALE) {
       this->histogram->AddSystematic(
-        pdfz::ResolutionScaleSystematic(o_field, t_field, i));
+        pdfz::ResolutionScaleSystematic(o_field, t_field, pars));
     }
     else {
       std::cerr << "Signal::build_pdfz: Unknown systematic ID "
@@ -215,9 +237,9 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected,
                std::vector<Observable>& observables,
                std::vector<Observable>& cuts,
                std::vector<Systematic>& systematics,
-               std::vector<std::string>& filenames)
+               std::vector<std::string>& filenames, bool _fixed)
     : name(_name), title(_title), category(_category), nexpected(_nexpected),
-      sigma(_sigma), efficiency(1) {
+      sigma(_sigma), efficiency(1), fixed(_fixed) {
   std::vector<float> dataset;
   std::vector<unsigned int> rank;
   std::vector<std::string> ttree_fields;
@@ -238,7 +260,7 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected,
   }
 
   read_dataset_to_samples(samples, dataset, sample_fields, ttree_fields, cuts);
-  apply_exclusions(samples, sample_fields, observables);
+  //apply_exclusions(samples, sample_fields, observables);
 
   // Create default weights
   std::vector<int> weights(samples.size() / sample_fields.size(), 1);
@@ -259,15 +281,15 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected,
                std::vector<Systematic>& systematics,
                std::vector<float>& samples,
                std::vector<std::string>& sample_fields,
-               std::vector<int> &weights)
+               std::vector<int> &weights, bool _fixed)
     : name(_name), title(_title), category(_category), nexpected(_nexpected),
-      sigma(_sigma), efficiency(1) {
+      sigma(_sigma), efficiency(1), fixed(_fixed) {
   this->n_mc = 0;
   for (size_t i=0; i<weights.size(); i++) {
     this->n_mc += weights[i];
   }
 
-  apply_exclusions(samples, sample_fields, weights, observables);
+  //apply_exclusions(samples, sample_fields, weights, observables);
 
   // Build the histogram evaluator
   build_pdfz(samples, weights, sample_fields.size(), observables, systematics);

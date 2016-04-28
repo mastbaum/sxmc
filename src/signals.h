@@ -48,8 +48,9 @@ struct Systematic {
   size_t observable_field_index;  //!< Index of the observable field in the data
   size_t truth_field_index;  //!< Index of the truth field in the data
   pdfz::Systematic::Type type;  //!< The type of systematic
-  double mean;  //!< Mean value
-  double sigma;  //!< Standard deviation (constraint)
+  size_t npars;  //!< Number of parameters in power series
+  double* means;  //!< Mean values (power series)
+  double* sigmas;  //!< Standard deviations
   bool fixed;  //! Fix the value of the parameter to the mean
 };
 
@@ -74,6 +75,7 @@ public:
    * \param cuts - A list of observables to be applied as cuts
    * \param systematics - A list of systematics to be used in the fit
    * \param filenames - A list of ROOT file names with the PDF data
+   * \param fixed - Normalization is fixed
   */
   Signal(std::string _name, std::string _title, float _nexpected,
          float _sigma, std::string _category,
@@ -81,7 +83,8 @@ public:
          std::vector<Observable>& observables,
          std::vector<Observable>& cuts,
          std::vector<Systematic>& systematics,
-         std::vector<std::string>& filenames);
+         std::vector<std::string>& filenames,
+         bool fixed=false);
 
   /**
    * Construct a Signal from a list of samples and weights.
@@ -97,6 +100,7 @@ public:
    * \param samples - The vector of data samples for the PDF
    * \param sample_fields - The names of the fields for the data samples
    * \param weights - The vector of sample weights for the PDF
+   * \param fixed - Normalization is fixed
    */ 
   Signal(std::string _name, std::string _title, float _nexpected,
          float _sigma, std::string _category,
@@ -105,7 +109,8 @@ public:
          std::vector<Systematic>& systematics,
          std::vector<float>& samples,
          std::vector<std::string>& sample_fields,
-         std::vector<int>& weights);
+         std::vector<int>& weights,
+         bool fixed=false);
 
   /**
    * Get samples and weights as a pair of arrays.
@@ -120,6 +125,7 @@ public:
   double sigma;  //!< Fractional uncertainty
   double efficiency;  //!< Fraction of generated events that make it past
                       //!< cuts (not counting the efficiency correction)
+  bool fixed;  //!< Fix this parameter in the fit
   size_t nevents;  //!< Number of events in PDF
   size_t n_mc;  //!< Number of simulated events used to make pdf
   pdfz::Eval* histogram;  //!< PDF

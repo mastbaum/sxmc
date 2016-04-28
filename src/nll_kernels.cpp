@@ -37,13 +37,18 @@ void pick_new_vector_device(int nthreads, RNGState* rng,
   int stride = hemiGetElementStride();
 
   for (int i=offset; i<(int)nthreads; i+=stride) {
+    if (jump_width[i] > 0) {
 #ifdef HEMI_DEV_CODE
-    double u = curand_normal(&rng[i]);
-    proposed_vector[i] = current_vector[i] + jump_width[i] * u;
+      double u = curand_normal(&rng[i]);
+      proposed_vector[i] = current_vector[i] + jump_width[i] * u;
 #else
-    double u = gRandom->Gaus(current_vector[i], jump_width[i]);
-    proposed_vector[i] = u;
+      double u = gRandom->Gaus(current_vector[i], jump_width[i]);
+      proposed_vector[i] = u;
 #endif
+    }
+    else {
+      proposed_vector[i] = current_vector[i];
+    }
   }
 }
 
@@ -96,9 +101,7 @@ HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
     double s = 0;
     for (size_t j=0; j<ns; j++) {
       float v = lut[j * ne + i];
-      // Efficiency correction due to systematics
-      float se = 1.0 * norms[j] / norms_nominal[j];
-      s += pars[j] * se * (!isnan(v) ? v : 0);  // Handle nans from empty hists
+      s += pars[j] * (!isnan(v) ? v : 0);  // Handle nans from empty hists
     }
     if (s > 0) {
       sum += log(s) * dataweights[i];
@@ -165,9 +168,7 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
 
     // Normalization constraints
     if (i < nsignals) {
-      // Efficiency correction due to systematics
-      float se = 1.0 * norms[i] / norms_nominal[i];
-      sum += pars[i] * se;
+      sum += pars[i];
     }
 
     // Gaussian constraints

@@ -64,7 +64,7 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
                             std::vector<Systematic>& systematics,
                             std::vector<Observable>& observables,
                             std::vector<Observable>& cuts,
-                            Signal* data,
+                            std::vector<Signal>* data,
                             unsigned steps, float burnin_fraction,
                             float confidence, unsigned nexperiments,
                             float live_time, const bool debug_mode,
@@ -91,11 +91,6 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
       param_names.push_back(signals[j].name);
     }
 
-    for (size_t j=0; j<systematics.size(); j++) {
-      params.push_back(systematics[j].mean);
-      param_names.push_back(systematics[j].name);
-    }
-
     std::vector<float> samples;
     std::vector<int> weights;
     if (!data) {
@@ -106,7 +101,8 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
       weights = fakedata.second;
     }
     else {
-      samples = dynamic_cast<pdfz::EvalHist*>(data->histogram)->get_samples();
+      samples = \
+        dynamic_cast<pdfz::EvalHist*>(data->at(i).histogram)->get_samples();
       weights.resize(samples.size(), 1);
     }
 
@@ -216,6 +212,7 @@ int main(int argc, char* argv[]) {
   // Load configuration from JSON file
   std::cout << "sxmc: Loading configuration..." << std::endl;
   std::string config_filename = std::string(argv[1]);
+  std::cout << "sxmc: Configuration: " << config_filename << std::endl;
   FitConfig fc(config_filename);
   fc.print();
 
@@ -226,12 +223,13 @@ int main(int argc, char* argv[]) {
              fc.steps, fc.burnin_fraction, fc.confidence, fc.experiments,
              fc.live_time, fc.debug_mode, output_path, fc.signal_name);
 
-  std::cout << "main: Upper limits: ";
+  std::cout << "sxmc: Upper limits: ";
   for (size_t i=0; i<limits.size(); i++) {
     std::cout << limits[i] << ", ";
   }
   std::cout << std::endl;
-  std::cout << "main: Median upper limit: " << median(limits) << std::endl;
+  std::cout << "sxmc: Median upper limit: "
+            << (limits.size() > 0 ? median(limits) : -1) << std::endl;
 
   return 0;
 }

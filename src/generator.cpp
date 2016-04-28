@@ -20,8 +20,10 @@ make_fake_dataset(std::vector<Signal>& signals,
   std::cout << "make_fake_dataset: Generating dataset..." << std::endl;
 
   std::vector<double> syst_vals;
-  for (size_t i=signals.size(); i<signals.size() + systematics.size(); i++) {
-    syst_vals.push_back(params[i]);
+  for (size_t i=0; i<systematics.size(); i++) {
+    for (size_t j=0; j<systematics[i].npars; j++) {
+      syst_vals.push_back(systematics[i].means[j]);
+    }
   }
 
   std::vector<float> upper;

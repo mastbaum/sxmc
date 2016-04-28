@@ -108,7 +108,7 @@ struct Systematic {
   enum Type {
     SHIFT,
     SCALE,
-    RESOLUTION_SCALE,
+    RESOLUTION_SCALE
   };
 
   Type type;
@@ -126,13 +126,15 @@ struct Systematic {
  * \brief Offset an observable.
  *
  * Transform x' = x + p
+ *
+ *   where p = sum(p_i * x^i)
 */
 struct ShiftSystematic : public Systematic {
-ShiftSystematic(int _obs, int _par)
-    : Systematic(SHIFT), obs(_obs), par(_par) { }
+  ShiftSystematic(int _obs, hemi::Array<short>* _pars)
+    : Systematic(SHIFT), obs(_obs), pars(_pars) {}
 
   int obs;  // Index of observable
-  int par;  // Index of systematic parameter
+  hemi::Array<short>* pars;  // Parameters
 };
 
 
@@ -141,13 +143,15 @@ ShiftSystematic(int _obs, int _par)
  * \brief Rescale an observable.
  *
  * Transform x' = x * (1 + p)
+ *
+ *   where p = sum(p_i * x^i)
 */
 struct ScaleSystematic : public Systematic {
-ScaleSystematic(int _obs, int _par)
-    : Systematic(SCALE), obs(_obs), par(_par) { }
+  ScaleSystematic(int _obs, hemi::Array<short>* _pars)
+    : Systematic(SCALE), obs(_obs), pars(_pars) {}
 
   int obs;  // Index of observable
-  int par;  // Index of systematic parameter
+  hemi::Array<short>* pars;  // Parameters
 };
 
 
@@ -157,15 +161,17 @@ ScaleSystematic(int _obs, int _par)
  *        its distance from a "true" value.
  *
  * Transform x' = x + p * (x - x_true)
+ *
+ *   where p = sum(p_i * x^i)
 */
 struct ResolutionScaleSystematic : public Systematic {
-ResolutionScaleSystematic(int _obs, int _true_obs, int _par)
+  ResolutionScaleSystematic(int _obs, int _true_obs, hemi::Array<short>* _pars)
     : Systematic(RESOLUTION_SCALE), obs(_obs), true_obs(_true_obs),
-      par(_par) { }
+      pars(_pars) {}
 
-    int obs;  // Index of observable
-    int true_obs;  // Index of "true" observable
-    int par;  // Index of systematic parameter
+  int obs;  // Index of observable
+  int true_obs;  // Index of "true" observable
+  hemi::Array<short>* pars;  // Parameters
 };
 
 

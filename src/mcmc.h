@@ -106,6 +106,7 @@ private:
   size_t nsystematics;  //!< number of systematic parameters
   size_t nparameters;  //!< total number of parameters
   size_t nobservables;  //!< number of observables in data
+  bool systematics_fixed;  //!< All systematic parameters are fixed
   unsigned nnllblocks;  //!< number of cuda blocks for nll partial sums
   unsigned nllblocksize;  //!< size of cuda blocks for nll partial sums
   unsigned nnllthreads;  //!< number of threads for nll partial sums
@@ -118,6 +119,7 @@ private:
   hemi::Array<double>* parameter_sigma;  //!< parameter Gaussian uncertainty
   hemi::Array<RNGState>* rngs;  //!< CURAND RNGs, ignored in CPU mode
   std::vector<std::string> parameter_names;  //!< string name of each param
+  std::vector<bool> parameter_fixed;  //!< Is this parameter fixed?
   std::vector<pdfz::Eval*> pdfs;  //!< references to signal pdfs
 };
 

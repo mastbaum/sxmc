@@ -20,7 +20,8 @@ class TH1;
 
 /** A ROOT color palette in which sequential colors look okay. */
 extern const int ncolors;
-extern const int colors[16];
+extern const int colors[6];
+extern const int styles[6];
 
 
 /**
