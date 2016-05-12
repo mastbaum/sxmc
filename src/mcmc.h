@@ -106,6 +106,7 @@ private:
   size_t nsystematics;  //!< number of systematic parameters
   size_t nparameters;  //!< total number of parameters
   size_t nobservables;  //!< number of observables in data
+  size_t nfloat;  //!< Number of floating parameters
   bool systematics_fixed;  //!< All systematic parameters are fixed
   unsigned nnllblocks;  //!< number of cuda blocks for nll partial sums
   unsigned nllblocksize;  //!< size of cuda blocks for nll partial sums

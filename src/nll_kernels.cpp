@@ -1,4 +1,3 @@
-#include <iostream>
 #include <cmath>
 #include <hemi/hemi.h>
 #include <TRandom.h>
@@ -173,8 +172,7 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
 
     // Gaussian constraints
     if (sigmas[i] > 0) {
-      double denom = i < nsignals ? means[i] * sigmas[i] : sigmas[i];
-      double x = (pars[i] - means[i]) / denom;
+      double x = (pars[i] - means[i]) / sigmas[i];
       sum += 0.5 * x * x;
     }
   }
@@ -184,10 +182,10 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
 
 
 HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
-                             const float* sigma,
+                             const float* jump_width,
                              const double* current_vector,
                              double* proposed_vector) {
-  pick_new_vector_device(nthreads, rng, sigma, current_vector,
+  pick_new_vector_device(nthreads, rng, jump_width, current_vector,
                          proposed_vector);
 }
 
@@ -223,12 +221,12 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
                                         const double* means,
                                         const double* sigmas,
                                         RNGState* rng,
-                                        double *nll_current,
-                                        double *nll_proposed,
-                                        double *v_current, double *v_proposed,
+                                        double* nll_current,
+                                        double* nll_proposed,
+                                        double* v_current, double* v_proposed,
                                         int* accepted, int* counter,
                                         float* jump_buffer, int nparameters,
-                                        const float* sigma,
+                                        const float* jump_width,
                                         const unsigned* norms,
                                         const unsigned* norms_nominal,
                                         const bool debug_mode) {
@@ -253,6 +251,6 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
   __syncthreads();
 #endif
 
-  pick_new_vector_device(nparameters, rng, sigma, v_current, v_proposed);
+  pick_new_vector_device(nparameters, rng, jump_width, v_current, v_proposed);
 }
 

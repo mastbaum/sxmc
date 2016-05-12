@@ -51,10 +51,14 @@ MCMC::MCMC(const std::vector<Signal>& signals,
   this->parameter_means = new hemi::Array<double>(this->nparameters, true);
   this->parameter_sigma = new hemi::Array<double>(this->nparameters, true);
   this->parameter_fixed.resize(this->nparameters);
+  this->nfloat = 0;
   for (size_t i=0; i<this->nsignals; i++) {
-    this->parameter_means->writeOnlyHostPtr()[i] = signals[i].nexpected;
-    this->parameter_sigma->writeOnlyHostPtr()[i] = signals[i].sigma;
+    this->parameter_means->writeOnlyHostPtr()[i] = \
+      std::max(signals[i].nexpected, (double) 5);
+    this->parameter_sigma->writeOnlyHostPtr()[i] = \
+      signals[i].nexpected * signals[i].sigma;  // Fractional
     this->parameter_fixed[i] = signals[i].fixed;
+    this->nfloat += (signals[i].fixed ? 0 : 1);
   }
 
   this->systematics_fixed = true;
@@ -68,6 +72,7 @@ MCMC::MCMC(const std::vector<Signal>& signals,
       this->parameter_means->writeOnlyHostPtr()[k] = systematics[i].means[j];
       this->parameter_sigma->writeOnlyHostPtr()[k] = systematics[i].sigmas[j];
       this->parameter_fixed[k] = systematics[i].fixed;
+      this->nfloat += (systematics[i].fixed ? 0 : 1);
       k++;
     }
   }
@@ -107,7 +112,9 @@ MCMC::MCMC(const std::vector<Signal>& signals,
   int bs = 128;
   int nb = this->nparameters / bs + 1;
   assert(nb < 8);
-  init_device_rngs<<<nb, bs>>>(this->nparameters, 1234, this->rngs->ptr());
+  init_device_rngs<<<nb, bs>>>(this->nparameters,
+                               gRandom->GetSeed(),  // Random seed
+                               this->rngs->ptr());
 #else
   this->rngs->writeOnlyHostPtr();
 #endif
@@ -167,24 +174,28 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
 
   // Initial standard deviations for each dimension
   hemi::Array<float> jump_width(this->nparameters, true);
-  const float scale_factor = 2.4 * 2.4 / this->nparameters;  // Haario, 2001
+  const float scale_factor = 2.4 * 2.4 / this->nfloat;  // Haario, 2001
+  std::cout << "MCMC: Intial jump sigma" << std::endl;
   for (size_t i=0; i<this->nparameters; i++) {
     float mean = std::max(this->parameter_means->readOnlyHostPtr()[i], 10.0);
     float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
     float width;
+    std::cout << " " << this->parameter_names[i] << ": ";
     if (this->parameter_fixed[i]) {
       width = -1;
+      std::cout << "fixed" << std::endl;
       continue;
     }
     if (i < nsignals) {
-      width = (sigma > 0 ? mean * sigma : sqrt(mean));
+      float m = std::max(mean, (float) 10);
+      width = (sigma > 0 ? m * sigma : sqrt(m));
     }
     else {
-      width = (sigma > 0 ? sigma : sqrt(mean));
+      float m = std::max(mean, (float) 1);
+      width = (sigma > 0 ? sigma : sqrt(m));
     }
     jump_width.writeOnlyHostPtr()[i] = 0.1 * width * scale_factor;
-    std::cout << "MCMC: Intial jump sigma: " << this->parameter_names[i]
-              << ": " << jump_width.readOnlyHostPtr()[i] << std::endl;
+    std::cout << jump_width.readOnlyHostPtr()[i] << std::endl;
   }
   jump_width.writeOnlyHostPtr();
 
@@ -271,7 +282,8 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
         TH1F* hsproj = (TH1F*) gDirectory->Get("hsproj");
         assert(hsproj);
 
-        double fit_width = hsproj->GetRMS();
+        double fit_width = (hsproj->GetRMS() > 0 ? hsproj->GetRMS() :
+                            jump_width.readOnlyHostPtr()[j]);
 
         std::cout << " " << name << ": "
                   << jump_width.readOnlyHostPtr()[j] << " -> ";

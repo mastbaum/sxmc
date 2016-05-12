@@ -1,5 +1,5 @@
-#ifndef __NLL_H__
-#define __NLL_H__
+#ifndef __NLL_KERNELS_H__
+#define __NLL_KERNELS_H__
 
 /**
  * \file nll_kernels.h
@@ -53,12 +53,12 @@ __global__ void init_device_rngs(int nthreads, unsigned long long seed,
  *
  * \param nthreads Number of threads == length of vectors
  * \param rng CUDA RNG states, ignored on CPU
- * \param sigma Standard deviations to sample for each dimension
+ * \param jump_width Standard deviations to sample for each dimension
  * \param current_vector Vector of current parameters
  * \param proposed_vector Output vector of proposed parameters
 */
 HEMI_KERNEL(pick_new_vector)(int nthreads, RNGState* rng,
-                             const float* sigma,
+                             const float* jump_width,
                              const double* current_vector,
                              double* proposed_vector);
 
@@ -170,7 +170,7 @@ HEMI_KERNEL(nll_total)(const size_t nparameters, const double* pars,
  * \param counter The number of steps in the jump buffer
  * \param jump_buffer The buffer of steps (vectors and likelihoods)
  * \param nparameters The number of parameters (dimensions in the L space)
- * \param sigma The jump distribution widths in each dimension
+ * \param jump_width The jump distribution widths in each dimension
  * \param norms The number of events in the PDF range (with systematics)
  * \param norms_nominal The number of events nominally in the PDF
  * \param debug_mode Enable debugging mode, where every step is accepted
@@ -185,10 +185,10 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
                                         double *v_current, double *v_proposed,
                                         int* accepted, int* counter,
                                         float* jump_buffer, int nparameters,
-                                        const float* sigma,
+                                        const float* jump_width,
                                         const unsigned* norms,
                                         const unsigned* norms_nominal,
                                         const bool debug_mode=false);
 
-#endif  // __NLL_H__
+#endif  // __NLL_KERNELS_H__
 

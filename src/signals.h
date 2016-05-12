@@ -115,7 +115,7 @@ public:
   /**
    * Get samples and weights as a pair of arrays.
   */
-  std::pair<std::vector<float>, std::vector<int> > get_samples();
+  //std::pair<std::vector<float>, std::vector<int> > get_samples();
 
   std::string name;  //!< String identifier
   std::string title;  //!< Histogram title in ROOT-LaTeX format

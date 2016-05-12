@@ -19,18 +19,15 @@
 #include <sstream>
 #include <algorithm>
 #include <TStyle.h>
-#include <TLegend.h>
 #include <TFile.h>
 #include <TH1D.h>
 #include <TH2D.h>
 #include <TH3D.h>
 #include <TNtuple.h>
-#include <TCanvas.h>
 #include <TFile.h>
 #include <TH1F.h>
 #include <TRandom.h>
 #include <TRandom2.h>
-#include <TMath.h>
 #include <TError.h>
 
 #include <sxmc/config.h>
@@ -95,14 +92,16 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
     std::vector<int> weights;
     if (!data) {
       // Make fake data
+      std::cout << "ensemble: Sampling fake dataset " << i << std::endl;
       std::pair<std::vector<float>, std::vector<int> > fakedata = \
         make_fake_dataset(signals, systematics, observables, params, true);
       samples = fakedata.first;
       weights = fakedata.second;
     }
     else {
+      std::cout << "ensemble: Using dataset " << i << std::endl;
       samples = \
-        dynamic_cast<pdfz::EvalHist*>(data->at(i).histogram)->get_samples();
+        dynamic_cast<pdfz::EvalHist*>(data->at(i).histogram)->GetSamples();
       weights.resize(samples.size(), 1);
     }
 

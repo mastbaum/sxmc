@@ -345,7 +345,7 @@ public:
   virtual TH1D* CreateHistogramProjection(int observable_index);
 
   /**
-   *  Sets the systematics to zero and calls create histogram.
+   * Sets the systematics to zero and calls create histogram.
   */
   TH1* DefaultHistogram();
 
@@ -377,11 +377,17 @@ public:
                         _upper, _lower, poisson, maxsamples);
   };
 
-  std::vector<float> get_samples() {
+  /**
+   * Copy out the samples array (for observable fields only!) into a vector.
+  */
+  std::vector<float> GetSamples() {
+    size_t nevents = this->samples.size() / this->nfields;
     const float* s = samples.readOnlyHostPtr();
-    std::vector<float> sv(samples.size());
-    for (size_t i=0; i<sv.size(); i++) {
-      sv[i] = s[i];
+    std::vector<float> sv(nevents * this->nobservables);
+    for (size_t i=0; i<nevents; i++) {
+      for (int j=0; j<this->nobservables; j++) {
+        sv[i * this->nobservables + j] = s[i * this->nfields + j];
+      }
     }
     return sv;
   }
@@ -389,10 +395,11 @@ public:
 protected:
     hemi::Array<float> samples;
     hemi::Array<int> weights;
-    hemi::Array<int> *read_bins;
+    hemi::Array<int>* read_bins;
     hemi::Array<int> nbins;
     hemi::Array<int> bin_stride;
-    hemi::Array<unsigned int> *bins;
+    hemi::Array<unsigned int>* bins;
+
     int total_nbins;
     double bin_volume;
 
@@ -419,13 +426,13 @@ protected:
  * bandwidth_scale.size() != nobs.
 */
 class EvalKernel : public Eval {
-  EvalKernel(const std::vector<float> &samples, int nfields, int nobservables,
-             const std::vector<double> &lower,
-             const std::vector<double> &upper,
-             const std::vector<double> &bandwidth_scale);
+  EvalKernel(const std::vector<float>& samples, int nfields, int nobservables,
+             const std::vector<double>& lower,
+             const std::vector<double>& upper,
+             const std::vector<double>& bandwidth_scale);
 
   virtual ~EvalKernel();
-  virtual void SetEvalPoints(const std::vector<float> &points);
+  virtual void SetEvalPoints(const std::vector<float>& points);
   virtual void EvalAsync(bool do_eval_pdf=true);
   virtual void EvalFinished();
 };

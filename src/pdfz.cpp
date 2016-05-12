@@ -289,6 +289,7 @@ void apply_systematic(const SystematicDescriptor* syst,
     p += (parameters[syst->pars[i] * param_stride] *
           pow(fields[syst->obs], (double) i));
   }
+
   switch (syst->type) {
     case Systematic::SHIFT:
       fields[syst->obs] += p;
