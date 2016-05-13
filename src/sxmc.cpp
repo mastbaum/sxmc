@@ -111,7 +111,9 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
       mcmc(samples, weights, steps, burnin_fraction, debug_mode);
 
     // Write out samples for debugging
-    TFile f((output_path + "lspace.root").c_str(), "recreate");
+    std::ostringstream lsfile;
+    lsfile << output_path << "lspace_" << i << ".root";
+    TFile f(lsfile.str().c_str(), "recreate");
     TNtuple* lsclone = dynamic_cast<TNtuple*>(ls->get_samples()->Clone("ls"));
     lsclone->Write();
     lsclone->Delete();
@@ -127,7 +129,7 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
     // Build a list of upper limits
     float ml;
     std::map<std::string, Interval> best_fit = \
-      ls->extract_best_fit(ml, 0.9, ERROR_PROJECTION);
+      ls->extract_best_fit(ml, confidence, ERROR_PROJECTION);
 
     if (signal_name != "" && best_fit.find(signal_name) != best_fit.end()) {
       Interval bfi = best_fit[signal_name];
