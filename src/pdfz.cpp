@@ -140,6 +140,14 @@ void Eval::AddSystematic(const Systematic& syst) {
     desc.npars = scale.pars->size();
     desc.pars = scale.pars->devicePtr();
   }
+  else if (syst.type == Systematic::CTSCALE) {
+    const CosThetaScaleSystematic& ctscale = \
+      dynamic_cast<const CosThetaScaleSystematic&>(syst);
+    desc.obs = ctscale.obs;
+    desc.extra_field = 0;
+    desc.npars = ctscale.pars->size();
+    desc.pars = ctscale.pars->devicePtr();
+  }
   else if (syst.type == Systematic::RESOLUTION_SCALE) {
     const ResolutionScaleSystematic &res = \
       dynamic_cast<const ResolutionScaleSystematic&>(syst);
@@ -297,6 +305,9 @@ void apply_systematic(const SystematicDescriptor* syst,
     case Systematic::SCALE:
       fields[syst->obs] *= (1 + p);
       break;
+    case Systematic::CTSCALE:
+      fields[syst->obs] = 1 + (fields[syst->obs] - 1) * (1 + p);
+      break;
     case Systematic::RESOLUTION_SCALE:
       fields[syst->obs] += \
         (p * (fields[syst->obs] - fields[syst->extra_field]));
@@ -354,7 +365,8 @@ HEMI_KERNEL(bin_samples)(int ndata, const float* data, const int* weights,
 
     // Apply systematics
     for (int isyst=0; isyst<nsyst; isyst++) {
-      apply_systematic(syst + isyst, field_buffer, parameters, param_stride);
+      apply_systematic(syst + isyst, field_buffer, parameters,
+                       param_stride);
     }
 
     // Compute histogram bin

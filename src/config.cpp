@@ -107,6 +107,9 @@ FitConfig::get_pdf_systematics(const Json::Value& pdf_params) {
     else if (type_string == "scale") {
         s.type = pdfz::Systematic::SCALE;
     }
+    else if (type_string == "ctscale") {
+        s.type = pdfz::Systematic::CTSCALE;
+    }
     else if (type_string == "resolution_scale") {
         s.type = pdfz::Systematic::RESOLUTION_SCALE;
         assert(s_json.isMember("truth_field"));
@@ -228,6 +231,9 @@ FitConfig::FitConfig(std::string filename) {
   this->burnin_fraction = fit_params.get("burnin_fraction", 0.1).asFloat();
   this->debug_mode = fit_params.get("debug_mode", false).asBool();
   this->signal_name = fit_params.get("signal_name", "").asString();
+  this->prefix = fit_params.get("prefix", "lspace").asString();
+  this->plots = fit_params.get("plots", true).asBool();
+  this->seed = fit_params.get("seed", 0).asInt64();
 
   // Find observables we want to fit for
   for (Json::Value::const_iterator it=fit_params["observables"].begin();
@@ -358,7 +364,8 @@ void FitConfig::print() const {
   std::cout << "Fit:" << std::endl
     << "  Fake experiments: " << this->experiments << std::endl
     << "  MCMC steps: " << this->steps << std::endl
-    << "  Burn-in fraction: " << this->burnin_fraction << std::endl;
+    << "  Burn-in fraction: " << this->burnin_fraction << std::endl
+    << "  Random seed (0=random): " << this->seed << std::endl;
 
   std::cout << "Experiment:" << std::endl
     << "  Live time: " << this->live_time << " y" << std::endl

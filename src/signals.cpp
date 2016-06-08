@@ -218,6 +218,10 @@ void Signal::build_pdfz(std::vector<float> &samples,
       this->histogram->AddSystematic(
         pdfz::ScaleSystematic(o_field, pars));
     }
+    else if (syst->type == pdfz::Systematic::CTSCALE) {
+      this->histogram->AddSystematic(
+        pdfz::CosThetaScaleSystematic(o_field, pars));
+    }
     else if (syst->type == pdfz::Systematic::RESOLUTION_SCALE) {
       this->histogram->AddSystematic(
         pdfz::ResolutionScaleSystematic(o_field, t_field, pars));

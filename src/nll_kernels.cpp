@@ -36,6 +36,7 @@ void pick_new_vector_device(int nthreads, RNGState* rng,
   int stride = hemiGetElementStride();
 
   for (int i=offset; i<(int)nthreads; i+=stride) {
+    // Fixed parameters have jump width set to -1
     if (jump_width[i] > 0) {
 #ifdef HEMI_DEV_CODE
       double u = curand_normal(&rng[i]);

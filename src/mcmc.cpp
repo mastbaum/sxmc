@@ -184,6 +184,7 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
     if (this->parameter_fixed[i]) {
       width = -1;
       std::cout << "fixed" << std::endl;
+      jump_width.writeOnlyHostPtr()[i] = -1;
       continue;
     }
     if (i < nsignals) {

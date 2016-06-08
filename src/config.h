@@ -88,7 +88,10 @@ public:
   float efficiency_correction;  //!< Overall efficiency correction
   float burnin_fraction;  //!< Fraction of steps to use for burn-in period
   bool debug_mode;  //!< Enable/disable debugging mode (accept/save all)
+  bool plots;  //!< Write out fit plots and PDF root files
+  long seed;  //!< RNG seed
   std::string signal_name;  //!< Name of the signal of interest (if any)
+  std::string prefix;  //!< Prefix for output ROOT file name
   std::vector<Signal> signals;  //!< Signal histograms and metadata
   std::vector<Systematic> systematics;  //!< Systematics used in PDFs
   std::vector<Observable> observables;  //!< Observables used in PDFs

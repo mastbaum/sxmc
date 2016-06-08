@@ -65,17 +65,20 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
                             unsigned steps, float burnin_fraction,
                             float confidence, unsigned nexperiments,
                             float live_time, const bool debug_mode,
-                            std::string output_path, std::string signal_name) {
+                            std::string output_path, std::string signal_name,
+                            std::string prefix, bool plots) {
   std::vector<float> limits;
 
-  for (size_t i=0; i<signals.size(); i++) {
-    const char* output_file = \
-      (output_path + signals[i].name + "_pdf.root").c_str();
-    TFile f1(output_file, "RECREATE");
-    TH1* hist = \
-      dynamic_cast<pdfz::EvalHist*>(signals[i].histogram)->DefaultHistogram();
-    hist->Write();
-    f1.Close();
+  if (plots) {
+    for (size_t i=0; i<signals.size(); i++) {
+      const char* output_file = \
+        (output_path + signals[i].name + "_pdf.root").c_str();
+      TFile f1(output_file, "RECREATE");
+      TH1* hist = \
+        dynamic_cast<pdfz::EvalHist*>(signals[i].histogram)->DefaultHistogram();
+      hist->Write();
+      f1.Close();
+    }
   }
 
   for (unsigned i=0; i<nexperiments; i++) {
@@ -112,7 +115,7 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
 
     // Write out samples for debugging
     std::ostringstream lsfile;
-    lsfile << output_path << "lspace_" << i << ".root";
+    lsfile << output_path << prefix << "_" << i << ".root";
     TFile f(lsfile.str().c_str(), "recreate");
     TNtuple* lsclone = dynamic_cast<TNtuple*>(ls->get_samples()->Clone("ls"));
     lsclone->Write();
@@ -123,8 +126,10 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
     ls->print_correlations();
 
     // Make projection plots
-    plot_fit(ls->get_best_fit(), live_time, signals, systematics, observables,
-             samples, weights, output_path);
+    if (plots) {
+      plot_fit(ls->get_best_fit(), live_time, signals, systematics,
+               observables, samples, weights, output_path);
+    }
 
     // Build a list of upper limits
     float ml;
@@ -195,7 +200,6 @@ int main(int argc, char* argv[]) {
   // ROOT environment tweaks, including a faster RNG
   delete gRandom;
   gRandom = new TRandom2(0);
-  gRandom->SetSeed(0);
   gStyle->SetErrorX(0);
   gStyle->SetOptStat(0);
   gErrorIgnoreLevel = kWarning;
@@ -217,12 +221,15 @@ int main(int argc, char* argv[]) {
   FitConfig fc(config_filename);
   fc.print();
 
+  gRandom->SetSeed(fc.seed);
+
   // Run ensemble
   std::cout << "sxmc: Running ensemble..." << std::endl;
   std::vector<float> limits = \
     ensemble(fc.signals, fc.systematics, fc.observables, fc.cuts, fc.data,
              fc.steps, fc.burnin_fraction, fc.confidence, fc.experiments,
-             fc.live_time, fc.debug_mode, output_path, fc.signal_name);
+             fc.live_time, fc.debug_mode, output_path, fc.signal_name,
+             fc.prefix, fc.plots);
 
   std::cout << "sxmc: Upper limits: ";
   for (size_t i=0; i<limits.size(); i++) {

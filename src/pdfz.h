@@ -108,7 +108,8 @@ struct Systematic {
   enum Type {
     SHIFT,
     SCALE,
-    RESOLUTION_SCALE
+    RESOLUTION_SCALE,
+    CTSCALE
   };
 
   Type type;
@@ -149,6 +150,26 @@ struct ShiftSystematic : public Systematic {
 struct ScaleSystematic : public Systematic {
   ScaleSystematic(int _obs, hemi::Array<short>* _pars)
     : Systematic(SCALE), obs(_obs), pars(_pars) {}
+
+  int obs;  // Index of observable
+  hemi::Array<short>* pars;  // Parameters
+};
+
+
+/**
+ * \struct pdfz::CosThetaScaleSystematic
+ * \brief Rescale an observable with an offset, as used for CosThetaSun in
+ * SNO fits.
+ *
+ * Transform x' = 1 + (x - 1) * (1 + p)
+ *
+ *   where p = sum(p_i * x^i)
+ *
+ * If x' is outside [-1,1], it is given a random value within.
+*/
+struct CosThetaScaleSystematic : public Systematic {
+  CosThetaScaleSystematic(int _obs, hemi::Array<short>* _pars)
+    : Systematic(CTSCALE), obs(_obs), pars(_pars) {}
 
   int obs;  // Index of observable
   hemi::Array<short>* pars;  // Parameters
@@ -301,7 +322,7 @@ protected:
 
     hemi::Array<SystematicDescriptor>* syst;
 
-    CudaState *cuda_state;
+    CudaState* cuda_state;
 };
 
 
