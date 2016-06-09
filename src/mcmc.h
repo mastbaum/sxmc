@@ -45,7 +45,8 @@ public:
    * \param systematics List of systematic parameter definitions
    * \param observables List of observables in the data
    */
-  MCMC(const std::vector<Signal>& signals,
+  MCMC(const std::vector<Source>& sources,
+       const std::vector<Signal>& signals,
        const std::vector<Systematic>& systematics,
        const std::vector<Observable>& observables);
 
@@ -96,13 +97,13 @@ protected:
    */
   void nll(const float* lut, size_t nevents,
            const double* v, double* nll,
-           const double* nexpected,
+           const double* nexpected, const short* source_id,
            const unsigned* norms, const unsigned* norms_nominal,
            double* event_partial_sums,
            double* event_total_sum);
 
 private:
-  size_t nrates;  //!< Number of signal rates
+  size_t nsources;  //!< Number of signal sources
   size_t nsignals;  //!< Number of signal parameters
   size_t nsystematics;  //!< Number of systematic parameters
   size_t nparameters;  //!< Total number of parameters
@@ -118,6 +119,7 @@ private:
   hemi::Array<double>* parameter_means;  //!< Parameter central values
   hemi::Array<double>* parameter_sigma;  //!< Parameter Gaussian uncertainty
   hemi::Array<double>* nexpected;  //!< Expectation values
+  hemi::Array<short>* source_id;  //!< Source array offsets
   hemi::Array<RNGState>* rngs;  //!< CURAND RNGs, ignored in CPU mode
   std::vector<std::string> parameter_names;  //!< String name of each param
   std::vector<bool> parameter_fixed;  //!< Is this parameter fixed?

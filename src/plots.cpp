@@ -180,17 +180,14 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
   std::cout << "plot_fit: Best fit" << std::endl;
   std::vector<float> params;
   for (size_t i=0; i<signals.size(); i++) {
-    params.push_back(best_fit[signals[i].name].point_estimate * signals[i].nexpected);
-    std::cout << " " << signals[i].name << ": "
-              << best_fit[signals[i].name].point_estimate << std::endl;
+    std::string source_name = signals[i].source.name;
+    params.push_back(best_fit[source_name].point_estimate * signals[i].nexpected);
   }
   for (size_t i=0; i<systematics.size(); i++) {
     for (size_t j=0; j<systematics[i].npars; j++) {
       std::ostringstream oss;
       oss << systematics[i].name << "_" << j;
       params.push_back(best_fit[oss.str()].point_estimate);
-      std::cout << " " << oss.str() << ": "
-                << best_fit[oss.str()].point_estimate << std::endl;
     }
   }
 

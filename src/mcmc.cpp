@@ -23,9 +23,11 @@
 #include <hemi/array.h>
 #endif
 
-MCMC::MCMC(const std::vector<Signal>& signals,
+MCMC::MCMC(const std::vector<Source>& sources,
+           const std::vector<Signal>& signals,
            const std::vector<Systematic>& systematics,
            const std::vector<Observable>& observables) {
+  this->nsources = sources.size();
   this->nsignals = signals.size();
   this->nsystematics = systematics.size();
   this->nobservables = observables.size();
@@ -47,24 +49,22 @@ MCMC::MCMC(const std::vector<Signal>& signals,
   }
 
   // Set mean/expectation and sigma for all fit parameters
-  this->nparameters = this->nsignals + npars;
+  this->nparameters = this->nsources + npars;
   this->parameter_means = new hemi::Array<double>(this->nparameters, true);
   this->parameter_sigma = new hemi::Array<double>(this->nparameters, true);
   this->parameter_fixed.resize(this->nparameters);
   this->nfloat = 0; 
 
-  for (size_t i=0; i<this->nsignals; i++) {
-    this->parameter_means->writeOnlyHostPtr()[i] = \
-      1.0; //std::max(signals[i].nexpected, (double) 5);
-    this->parameter_sigma->writeOnlyHostPtr()[i] = \
-      signals[i].sigma; //signals[i].nexpected * signals[i].sigma;  // Fractional
-    this->parameter_fixed[i] = signals[i].fixed;
-    this->nfloat += (signals[i].fixed ? 0 : 1);
+  for (size_t i=0; i<this->nsources; i++) {
+    this->parameter_means->writeOnlyHostPtr()[i] = sources[i].mean;
+    this->parameter_sigma->writeOnlyHostPtr()[i] = sources[i].sigma;
+    this->parameter_fixed[i] = sources[i].fixed;
+    this->nfloat += (sources[i].fixed ? 0 : 1);
   }
 
   this->systematics_fixed = true;
 
-  size_t k = this->nsignals;
+  size_t k = this->nsources;
   for (size_t i=0; i<systematics.size(); i++) {
     if (!systematics[i].fixed) {
       this->systematics_fixed = false;
@@ -86,15 +86,17 @@ MCMC::MCMC(const std::vector<Signal>& signals,
   // Signal expectations, datasets, pdfz::Eval histograms
   this->pdfs.resize(this->nsignals);
   this->nexpected = new hemi::Array<double>(this->nsignals, true);
+  this->source_id = new hemi::Array<short>(this->nsignals, true);
   for (size_t i=0; i<this->nsignals; i++) {
     this->pdfs[i] = signals[i].histogram;
     this->nexpected->writeOnlyHostPtr()[i] = signals[i].nexpected;
+    this->source_id->writeOnlyHostPtr()[i] = signals[i].source.index;
   }
 
   // List of parameters for output ntuple
-  for (size_t i=0; i<signals.size(); i++) {
-    this->varlist += (signals[i].name + ":");
-    this->parameter_names.push_back(signals[i].name);
+  for (size_t i=0; i<sources.size(); i++) {
+    this->varlist += (sources[i].name + ":");
+    this->parameter_names.push_back(sources[i].name);
   }
   for (size_t i=0; i<systematics.size(); i++) {
     for (size_t j=0; j<systematics[i].npars; j++) {
@@ -247,7 +249,7 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
   // Calculate nll with initial parameters
   nll(lut.readOnlyPtr(), nevents,
       current_vector.readOnlyPtr(), current_nll.writeOnlyPtr(),
-      this->nexpected->readOnlyPtr(),
+      this->nexpected->readOnlyPtr(), this->source_id->readOnlyPtr(),
       normalizations.readOnlyPtr(), normalizations_nominal.readOnlyPtr(),
       event_partial_sums.ptr(), event_total_sum.ptr());
 
@@ -319,6 +321,7 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
                        proposed_vector.readOnlyPtr(),
                        nevents, this->nsignals,
                        this->nexpected->readOnlyPtr(),
+                       this->source_id->readOnlyPtr(),
                        normalizations.readOnlyPtr(),
                        normalizations_nominal.readOnlyPtr(),
                        event_partial_sums.ptr());
@@ -342,6 +345,7 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
                        this->nparameters,
                        jump_width.readOnlyPtr(),
                        this->nexpected->readOnlyPtr(),
+                       this->source_id->readOnlyPtr(),
                        normalizations.readOnlyPtr(),
                        normalizations_nominal.readOnlyPtr(),
                        debug_mode);
@@ -387,14 +391,14 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
 
 
 void MCMC::nll(const float* lut, size_t nevents, const double* v, double* nll,
-               const double* nexpected,
+               const double* nexpected, const short* source_id,
                const unsigned* norms, const unsigned* norms_nominal,
                double* event_partial_sums, double* event_total_sum) {
   // Partial sums of event term
   HEMI_KERNEL_LAUNCH(nll_event_chunks,
                      this->nnllblocks, this->nllblocksize, 0, 0,
                      lut, v, nevents, this->nsignals,
-                     nexpected,
+                     nexpected, source_id,
                      norms, norms_nominal,
                      event_partial_sums);
 
@@ -408,6 +412,7 @@ void MCMC::nll(const float* lut, size_t nevents, const double* v, double* nll,
                      this->nparameters, v, this->nsignals,
                      this->parameter_means->readOnlyPtr(),
                      this->parameter_sigma->readOnlyPtr(),
-                     event_total_sum, nexpected, norms, norms_nominal, nll);
+                     event_total_sum, nexpected, source_id,
+                     norms, norms_nominal, nll);
 }
 

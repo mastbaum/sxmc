@@ -10,6 +10,44 @@
 #include <sxmc/ttree_io.h>
 #include <sxmc/pdfz.h>
 
+Signal::Signal(std::string _name, std::string _title,
+               std::string _filename, unsigned _dataset,
+               Source _source, double _nexpected,
+               std::vector<std::string>& sample_fields,
+               std::vector<Observable>& observables,
+               std::vector<Observable>& cuts,
+               std::vector<Systematic>& systematics)
+    : name(_name), title(_title), filename(_filename), dataset(_dataset),
+      source(_source), nexpected(_nexpected) {
+  std::vector<float> data;
+  std::vector<unsigned int> rank;
+  std::vector<std::string> ttree_fields;
+
+  int rc = \
+    sxmc::io::read_float_vector_ttree(filename, data, rank, ttree_fields);
+  assert(rc >= 0);
+
+  this->n_mc = rank[0];
+  std::vector<float> samples(this->n_mc * sample_fields.size());
+
+  // If user provided a scale factor for MC generation rather than a rate,
+  // nexpected is set negative.
+  if (this->nexpected < 0) {
+    this->nexpected *= -1.0 * n_mc;
+  }
+
+  read_dataset_to_samples(samples, data, this->dataset,
+                          sample_fields, ttree_fields, cuts);
+
+  // Build the histogram evaluator
+  build_pdfz(samples, sample_fields.size(), observables, systematics);
+
+  // Evaluate histogram at mean of systematics to see how many
+  // of our samples fall within our observable min and max limits
+  set_efficiency(systematics);
+}
+
+
 void Signal::read_dataset_to_samples(std::vector<float>& samples,
                                      std::vector<float>& dataset,
                                      unsigned dataset_id,
@@ -177,43 +215,6 @@ void Signal::build_pdfz(std::vector<float> &samples, int nfields,
   }
 }
 
-Signal::Signal(std::string _name, std::string _title,
-               std::string _filename, unsigned _dataset,
-               double _nexpected, double _sigma, bool _fixed,
-               std::vector<std::string>& sample_fields,
-               std::vector<Observable>& observables,
-               std::vector<Observable>& cuts,
-               std::vector<Systematic>& systematics)
-    : name(_name), title(_title), filename(_filename),
-      dataset(_dataset), nexpected(_nexpected), sigma(_sigma), fixed(_fixed) {
-  std::vector<float> data;
-  std::vector<unsigned int> rank;
-  std::vector<std::string> ttree_fields;
-
-  int rc = \
-    sxmc::io::read_float_vector_ttree(filename, data, rank, ttree_fields);
-  assert(rc >= 0);
-
-  this->n_mc = rank[0];
-  std::vector<float> samples(this->n_mc * sample_fields.size());
-
-  // If user provided a scale factor for MC generation rather than a rate,
-  // nexpected is set negative.
-  if (this->nexpected < 0) {
-    this->nexpected *= -1.0 * n_mc;
-  }
-
-  read_dataset_to_samples(samples, data, this->dataset,
-                          sample_fields, ttree_fields, cuts);
-
-  // Build the histogram evaluator
-  build_pdfz(samples, sample_fields.size(), observables, systematics);
-
-  // Evaluate histogram at mean of systematics to see how many
-  // of our samples fall within our observable min and max limits
-  set_efficiency(systematics);
-}
-
 
 Observable::Observable(const std::string _name, const Json::Value& config)
       : name(_name) {
@@ -245,7 +246,7 @@ Observable::Observable(const std::string _name, const Json::Value& config)
 
 
 Systematic::Systematic(const std::string _name, const Json::Value& config)
-      : name(_name) {
+      : name(_name), means(NULL), sigmas(NULL) {
   assert(config.isMember("title"));
   this->title = config["title"].asString();
 
@@ -307,20 +308,10 @@ Systematic::Systematic(const std::string _name, const Json::Value& config)
 }
 
 
-//Rate::Rate(const std::string& _name, const Json::Value& params) : name(_name) {
-//  // Must specify rate or scale, but not both
-//  assert(params.isMember("rate") || params.isMember("scale"));
-//  assert(!(params.isMember("rate") && params.isMember("scale")));
-//
-//  if (params.isMember("rate")) {
-//    this->rate = params["rate"].asFloat();
-//  }
-//  else {
-//    // (-) tell signals to scale by the total number of samples
-//    this->rate = -1.0 / params["scale"].asFloat();
-//  }
-//
-//  this->sigma = params.get("constraint", 0.0).asFloat();
-//  this->fixed = params.get("fixed", false).asBool();
-//}
+Source::Source(const std::string& _name, const Json::Value& params)
+    : name(_name) {
+  this->mean = params.get("mean", 1.0).asFloat();
+  this->sigma = params.get("sigma", 0.0).asFloat();
+  this->fixed = params.get("fixed", false).asBool();
+}
 

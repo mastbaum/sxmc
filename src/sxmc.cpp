@@ -84,7 +84,7 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
     }
 
     // Run MCMC
-    MCMC mcmc(fc.signals, fc.systematics, fc.observables);
+    MCMC mcmc(fc.sources, fc.signals, fc.systematics, fc.observables);
     LikelihoodSpace* ls = \
       mcmc(samples, fc.nsteps, fc.burnin_fraction, fc.debug_mode);
 

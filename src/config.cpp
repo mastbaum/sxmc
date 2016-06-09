@@ -37,6 +37,7 @@ FitConfig::FitConfig(std::string filename) {
   const Json::Value sys_params = root["pdfs"]["systematics"];
   const Json::Value rate_params = root["rates"];
   const Json::Value sig_params = root["signals"];
+  const Json::Value src_params = root["sources"];
 
   // Load general fit parameters
   assert(fit_params.isMember("nexperiments"));
@@ -75,18 +76,21 @@ FitConfig::FitConfig(std::string filename) {
     this->cuts.push_back(Observable(name, obs_params[name]));
   }
 
-  // Systematics: union of all signal systematics
+  // Systematics and sources: union of all used in signals
+  short sidx = 0;
   short pidx = 0;
   for (Json::Value::const_iterator it=sig_params.begin();
        it!=sig_params.end(); ++it) {
     std::string signal_name = it.key().asString();
+
+    // Systematics
     if (sig_params[signal_name].isMember("systematics")) {
       const Json::Value slist = sig_params[signal_name]["systematics"];
       for (Json::Value::const_iterator it=slist.begin();
            it!=slist.end(); ++it) {
         std::string sys_name = (*it).asString();
         assert(sys_params.isMember(sys_name));
-        bool exists = false;;
+        bool exists = false;
         for (size_t k=0; k<this->systematics.size(); k++) {
           if (this->systematics[k].name == sys_name) {
             exists = true;
@@ -94,13 +98,41 @@ FitConfig::FitConfig(std::string filename) {
           }
         }
         if (!exists) {
-          Systematic s(sys_name, sys_params[sys_name]);
-          for (size_t k=0; k<s.npars; k++) {
-            s.pidx.push_back(pidx++);
+          this->systematics.push_back(
+            Systematic(sys_name, sys_params[sys_name]));
+          Systematic* s = &this->systematics.back();
+          for (size_t k=0; k<s->npars; k++) {
+            s->pidx.push_back(pidx++);
           }
-          this->systematics.push_back(s);
         }
       }
+    }
+
+    // Sources
+    if (sig_params[signal_name].isMember("source")) {
+      std::string src_name = sig_params[signal_name]["source"].asString();
+      assert(src_params.isMember(src_name));
+      bool exists = false;
+      for (size_t k=0; k<this->sources.size(); k++) {
+        if (this->sources[k].name == src_name) {
+          exists = true;
+          break;
+        }
+      }
+      if (!exists) {
+        Source s(src_name, src_params[src_name]);
+        s.index = sidx++;
+        this->sources.push_back(s);
+      }
+    }
+    else {
+      // The signal is a source for itself
+      this->sources.push_back(Source(
+        signal_name, sidx++,
+        sig_params[signal_name].get("mean", 1.0).asFloat(),
+        sig_params[signal_name].get("sigma", 0.0).asFloat(),
+        sig_params[signal_name].get("fixed", false).asBool()
+      ));
     }
   }
 
@@ -153,7 +185,7 @@ FitConfig::FitConfig(std::string filename) {
     std::string name = (*it).asString();
 
     assert(sig_params.isMember(name));
-    Json::Value config = sig_params[name];
+    const Json::Value config = sig_params[name];
 
     std::cout << "FitConfig: Loading signal: " << name << std::endl;
 
@@ -197,9 +229,18 @@ FitConfig::FitConfig(std::string filename) {
       }
     }
 
+    // Source
+    Source source;
+    std::string source_name = config.get("source", name).asString();
+    for (size_t k=0; k<this->sources.size(); k++) {
+      if (this->sources[k].name == source_name) {
+        source = this->sources[k];
+        break;
+      }
+    }
+
     this->signals.push_back(
-      Signal(name, title, filename, dataset,
-             nexpected, sigma, fixed,
+      Signal(name, title, filename, dataset, source, nexpected,
              this->sample_fields, this->observables,
              this->cuts, systs));
   }
@@ -235,8 +276,8 @@ FitConfig::FitConfig(std::string filename) {
 
         std::cout << "FitConfig: Loading data: " << filename << std::endl;
         this->data[dataset].push_back(
-          Signal(title, title, filename, dataset,
-                 -1.0, 0.0, false, this->sample_fields,
+          Signal(title, title, filename, dataset, Source(),
+                 -1.0, this->sample_fields,
                  this->observables, cc, syst));
       }
     }
@@ -258,14 +299,27 @@ void FitConfig::print() const {
     std::cout << "  " << it->name << std::endl
       << "    Filename: " << it->filename << std::endl
       << "    Dataset: " << it->dataset << std::endl
-      << "    Title: \"" << it->title << "\"" << std::endl
-      << "    Expectation: " << it->nexpected << std::endl
+      << "    Title: \"" << it->title << "\"" << std::endl;
+  }
+
+  std::cout << "Sources:" << std::endl;
+  for (std::vector<Source>::const_iterator it=this->sources.begin();
+      it!=this->sources.end(); ++it) {
+    std::cout << "  " << it->name << std::endl
+      << "    Mean: " << it->mean << std::endl
       << "    Constraint: ";
     if (it->sigma != 0) {
       std::cout << it->sigma << std::endl;
     }
     else {
       std::cout << "none" << std::endl;
+    }
+    std::cout << "    Fixed: ";
+    if (it->fixed) {
+      std::cout << "yes" << std::endl;
+    }
+    else {
+      std::cout << "no" << std::endl;
     }
   }
 

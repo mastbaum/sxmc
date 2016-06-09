@@ -46,11 +46,14 @@ struct Observable {
  *
  * A container for systematic parameter metadata
 */
-struct Systematic {
-  Systematic() {}
+class Systematic {
+public:
+  Systematic() : means(NULL), sigmas(NULL) {}
 
   // Load from JSON configuration
   Systematic(const std::string _name, const Json::Value& config);
+
+  virtual ~Systematic() {}
 
   std::string name;  //!< Name of the systematic parameter
   std::string title;  //!< Title in ROOT LaTeX format, for display
@@ -67,23 +70,28 @@ struct Systematic {
 };
 
 
-///**
-// * \struct Rate
-// *
-// * A container for a signal rate.
-//*/
-//struct Rate {
-//  Rate() {}
-//
-//  // Load from JSON configuration
-//  Rate(const std::string& _name, const Json::Value& params);
-//
-//  std::string name;  //!< String identifier
-//  size_t index;  //!< Index in the list of rates
-//  float rate;  //!< Number of events expected
-//  float sigma;  //!< Gaussian constraint
-//  bool fixed;  //!< Rate is fixed
-//};
+/**
+ * \struct Source
+ *
+ * A container for a signal source
+*/
+struct Source {
+  Source() {}
+
+  Source(const std::string& _name, size_t _index,
+         float _mean, float _sigma, bool _fixed)
+      : name(_name), index(_index),
+        mean(_mean), sigma(_sigma), fixed(_fixed) {}
+
+  // Load from JSON configuration
+  Source(const std::string& _name, const Json::Value& params);
+
+  std::string name;  //!< String identifier
+  size_t index;  //!< Index in the list of sources
+  float mean;  //!< Mean expectation (scaling, 1.0 is nominal)
+  float sigma;  //!< Gaussian constraint (fractional)
+  bool fixed;  //!< Rate is fixed
+};
 
 
 /**
@@ -110,8 +118,8 @@ public:
    * \param fixed - Normalization is fixed
   */
   Signal(std::string _name, std::string _title,
-         std::string _filename, unsigned _dataset,
-         double _nexpected, double _sigma, bool _fixed,
+         std::string _filename, unsigned _dataset, Source _source,
+         double _nexpected,
          std::vector<std::string>& sample_fields,
          std::vector<Observable>& observables,
          std::vector<Observable>& cuts,
@@ -121,9 +129,10 @@ public:
   std::string title;  //!< Histogram title in ROOT-LaTeX format
   std::string filename;
   unsigned dataset;  //!< Dataset identifier (cf. multi-phase fitting)
+  Source source;  //!< Source for correlated rates
   double nexpected;  //!< Events expected in this fit
-  float sigma;  //!< Gaussian constraint
-  bool fixed;  //!< Rate is fixed
+  //float sigma;  //!< Gaussian constraint
+  //bool fixed;  //!< Rate is fixed
   size_t n_mc;  //!< Number of simulated events used to make pdf
   double nevents;  //!< Events in the PDF
   double efficiency;  //!< Fraction of generated events that make it past

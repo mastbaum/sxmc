@@ -49,8 +49,9 @@ public:
   std::vector<Systematic> systematics;  //!< Systematics used in PDFs
   std::vector<Observable> observables;  //!< Observables used in PDFs
   std::vector<Observable> cuts;  //!< Cuts applied before fit
+  std::vector<Source> sources;  //!< Sources for correlated rates
   std::map<unsigned, std::vector<Signal> > data;  //!< Data to fit, if any
-  std::vector<std::string> sample_fields;  //!< Names of sample array fields:
+  std::vector<std::string> sample_fields;  //!< Names of sample array fields
   std::set<unsigned> datasets;  //!< Dataset tags
 };
 
