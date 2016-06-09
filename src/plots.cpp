@@ -17,34 +17,6 @@
 
 #include <sxmc/plots.h>
 
-//const int ncolors = 27;
-//const int colors[27] = {kRed,      kGreen,    kBlue,      kMagenta,
-//                        kCyan,     kYellow,   kOrange,    kViolet+2,
-//                        kRed+2,    kGreen+2,  kBlue+2,    kMagenta+2,
-//                        kCyan+2,   kYellow+2, kOrange+2,  kRed-7,
-//                        kGreen-7,  kBlue-7,   kMagenta-7, kCyan-7,
-//                        kYellow-7, kOrange-7, kRed-6,     kAzure+1,
-//                        kTeal+1,   kSpring-9, kAzure-9};
-
-// SNO+ "Laura" colors
-//const int ncolors = 7;
-//const int colors[7] = {
-//  TColor::GetColor(153, 153, 153),
-//  TColor::GetColor(75,  110, 188),
-//  TColor::GetColor(110, 157, 100),
-//  TColor::GetColor(121, 93,  136),
-//  TColor::GetColor(255, 153, 4),
-//  TColor::GetColor(153, 102, 51),
-//  TColor::GetColor(0,   204, 204)
-//};
-
-//const int ncolors = 16;
-//const int colors[16] = {
-//  kGray+1,   kAzure,    kSpring-6, kRed+1,     kAzure+1,  kOrange+1,
-//  kViolet+1, kOrange-7, kCyan+1,   kMagenta+1, kSpring+4, kMagenta+3,
-//  kViolet,   kViolet-9, kBlue-6,   kGreen-6  
-//};
-
 const int ncolors = 6;
 const int colors[6] = {
   kBlue, kBlack, kRed, kGreen+1, kGray+1, kOrange+1

@@ -1,11 +1,12 @@
+#include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <iostream>
-#include <utility>
 #include <fstream>
+#include <sstream>
 #include <streambuf>
 #include <string>
-#include <algorithm>
-#include <stdlib.h>
+#include <utility>
 #include <vector>
 #include <json/value.h>
 #include <json/reader.h>
@@ -15,7 +16,7 @@
 #include <sxmc/signals.h>
 #include <sxmc/utils.h>
 
-FitConfig::FitConfig(std::string filename) : data(NULL) {
+FitConfig::FitConfig(std::string filename) {
   // Read JSON configuration file
   Json::Reader reader;
   Json::Value root;
@@ -168,47 +169,43 @@ FitConfig::FitConfig(std::string filename) : data(NULL) {
              this->cuts, this->systematics));
   }
 
-// DATA LOADING FIXME
-//
-//  this->data = NULL;  // Deferred to signal loading phase
-//  
-//  std::vector<std::string> data_signals;
-//  if (experiment_params.isMember("data")) {
-//    for (unsigned k=0; k<experiment_params["data"].size(); k++) {
-//      std::string dsname = experiment_params["data"][k].asString();
-//      assert(std::find(signal_names.begin(), signal_names.end(), dsname) ==
-//             signal_names.end());
-//      data_signals.push_back(dsname);
-//    }
-//    this->data = new std::vector<Signal>;
-//  }
-//
-//  // Loop over all possible signals
-//
-//    // Check if this signal is being used as fit data (and not as a PDF!)
-//    if (std::find(data_signals.begin(), data_signals.end(), name) !=
-//                  data_signals.end()) {
-//      const Json::Value signal_params = all_signals[name];
-//      SignalParams sp(signal_params, 1.0);
-//      std::cout << "FitConfig: Loading data: " << name << std::endl;
-//
-//      // All active observables are treated as cuts, in order to clip the data
-//      // to the PDF boundaries.
-//      std::vector<Observable> cc = this->observables;
-//      for (size_t ii=0; ii<this->cuts.size(); ii++) {
-//        cc.push_back(this->cuts[ii]);
-//      }
-//
-//      std::vector<Systematic> syst;  // No systematics applied to data!
-//
-//      this->data->push_back(
-//        Signal(name, sp.title, sp.nexpected, sp.sigma, sp.category,
-//               this->sample_fields, this->observables, cc,
-//               syst, sp.files));
-//
-//      continue;
-//    }
+  //// Load data
+  if (root.isMember("data")) {
+    const Json::Value data_params = root["data"];
 
+    for (Json::Value::const_iterator it=data_params.begin();
+         it!=data_params.end(); ++it) {
+      std::string ds_name = it.key().asString();
+      unsigned dataset;
+      std::istringstream is(ds_name);
+      is >> dataset;
+
+      const Json::Value dconfig = data_params[ds_name];
+
+      for (Json::Value::const_iterator jt=dconfig.begin();
+           jt!=dconfig.end(); ++jt) {
+
+        const Json::Value drow = *jt;
+        std::string title = drow["title"].asString();
+        std::string filename = drow["filename"].asString();
+
+        // All active observables are treated as cuts, in order to clip the data
+        // to the PDF boundaries.
+        std::vector<Observable> cc = this->observables;
+        for (size_t ii=0; ii<this->cuts.size(); ii++) {
+          cc.push_back(this->cuts[ii]);
+        }
+
+        std::vector<Systematic> syst;  // No systematics applied to data!
+
+        std::cout << "FitConfig: Loading data: " << filename << std::endl;
+        this->data[dataset].push_back(
+          Signal(title, title, filename, dataset,
+                 -1.0, 0.0, false, this->sample_fields,
+                 this->observables, cc, syst));
+      }
+    }
+  }
 }
 
 
@@ -220,31 +217,14 @@ void FitConfig::print() const {
     << "  Random seed (0=random): " << this->seed << std::endl
     << "  Confidence level: " << this->confidence << std::endl;
 
-  std::cout << "Cuts:" << std::endl;
-  for (std::vector<Observable>::const_iterator it=this->cuts.begin();
-      it!=this->cuts.end(); ++it) {
-    std::cout << "  " << it->name << std::endl
-      << "    Title: \"" << it->title << "\"" << std::endl
-      << "    Lower bound: "<< it->lower << std::endl
-      << "    Upper bound: " << it->upper << std::endl;
-  }
-
-  std::cout << "Observables:" << std::endl;
-  for (std::vector<Observable>::const_iterator it=this->observables.begin();
-      it!=this->observables.end(); ++it) {
-    std::cout << "  " << it->name << std::endl
-      << "    Title: \"" << it->title << "\"" << std::endl
-      << "    Lower bound: "<< it->lower << std::endl
-      << "    Upper bound: " << it->upper << std::endl
-      << "    Bins: " << it->bins << std::endl;
-  }
-
   std::cout << "Signals:" << std::endl;
   for (std::vector<Signal>::const_iterator it=this->signals.begin();
       it!=this->signals.end(); ++it) {
     std::cout << "  " << it->name << std::endl
+      << "    Filename: " << it->filename << std::endl
+      << "    Dataset: " << it->dataset << std::endl
       << "    Title: \"" << it->title << "\"" << std::endl
-      << "    Expectation: "<< it->nexpected << std::endl
+      << "    Expectation: " << it->nexpected << std::endl
       << "    Constraint: ";
     if (it->sigma != 0) {
       std::cout << it->sigma << std::endl;
@@ -254,14 +234,33 @@ void FitConfig::print() const {
     }
   }
 
+  std::cout << "Cuts:" << std::endl;
+  for (std::vector<Observable>::const_iterator it=this->cuts.begin();
+      it!=this->cuts.end(); ++it) {
+    std::cout << "  " << it->name << std::endl
+      << "    Title: \"" << it->title << "\"" << std::endl
+      << "    Lower bound: " << it->lower << std::endl
+      << "    Upper bound: " << it->upper << std::endl;
+  }
+
+  std::cout << "Observables:" << std::endl;
+  for (std::vector<Observable>::const_iterator it=this->observables.begin();
+      it!=this->observables.end(); ++it) {
+    std::cout << "  " << it->name << std::endl
+      << "    Title: \"" << it->title << "\"" << std::endl
+      << "    Lower bound: " << it->lower << std::endl
+      << "    Upper bound: " << it->upper << std::endl
+      << "    Bins: " << it->bins << std::endl;
+  }
+
   if (this->systematics.size() > 0) {
     std::cout << "Systematics:" << std::endl;
     for (std::vector<Systematic>::const_iterator it=this->systematics.begin();
          it!=this->systematics.end(); ++it) {
       std::cout << "  " << it->name << std::endl
                 << "    Title: \"" << it->title << "\"" << std::endl
-                << "    Type: "<< it->type << std::endl
-                << "    Observable: "<< it->observable_field << std::endl;
+                << "    Type: " << it->type << std::endl
+                << "    Observable: " << it->observable_field << std::endl;
       if (it->type == pdfz::Systematic::RESOLUTION_SCALE) {
         std::cout << "    Truth: " << it->truth_field << std::endl;
       }

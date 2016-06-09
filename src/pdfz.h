@@ -400,19 +400,22 @@ public:
   };
 
   /**
-   * Copy out the samples array (for observable fields only!) into a vector.
+   * Copy out the samples array (for observable fields only) into a vector.
   */
-  std::vector<float> GetSamples() {
+  void GetSamples(std::vector<float>& sv) {
+    size_t oldsize = sv.size();
     size_t nevents = this->samples.size() / this->nfields;
+    size_t ncols = this->nobservables + 1;
+
+    sv.resize(oldsize + nevents * ncols);
+
     const float* s = samples.readOnlyHostPtr();
-    std::vector<float> sv(nevents * (this->nobservables + 1));
     for (size_t i=0; i<nevents; i++) {
       for (int j=0; j<this->nobservables; j++) {
-        sv[i * this->nobservables + j] = s[i * this->nfields + j];
+        sv[oldsize + i * (this->nobservables+1) + j] = s[i * this->nfields + j];
       }
-      sv[i * this->nobservables + this->nobservables] = this->dataset;
+      sv[oldsize + i * (this->nobservables+1) + this->nobservables] = this->dataset;
     }
-    return sv;
   }
 
 protected:

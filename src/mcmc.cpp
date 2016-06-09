@@ -86,11 +86,9 @@ MCMC::MCMC(const std::vector<Signal>& signals,
   // Signal expectations, datasets, pdfz::Eval histograms
   this->pdfs.resize(this->nsignals);
   this->nexpected = new hemi::Array<double>(this->nsignals, true);
-  //this->rate_index = new hemi::Array<unsigned>(this->nsignals, true);
   for (size_t i=0; i<this->nsignals; i++) {
     this->pdfs[i] = signals[i].histogram;
     this->nexpected->writeOnlyHostPtr()[i] = signals[i].nexpected;
-    //this->rate_index->writeOnlyHostPtr()[i] = signals[i].rate->index;
   }
 
   // List of parameters for output ntuple
@@ -186,38 +184,24 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
       continue;
     }
 
-    if (i < nsignals) {
-      jump_width.writeOnlyHostPtr()[i] = 0.1 * scale_factor;
+    float mean = this->parameter_means->readOnlyHostPtr()[i];
+    float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
+    float width = 0.1;
+
+    if (sigma > 0) {
+      width = sigma;
+    }
+    else if (i < nsignals) {
+      float m = std::max(mean, (float) 10);
+      width = sqrt(m) / m;
     }
     else {
-      float mean = std::max(this->parameter_means->readOnlyHostPtr()[i], 10.0);
-      float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
-      float m = std::max(mean, (float) 1);
-      float width = (sigma > 0 ? sigma : sqrt(m));
-      jump_width.writeOnlyHostPtr()[i] = 0.1 * width * scale_factor;
+      width = sqrt(std::max(mean, (float) 1));
     }
 
-    std::cout << jump_width.readOnlyHostPtr()[i] << std::endl;
+    jump_width.writeOnlyHostPtr()[i] = 0.1 * width * scale_factor;
 
-    //float mean = std::max(this->parameter_means->readOnlyHostPtr()[i], 10.0);
-    //float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
-    //float width;
-    //std::cout << " " << this->parameter_names[i] << ": ";
-    //if (this->parameter_fixed[i]) {
-    //  width = -1;
-    //  std::cout << "fixed" << std::endl;
-    //  jump_width.writeOnlyHostPtr()[i] = -1;
-    //  continue;
-    //}
-    //if (i < nrates) {
-    //  float m = std::max(mean, (float) 10);
-    //  width = (sigma > 0 ? m * sigma : sqrt(m));
-    //}
-    //else {
-    //  float m = std::max(mean, (float) 1);
-    //  width = (sigma > 0 ? sigma : sqrt(m));
-    //}
-    //jump_width.writeOnlyHostPtr()[i] = 0.1 * width * scale_factor;
+    std::cout << jump_width.readOnlyHostPtr()[i] << std::endl;
   }
 
   jump_width.writeOnlyHostPtr();
@@ -248,7 +232,6 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
     p->SetEvalPoints(data);
     p->SetPDFValueBuffer(&lut, i * nevents, 1);
     p->SetNormalizationBuffer(&normalizations_nominal, i);
-    //p->SetNormalizationBuffer(&normalizations, i);
     p->SetParameterBuffer(&current_vector, this->nsignals);
     p->EvalAsync();
     p->EvalFinished();
@@ -332,7 +315,7 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
     // Partial sums of event term
     HEMI_KERNEL_LAUNCH(nll_event_chunks, this->nnllblocks,
                        this->nllblocksize, 0, 0,
-                       lut.readOnlyPtr(), /*dataweights.readOnlyPtr(),*/
+                       lut.readOnlyPtr(),
                        proposed_vector.readOnlyPtr(),
                        nevents, this->nsignals,
                        this->nexpected->readOnlyPtr(),

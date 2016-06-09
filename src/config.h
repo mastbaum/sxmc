@@ -7,12 +7,11 @@
  * Fit configuration management and config file parsing.
 */
 
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
-#include <json/value.h>
 
-#include <sxmc/utils.h>
 #include <sxmc/signals.h>
 
 /**
@@ -32,9 +31,7 @@ public:
   FitConfig(std::string filename);
 
   /** Destructor */
-  virtual ~FitConfig() {
-    delete data;
-  }
+  virtual ~FitConfig() {}
 
   /** Pretty-print the fit parameters */
   void print() const;
@@ -52,7 +49,7 @@ public:
   std::vector<Systematic> systematics;  //!< Systematics used in PDFs
   std::vector<Observable> observables;  //!< Observables used in PDFs
   std::vector<Observable> cuts;  //!< Cuts applied before fit
-  std::vector<Signal>* data;  //!< Data to fit, if any
+  std::map<unsigned, std::vector<Signal> > data;  //!< Data to fit, if any
   std::vector<std::string> sample_fields;  //!< Names of sample array fields:
   std::set<unsigned> datasets;  //!< Dataset tags
 };

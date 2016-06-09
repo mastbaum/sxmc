@@ -684,7 +684,6 @@ void EvalHist::OptimizeBin() {
                            this->cuda_state->stream,
                            (int) this->samples.size(),
                            this->samples.readOnlyPtr(),
-                           /*this->weights.readOnlyPtr(),*/
                            this->nobservables, this->nfields,
                            this->bin_stride.readOnlyPtr(),
                            this->nbins.readOnlyPtr(),

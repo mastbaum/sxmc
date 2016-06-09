@@ -1,5 +1,5 @@
-#include <string>
 #include <sstream>
+#include <string>
 
 #include <sxmc/interval.h>
 

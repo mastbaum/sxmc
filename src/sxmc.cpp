@@ -60,7 +60,7 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
               << " / " << fc.nexperiments << std::endl;
 
     std::vector<float> samples;
-    if (!fc.data) {
+    if (fc.data.empty()) {
       // Make fake data
       std::vector<double> params;
       for (size_t j=0; j<fc.signals.size(); j++) {
@@ -73,9 +73,14 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
                           params, true);
     }
     else {
-      std::cout << "ensemble: Using dataset " << i << std::endl;
-      samples = \
-        dynamic_cast<pdfz::EvalHist*>(fc.data->at(i).histogram)->GetSamples();
+      for (std::map<unsigned, std::vector<Signal> >::iterator it=fc.data.begin();
+           it!=fc.data.end(); ++it) {
+        std::cout << "ensemble: Loading dataset "
+                  << it->first << "." << i << "("
+                  << it->second[i].filename << ")" << std::endl;
+
+        dynamic_cast<pdfz::EvalHist*>(it->second[i].histogram)->GetSamples(samples);
+      }
     }
 
     // Run MCMC

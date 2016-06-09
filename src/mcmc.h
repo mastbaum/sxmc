@@ -7,9 +7,9 @@
  * Utilities for Markov Chain Monte Carlo distribution sampling.
 */
 
-#include <vector>
 #include <cmath>
 #include <string>
+#include <vector>
 #include <cuda.h>
 #include <hemi/hemi.h>
 
@@ -114,8 +114,6 @@ private:
   unsigned nnllthreads;  //!< Number of threads for nll partial sums
   unsigned nreducethreads; //!< Number of threads to use in partial sum
                            //!< reduction kernel
-  //unsigned blocksize;  //!< Size of blocks for per-signal kernels
-  //unsigned nblocks;  //!< Number of blocks for per-signal kernels
   std::string varlist;  //!< String identifier list for ntuple indexing
   hemi::Array<double>* parameter_means;  //!< Parameter central values
   hemi::Array<double>* parameter_sigma;  //!< Parameter Gaussian uncertainty
