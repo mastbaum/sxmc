@@ -35,6 +35,8 @@ FitConfig::FitConfig(std::string filename) {
   const Json::Value fit_params = root["fit"];
   const Json::Value obs_params = root["pdfs"]["observables"];
   const Json::Value sys_params = root["pdfs"]["systematics"];
+  const Json::Value rate_params = root["rates"];
+  const Json::Value sig_params = root["signals"];
 
   // Load general fit parameters
   assert(fit_params.isMember("nexperiments"));
@@ -73,12 +75,33 @@ FitConfig::FitConfig(std::string filename) {
     this->cuts.push_back(Observable(name, obs_params[name]));
   }
 
-  // Systematics
-  for (Json::Value::const_iterator it=fit_params["systematics"].begin();
-       it!=fit_params["systematics"].end(); ++it) {
-    std::string name = (*it).asString();
-    assert(sys_params.isMember(name));
-    this->systematics.push_back(Systematic(name, sys_params[name]));
+  // Systematics: union of all signal systematics
+  short pidx = 0;
+  for (Json::Value::const_iterator it=sig_params.begin();
+       it!=sig_params.end(); ++it) {
+    std::string signal_name = it.key().asString();
+    if (sig_params[signal_name].isMember("systematics")) {
+      const Json::Value slist = sig_params[signal_name]["systematics"];
+      for (Json::Value::const_iterator it=slist.begin();
+           it!=slist.end(); ++it) {
+        std::string sys_name = (*it).asString();
+        assert(sys_params.isMember(sys_name));
+        bool exists = false;;
+        for (size_t k=0; k<this->systematics.size(); k++) {
+          if (this->systematics[k].name == sys_name) {
+            exists = true;
+            break;
+          }
+        }
+        if (!exists) {
+          Systematic s(sys_name, sys_params[sys_name]);
+          for (size_t k=0; k<s.npars; k++) {
+            s.pidx.push_back(pidx++);
+          }
+          this->systematics.push_back(s);
+        }
+      }
+    }
   }
 
   // Determine the order of data fields in the sampled data.
@@ -125,9 +148,6 @@ FitConfig::FitConfig(std::string filename) {
   this->sample_fields.push_back("DATASET");
 
   //// Load signals
-  const Json::Value rate_params = root["rates"];
-  const Json::Value sig_params = root["signals"];
-
   for (Json::Value::const_iterator it=fit_params["signals"].begin();
        it!=fit_params["signals"].end(); ++it) {
     std::string name = (*it).asString();
@@ -162,11 +182,26 @@ FitConfig::FitConfig(std::string filename) {
     assert(config.isMember("filename"));
     std::string filename = config["filename"].asString();
 
+    // Systematics
+    std::vector<Systematic> systs;
+    if (config.isMember("systematics")) {
+      const Json::Value slist = config["systematics"];
+      for (Json::Value::const_iterator it=slist.begin();
+           it!=slist.end(); ++it) {
+        std::string sys_name = (*it).asString();
+        for (size_t k=0; k<this->systematics.size(); k++) {
+          if (this->systematics[k].name == sys_name) {
+            systs.push_back(this->systematics[k]);
+          }
+        }
+      }
+    }
+
     this->signals.push_back(
       Signal(name, title, filename, dataset,
              nexpected, sigma, fixed,
              this->sample_fields, this->observables,
-             this->cuts, this->systematics));
+             this->cuts, systs));
   }
 
   //// Load data

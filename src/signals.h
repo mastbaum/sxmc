@@ -61,6 +61,7 @@ struct Systematic {
   size_t observable_field_index;  //!< Index of the observable field in the data
   size_t truth_field_index;  //!< Index of the truth field in the data
   size_t npars;  //!< Number of parameters in power series
+  std::vector<short> pidx;  //!< Global index for pdfz parameter array offsetting
   pdfz::Systematic::Type type;  //!< The type of systematic
   bool fixed;  //! Fix the value of the parameter to the mean
 };

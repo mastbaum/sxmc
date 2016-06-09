@@ -141,15 +141,13 @@ void Signal::build_pdfz(std::vector<float> &samples, int nfields,
     new pdfz::EvalHist(samples, nfields, observables.size(),
                        lower, upper, nbins, this->dataset);
 
-  short pidx = 0;  // Systematic parameter index
-
   for (size_t i=0; i<systematics.size(); i++) {
     Systematic* syst = &systematics[i];
 
     // Indices for these systematic parameters
     hemi::Array<short>* pars = new hemi::Array<short>(syst->npars, true);
-    for (unsigned i=0; i<syst->npars; i++) {
-      pars->writeOnlyHostPtr()[i] = pidx++;
+    for (unsigned i=0; i<syst->pidx.size(); i++) {
+      pars->writeOnlyHostPtr()[i] = syst->pidx[i];
     }
 
     size_t o_field = syst->observable_field_index;
