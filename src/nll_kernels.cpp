@@ -148,6 +148,7 @@ void nll_event_reduce_device(const size_t nthreads, const double* sums,
 
 HEMI_DEV_CALLABLE_INLINE
 void nll_total_device(const size_t nparameters, const size_t nsignals,
+                      const size_t nsources,
                       const double* pars, const double* means,
                       const double* sigmas, const double* events_total,
                       const double* nexpected,
@@ -163,8 +164,8 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
   }
 
   for (unsigned i=0; i<nparameters; i++) {
-    // Non-negative rates
-    if (i < nsignals && pars[i] < 0) {
+    // Steep penalty for negative rates
+    if (i < nsources && pars[i] < 0) {
       nll[0] = 1e18;
       return;      
     }
@@ -211,18 +212,22 @@ HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
 
 
 HEMI_KERNEL(nll_total)(const size_t npars, const double* pars,
-                       const size_t nsignals, const double* means,
+                       const size_t nsignals,
+                       const size_t nsources, const double* means,
                        const double* sigmas, const double* events_total,
                        const double* nexpected, const short* source_id,
                        const unsigned* norms, const unsigned* norms_nominal,
                        double* nll) {
-  nll_total_device(npars, nsignals, pars, means, sigmas, events_total,
-                   nexpected, source_id, norms, norms_nominal, nll);
+  nll_total_device(npars, nsignals, nsources, pars, means, sigmas,
+                   events_total, nexpected, source_id, norms, norms_nominal,
+                   nll);
 }
 
 
 HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
-                                        const double* sums, const size_t ns,
+                                        const double* sums,
+                                        const size_t nsignals,
+                                        const size_t nsources,
                                         const double* means,
                                         const double* sigmas,
                                         RNGState* rng,
@@ -246,8 +251,9 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
 #endif
 
   if (hemiGetElementOffset() == 0) {
-    nll_total_device(nparameters, ns, v_proposed, means, sigmas, &total_sum,
-                     nexpected, source_id, norms, norms_nominal, nll_proposed);
+    nll_total_device(nparameters, nsignals, nsources, v_proposed, means,
+                     sigmas, &total_sum, nexpected, source_id, norms,
+                     norms_nominal, nll_proposed);
 
     jump_decider_device(rng, nll_current, nll_proposed, v_current, v_proposed,
                         nparameters, accepted, counter, jump_buffer,

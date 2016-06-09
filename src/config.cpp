@@ -13,7 +13,7 @@
 
 #include <sxmc/config.h>
 #include <sxmc/ttree_io.h>
-#include <sxmc/signals.h>
+#include <sxmc/signal.h>
 #include <sxmc/utils.h>
 
 FitConfig::FitConfig(std::string filename) {
@@ -296,80 +296,32 @@ void FitConfig::print() const {
   std::cout << "Signals:" << std::endl;
   for (std::vector<Signal>::const_iterator it=this->signals.begin();
       it!=this->signals.end(); ++it) {
-    std::cout << "  " << it->name << std::endl
-      << "    Filename: " << it->filename << std::endl
-      << "    Dataset: " << it->dataset << std::endl
-      << "    Title: \"" << it->title << "\"" << std::endl;
+    it->print();
   }
 
   std::cout << "Sources:" << std::endl;
   for (std::vector<Source>::const_iterator it=this->sources.begin();
       it!=this->sources.end(); ++it) {
-    std::cout << "  " << it->name << std::endl
-      << "    Mean: " << it->mean << std::endl
-      << "    Constraint: ";
-    if (it->sigma != 0) {
-      std::cout << it->sigma << std::endl;
-    }
-    else {
-      std::cout << "none" << std::endl;
-    }
-    std::cout << "    Fixed: ";
-    if (it->fixed) {
-      std::cout << "yes" << std::endl;
-    }
-    else {
-      std::cout << "no" << std::endl;
-    }
+    it->print();
   }
 
   std::cout << "Cuts:" << std::endl;
   for (std::vector<Observable>::const_iterator it=this->cuts.begin();
       it!=this->cuts.end(); ++it) {
-    std::cout << "  " << it->name << std::endl
-      << "    Title: \"" << it->title << "\"" << std::endl
-      << "    Lower bound: " << it->lower << std::endl
-      << "    Upper bound: " << it->upper << std::endl;
+    it->print();
   }
 
   std::cout << "Observables:" << std::endl;
   for (std::vector<Observable>::const_iterator it=this->observables.begin();
       it!=this->observables.end(); ++it) {
-    std::cout << "  " << it->name << std::endl
-      << "    Title: \"" << it->title << "\"" << std::endl
-      << "    Lower bound: " << it->lower << std::endl
-      << "    Upper bound: " << it->upper << std::endl
-      << "    Bins: " << it->bins << std::endl;
+    it->print();
   }
 
   if (this->systematics.size() > 0) {
     std::cout << "Systematics:" << std::endl;
     for (std::vector<Systematic>::const_iterator it=this->systematics.begin();
          it!=this->systematics.end(); ++it) {
-      std::cout << "  " << it->name << std::endl
-                << "    Title: \"" << it->title << "\"" << std::endl
-                << "    Type: " << it->type << std::endl
-                << "    Observable: " << it->observable_field << std::endl;
-      if (it->type == pdfz::Systematic::RESOLUTION_SCALE) {
-        std::cout << "    Truth: " << it->truth_field << std::endl;
-      }
-      std::cout << "    Means: ";
-      for (size_t i=0; i<it->npars; i++) {
-        std::cout << "(" << i << ") " << it->means[i] << " ";
-      }
-      std::cout << std::endl;
-      std::cout << "    Constraints: ";
-      for (size_t i=0; i<it->npars; i++) {
-        std::cout << "(" << i << ") " << it->sigmas[i] << " ";
-      }
-      std::cout << std::endl;
-      std::cout << "    Fixed: ";
-      if (it->fixed) {
-        std::cout << "yes" << std::endl;
-      }
-      else {
-        std::cout << "no" << std::endl;
-      }
+      it->print();
     }
   }
 }

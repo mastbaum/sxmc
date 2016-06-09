@@ -1,98 +1,16 @@
-#ifndef __SIGNALS_H__
-#define __SIGNALS_H__
-
-/**
- * \file signals.h
- *
- * Signal-related data structures.
- *
- * (Not to be confused with signal.h, which defines UNIX signals.)
- */
+#ifndef __SIGNAL_H__
+#define __SIGNAL_H__
 
 #include <string>
 #include <vector>
-#include <sxmc/pdfz.h>
 
-namespace Json {
-  class Value;
+#include <sxmc/observable.h>
+#include <sxmc/systematic.h>
+#include <sxmc/source.h>
+
+namespace pdfz {
+  class Eval;
 }
-
-/**
- * \struct Observable
- *
- * A container for observable metadata
-*/
-struct Observable {
-  Observable() {}
-
-  // Load from JSON configuration
-  Observable(const std::string _name, const Json::Value& config);
-
-  std::string name;  //!< Name of the observable
-  std::string title;  //!< Title in ROOT LaTeX format, for display
-  std::string field;  //!< Name of the field (e.g. "energy")
-  std::string units;  //!< Units as string, used in plotting
-  std::vector<float> yrange;  //!< y axis range for plots
-  size_t field_index;  //!< Index in the sampled data for this field
-  size_t bins;  //!< Number of bins
-  float lower;  //!< Lower physical bound
-  float upper;  //!< Upper physical bound
-  bool logscale;  //!< Use log scale y in plots
-};
-
-
-/**
- * \struct Systematic
- *
- * A container for systematic parameter metadata
-*/
-class Systematic {
-public:
-  Systematic() : means(NULL), sigmas(NULL) {}
-
-  // Load from JSON configuration
-  Systematic(const std::string _name, const Json::Value& config);
-
-  virtual ~Systematic() {}
-
-  std::string name;  //!< Name of the systematic parameter
-  std::string title;  //!< Title in ROOT LaTeX format, for display
-  std::string observable_field;  //!< Name of the field of the observable
-  std::string truth_field;  //! Name of the field of the truth value
-  double* means;  //!< Mean values (power series)
-  double* sigmas;  //!< Standard deviations
-  size_t observable_field_index;  //!< Index of the observable field in the data
-  size_t truth_field_index;  //!< Index of the truth field in the data
-  size_t npars;  //!< Number of parameters in power series
-  std::vector<short> pidx;  //!< Global index for pdfz parameter array offsetting
-  pdfz::Systematic::Type type;  //!< The type of systematic
-  bool fixed;  //! Fix the value of the parameter to the mean
-};
-
-
-/**
- * \struct Source
- *
- * A container for a signal source
-*/
-struct Source {
-  Source() {}
-
-  Source(const std::string& _name, size_t _index,
-         float _mean, float _sigma, bool _fixed)
-      : name(_name), index(_index),
-        mean(_mean), sigma(_sigma), fixed(_fixed) {}
-
-  // Load from JSON configuration
-  Source(const std::string& _name, const Json::Value& params);
-
-  std::string name;  //!< String identifier
-  size_t index;  //!< Index in the list of sources
-  float mean;  //!< Mean expectation (scaling, 1.0 is nominal)
-  float sigma;  //!< Gaussian constraint (fractional)
-  bool fixed;  //!< Rate is fixed
-};
-
 
 /**
  * \class Signal
@@ -125,19 +43,20 @@ public:
          std::vector<Observable>& cuts,
          std::vector<Systematic>& systematics);
 
+  void print() const;
+
   std::string name;  //!< String identifier
   std::string title;  //!< Histogram title in ROOT-LaTeX format
   std::string filename;
   unsigned dataset;  //!< Dataset identifier (cf. multi-phase fitting)
   Source source;  //!< Source for correlated rates
   double nexpected;  //!< Events expected in this fit
-  //float sigma;  //!< Gaussian constraint
-  //bool fixed;  //!< Rate is fixed
   size_t n_mc;  //!< Number of simulated events used to make pdf
   double nevents;  //!< Events in the PDF
   double efficiency;  //!< Fraction of generated events that make it past
                       //!< cuts (not counting the efficiency correction)
   pdfz::Eval* histogram;  //!< PDF
+  std::vector<std::string> systematic_names;
 
 protected:
   /**
@@ -179,5 +98,5 @@ public:
                                       std::vector<Observable>& cuts);
 };
 
-#endif  // __SIGNALS_H__
+#endif  // __SIGNAL_H__
 

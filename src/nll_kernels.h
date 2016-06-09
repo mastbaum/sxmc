@@ -144,6 +144,7 @@ HEMI_KERNEL(nll_event_reduce)(const size_t nthreads, const double* sums,
 */
 HEMI_KERNEL(nll_total)(const size_t nparameters, const double* pars,
                        const size_t nsignals,
+                       const size_t nsources,
                        const double* means,
                        const double* sigmas,
                        const double* events_total,
@@ -180,7 +181,9 @@ HEMI_KERNEL(nll_total)(const size_t nparameters, const double* pars,
  * \param debug_mode Enable debugging mode, where every step is accepted
 */
 HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
-                                        const double* sums, const size_t ns,
+                                        const double* sums,
+                                        const size_t nsignals,
+                                        const size_t nsources,
                                         const double* means,
                                         const double* sigmas,
                                         RNGState* rng,

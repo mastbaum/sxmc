@@ -1,8 +1,10 @@
 #include <iostream>
 #include <vector>
 
+#include <sxmc/signal.h>
+#include <sxmc/observable.h>
+#include <sxmc/systematic.h>
 #include <sxmc/generator.h>
-#include <sxmc/signals.h>
 
 std::vector<float>
 make_fake_dataset(std::vector<Signal>& signals,

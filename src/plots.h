@@ -12,7 +12,9 @@
 #include <vector>
 
 #include <sxmc/error_estimator.h>
-#include <sxmc/signals.h>
+#include <sxmc/signal.h>
+#include <sxmc/observable.h>
+#include <sxmc/systematic.h>
 
 class TCanvas;
 class TLegend;

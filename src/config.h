@@ -12,7 +12,9 @@
 #include <string>
 #include <vector>
 
-#include <sxmc/signals.h>
+#include <sxmc/signal.h>
+#include <sxmc/observable.h>
+#include <sxmc/systematic.h>
 
 /**
  * \class FitConfig

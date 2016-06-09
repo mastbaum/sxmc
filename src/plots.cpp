@@ -16,6 +16,9 @@
 #include <TLegend.h>
 
 #include <sxmc/plots.h>
+#include <sxmc/signal.h>
+#include <sxmc/observable.h>
+#include <sxmc/systematic.h>
 
 const int ncolors = 6;
 const int colors[6] = {

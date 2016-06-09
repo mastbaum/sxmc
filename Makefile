@@ -84,7 +84,7 @@ build_dirs:
 	@$(foreach dir,$(SRCDIRS),$(shell mkdir -p build/$(dir)))
 
 includes: include_dir
-	@find src -name *.h -type f -exec cp {} ./include/sxmc \;
+	@find ./src -name "*.h" -type f -exec cp {} ./include/sxmc \;
 
 include_dir:
 	@mkdir -p include/sxmc

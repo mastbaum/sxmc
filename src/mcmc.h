@@ -13,7 +13,9 @@
 #include <cuda.h>
 #include <hemi/hemi.h>
 
-#include <sxmc/signals.h>
+#include <sxmc/signal.h>
+#include <sxmc/observable.h>
+#include <sxmc/systematic.h>
 #include <sxmc/nll_kernels.h>
 #include <sxmc/pdfz.h>
 

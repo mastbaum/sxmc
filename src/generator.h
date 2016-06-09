@@ -11,7 +11,9 @@
 #include <vector>
 #include <TH1.h>
 
-#include <sxmc/signals.h>
+#include <sxmc/signal.h>
+#include <sxmc/observable.h>
+#include <sxmc/systematic.h>
 
 /**
  * Make a fake data set.

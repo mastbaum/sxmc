@@ -15,7 +15,9 @@
 #include <TDirectory.h>
 
 #include <sxmc/mcmc.h>
-#include <sxmc/signals.h>
+#include <sxmc/signal.h>
+#include <sxmc/observable.h>
+#include <sxmc/systematic.h>
 #include <sxmc/likelihood.h>
 
 #ifndef __HEMI_ARRAY_H__
@@ -331,7 +333,8 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
                        this->nreducethreads * sizeof(double), 0,
                        this->nnllthreads,
                        event_partial_sums.ptr(),
-                       this->nsignals, 
+                       this->nsignals,
+                       this->nsources,
                        this->parameter_means->readOnlyPtr(),
                        this->parameter_sigma->readOnlyPtr(),
                        this->rngs->ptr(),
@@ -409,7 +412,7 @@ void MCMC::nll(const float* lut, size_t nevents, const double* v, double* nll,
 
   // Constraints + event term
   HEMI_KERNEL_LAUNCH(nll_total, 1, 1, 0, 0,
-                     this->nparameters, v, this->nsignals,
+                     this->nparameters, v, this->nsignals, this->nsources,
                      this->parameter_means->readOnlyPtr(),
                      this->parameter_sigma->readOnlyPtr(),
                      event_total_sum, nexpected, source_id,

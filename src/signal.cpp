@@ -1,14 +1,12 @@
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <TMath.h>
-#include <json/value.h>
 
-#include <sxmc/signals.h>
+#include <sxmc/signal.h>
 #include <sxmc/pdfz.h>
 #include <sxmc/ttree_io.h>
-#include <sxmc/pdfz.h>
 
 Signal::Signal(std::string _name, std::string _title,
                std::string _filename, unsigned _dataset,
@@ -45,6 +43,10 @@ Signal::Signal(std::string _name, std::string _title,
   // Evaluate histogram at mean of systematics to see how many
   // of our samples fall within our observable min and max limits
   set_efficiency(systematics);
+
+  for (size_t i=0; i<systematics.size(); i++) {
+    this->systematic_names.push_back(systematics[i].name);
+  }
 }
 
 
@@ -216,102 +218,18 @@ void Signal::build_pdfz(std::vector<float> &samples, int nfields,
 }
 
 
-Observable::Observable(const std::string _name, const Json::Value& config)
-      : name(_name) {
-  assert(config.isMember("title"));
-  this->title = config["title"].asString();
-
-  assert(config.isMember("field"));
-  this->field = config["field"].asString();
-
-  assert(config.isMember("bins"));
-  this->bins = config["bins"].asInt();
-
-  assert(config.isMember("min"));
-  this->lower = config["min"].asFloat();
-
-  assert(config.isMember("max"));
-  this->upper = config["max"].asFloat();
-
-  this->units = config.get("units", "").asString();
-  this->logscale = config.get("logscale", false).asBool();
-
-  this->yrange.resize(2, -1);
-
-  if (config.isMember("yrange")) {
-    this->yrange[0] = config["yrange"][0].asFloat();
-    this->yrange[1] = config["yrange"][1].asFloat();
+void Signal::print() const {
+  std::cout << "  " << this->name << std::endl
+    << "    Title: \"" << this->title << "\"" << std::endl
+    << "    Filename: " << this->filename << std::endl
+    << "    Dataset: " << this->dataset << std::endl
+    << "    Source: " << this->source.name << std::endl
+    << "    Nexpected: " << this->nexpected << std::endl
+    << "    Nmc: " << this->n_mc << std::endl
+    << "    Systematics: ";
+  for (size_t i=0; i<this->systematic_names.size(); i++) {
+    std::cout << this->systematic_names[i] << " ";
   }
-}
-
-
-Systematic::Systematic(const std::string _name, const Json::Value& config)
-      : name(_name), means(NULL), sigmas(NULL) {
-  assert(config.isMember("title"));
-  this->title = config["title"].asString();
-
-  assert(config.isMember("observable_field"));
-  this->observable_field = config["observable_field"].asString();
-
-  assert(config.isMember("type"));
-  std::string type_string = config["type"].asString();
-
-  if (type_string == "shift") {
-    this->type = pdfz::Systematic::SHIFT;
-  }
-  else if (type_string == "scale") {
-    this->type = pdfz::Systematic::SCALE;
-  }
-  else if (type_string == "ctscale") {
-    this->type = pdfz::Systematic::CTSCALE;
-  }
-  else if (type_string == "resolution_scale") {
-    this->type = pdfz::Systematic::RESOLUTION_SCALE;
-    assert(config.isMember("truth_field"));
-    this->truth_field = config["truth_field"].asString();
-  }
-  else {
-    std::cerr << "FitConfig::load_pdf_systematics: Unknown systematic type "
-              << type_string << std::endl;
-    throw(1);
-  }
-
-  // Parameter means and standard deviations are an array of coefficients
-  // in a power series expansion in the observable.
-  assert(config.isMember("mean"));
-  short npars = config["mean"].size();
-
-  double* means = new double[npars];
-  for (short j=0; j<npars; j++) {
-    means[j] = config["mean"][j].asDouble();
-  }
-
-  double* sigmas = new double[npars];
-  if (config.isMember("sigma")) {
-    assert(config["sigma"].size() == (unsigned) npars);
-    for (short j=0; j<npars; j++) {
-      sigmas[j] = config["sigma"][j].asDouble();
-    }
-  }
-  else {
-    for (short j=0; j<npars; j++) {
-      sigmas[j] = 0;
-    }
-  }
-
-  this->npars = npars;
-  this->means = means;
-  this->sigmas = sigmas;
-
-  // Fixing a systematic is all-or-nothing
-  this->fixed = config.get("fixed", false).asBool();
-}
-
-
-Source::Source(const std::string& _name, const Json::Value& params)
-    : name(_name) {
-  this->mean = params.get("mean", 1.0).asFloat();
-  this->sigma = params.get("sigma", 0.0).asFloat();
-  this->fixed = params.get("fixed", false).asBool();
+  std::cout << std::endl;
 }
 
