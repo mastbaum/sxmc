@@ -8,7 +8,7 @@
 #include <TH2D.h>
 #include <TH3D.h>
 
-#include <sxmc/generator.h>
+#include <sxmc/utils.h>
 #include <sxmc/pdfz.h>
 #include <sxmc/cuda_compat.h>
 
@@ -47,10 +47,13 @@ struct SystematicDescriptor {
 };
 
 
-Eval::Eval(const std::vector<float>&_samples, int _nfields, int _nobservables,
-           const std::vector<double>&_lower, const std::vector<double>&_upper)
+Eval::Eval(const std::vector<float>& _samples, int _nfields, int _nobservables,
+           const std::vector<double>& _lower,
+           const std::vector<double>& _upper,
+           unsigned _dataset)
     : nfields(_nfields), nobservables(_nobservables),
-      lower(_lower.size(), true), upper(_upper.size(), true), syst(NULL) {
+      lower(_lower.size(), true), upper(_upper.size(), true),
+      dataset(_dataset), syst(NULL) {
   if (_samples.size() % _nfields != 0) {
     throw Error("Length of samples array is not divisible by number of fields.");
   }
@@ -130,7 +133,7 @@ void Eval::AddSystematic(const Systematic& syst) {
     desc.obs = shift.obs;
     desc.extra_field = 0;
     desc.npars = shift.pars->size();
-    desc.pars = shift.pars->devicePtr();
+    desc.pars = shift.pars->ptr();
   }
   else if (syst.type == Systematic::SCALE) {
     const ScaleSystematic& scale = \
@@ -138,7 +141,7 @@ void Eval::AddSystematic(const Systematic& syst) {
     desc.obs = scale.obs;
     desc.extra_field = 0;
     desc.npars = scale.pars->size();
-    desc.pars = scale.pars->devicePtr();
+    desc.pars = scale.pars->ptr();
   }
   else if (syst.type == Systematic::CTSCALE) {
     const CosThetaScaleSystematic& ctscale = \
@@ -146,7 +149,7 @@ void Eval::AddSystematic(const Systematic& syst) {
     desc.obs = ctscale.obs;
     desc.extra_field = 0;
     desc.npars = ctscale.pars->size();
-    desc.pars = ctscale.pars->devicePtr();
+    desc.pars = ctscale.pars->ptr();
   }
   else if (syst.type == Systematic::RESOLUTION_SCALE) {
     const ResolutionScaleSystematic &res = \
@@ -154,7 +157,7 @@ void Eval::AddSystematic(const Systematic& syst) {
     desc.obs = res.obs;
     desc.extra_field = res.true_obs;
     desc.npars = res.pars->size();
-    desc.pars = res.pars->devicePtr();
+    desc.pars = res.pars->ptr();
   }
   else {
     throw Error("Unknown systematic type");
@@ -167,13 +170,13 @@ void Eval::AddSystematic(const Systematic& syst) {
 ///////////////////// EvalHist ///////////////////////
 
 EvalHist::EvalHist(const std::vector<float>& _samples,
-                   const std::vector<int>& _weights,
                    int nfields, int nobservables,
                    const std::vector<double>& lower,
                    const std::vector<double>& upper,
-                   const std::vector<int>& _nbins, bool optimize)
-    : Eval(_samples, nfields, nobservables, lower, upper),
-      samples(_samples.size(), false), weights(_weights.size(), true),
+                   const std::vector<int>& _nbins,
+                   unsigned _dataset, bool optimize)
+    : Eval(_samples, nfields, nobservables, lower, upper, _dataset),
+      samples(_samples.size(), false),
       read_bins(0), nbins(_nbins.size(), true),
       bin_stride(_nbins.size(), true), bins(0), needs_optimization(optimize) {
   if ((int) _nbins.size() != nobservables) {
@@ -186,7 +189,6 @@ EvalHist::EvalHist(const std::vector<float>& _samples,
 
   this->samples.copyFromHost(&_samples.front(), _samples.size());
   this->nbins.copyFromHost(&_nbins.front(), _nbins.size());
-  this->weights.copyFromHost(&_weights.front(), _weights.size());
 
   // Compute bin volume
   this->bin_volume = 1.0f;
@@ -234,13 +236,13 @@ EvalHist::~EvalHist() {
 
 
 void EvalHist::SetEvalPoints(const std::vector<float>& points) {
-  if (points.size() % this->nobservables != 0) {
+  if (points.size() % (this->nobservables + 1) != 0) {
     throw Error("Number of entries in evaluation points array not divisible by number of observables.");
   }
 
   delete this->read_bins;
   this->read_bins = \
-    new hemi::Array<int>(points.size() / this->nobservables, false);
+    new hemi::Array<int>(points.size() / (this->nobservables + 1), false);
   int* read_bins = this->read_bins->writeOnlyHostPtr();
 
   // Precompute the bin number corresponding to each evaluation point
@@ -259,12 +261,12 @@ void EvalHist::SetEvalPoints(const std::vector<float>& points) {
     bin_scale[iobs] = nbins[iobs] / span;
   }
 
-  for (unsigned ipoint=0; ipoint<points.size()/this->nobservables; ipoint++) {
+  for (unsigned ipoint=0; ipoint<points.size()/(this->nobservables+1); ipoint++) {
     bool in_pdf_domain = true;
     int bin_id = 0;
 
     for (int iobs=0; iobs<this->nobservables; iobs++) {
-      int ielement = this->nobservables * ipoint + iobs;
+      int ielement = (this->nobservables + 1) * ipoint + iobs;
       double element = points[ielement];
 
       // Throw out this event if outside of PDF domain
@@ -275,6 +277,12 @@ void EvalHist::SetEvalPoints(const std::vector<float>& points) {
 
       bin_id += \
         (int)((element - lower[iobs]) * bin_scale[iobs]) * bin_stride[iobs];
+    }
+
+    // Read dataset ID from the last column
+    int idx = (this->nobservables + 1) * ipoint + nobservables;
+    if (points[idx] != this->dataset) {
+      bin_id = -2;  // Filled in with zero during evaluation
     }
 
     if (in_pdf_domain) {
@@ -331,7 +339,7 @@ HEMI_KERNEL(zero_hist)(int total_nbins, unsigned int *bins,
 }
 
 
-HEMI_KERNEL(bin_samples)(int ndata, const float* data, const int* weights,
+HEMI_KERNEL(bin_samples)(int ndata, const float* data,
                          const int nobs, const int nfields,
                          const int* __restrict__ bin_stride,
                          const int* __restrict__ nbins,
@@ -384,8 +392,8 @@ HEMI_KERNEL(bin_samples)(int ndata, const float* data, const int* weights,
 
     // Add to histogram if sample in PDF domain
     if (in_pdf_domain) {
-      atomicAdd(bins + bin_id, weights[isample]);
-      thread_norm += weights[isample];
+      atomicAdd(bins + bin_id, 1);
+      thread_norm += 1;
     }
   }
 
@@ -406,7 +414,10 @@ HEMI_KERNEL(eval_pdf)(int npoints, const int* read_bins,
     int bin_id = read_bins[ipoint];
 
     double pdf_value = 0.0f;
-    if (bin_id < 0) {
+    if (bin_id == -2) {
+      pdf_value = 0.0;
+    }
+    else if (bin_id < 0) {
       pdf_value = nanf("");
     }
     else {
@@ -443,7 +454,6 @@ void EvalHist::EvalAsync(bool do_eval_pdf) {
                      this->bin_nthreads_per_block, 0,
                      this->cuda_state->stream,
                      (int) this->samples.size(), this->samples.readOnlyPtr(),
-                     this->weights.readOnlyPtr(),
                      this->nobservables, this->nfields,
                      this->bin_stride.readOnlyPtr(), this->nbins.readOnlyPtr(),
                      this->lower.readOnlyPtr(), this->upper.readOnlyPtr(),
@@ -674,7 +684,7 @@ void EvalHist::OptimizeBin() {
                            this->cuda_state->stream,
                            (int) this->samples.size(),
                            this->samples.readOnlyPtr(),
-                           this->weights.readOnlyPtr(),
+                           /*this->weights.readOnlyPtr(),*/
                            this->nobservables, this->nfields,
                            this->bin_stride.readOnlyPtr(),
                            this->nbins.readOnlyPtr(),
@@ -799,12 +809,11 @@ void EvalHist::OptimizeEval() {
 
 
 int EvalHist::RandomSample(std::vector<float> &events,
-                           std::vector<int> &eventweights,
                            double nexpected,
                            std::vector<double> &syst_vals,
                            std::vector<float> &uppers,
                            std::vector<float> &lowers, bool poisson,
-                           long int maxsamples) {
+                           unsigned dataset) {
   hemi::Array<double> params_buffer(syst_vals.size(), true);
   for (size_t i=0; i<syst_vals.size(); i++) {
     params_buffer.writeOnlyHostPtr()[i] = syst_vals[i];
@@ -816,10 +825,6 @@ int EvalHist::RandomSample(std::vector<float> &events,
   this->SetNormalizationBuffer(&norms_buffer);
   this->SetParameterBuffer(&params_buffer);
   TH1* hist = this->CreateHistogram();
-  int totalbins = \
-    hist->GetNbinsX() * hist->GetNbinsY() * hist->GetNbinsZ();
-
-  std::vector<int> histweights(totalbins);
 
   long int observed;
   if (poisson) {
@@ -829,47 +834,11 @@ int EvalHist::RandomSample(std::vector<float> &events,
     observed = nint(nexpected);
   }
 
-  double histint = hist->Integral();
-  double maxperbin = maxsamples / (1.0 * totalbins);
-  
-  bool weighted = false;
-  if (observed > maxsamples) {
-    std::cout << "EvalHist::RandomSample: Notice: Creating weighted samples"
-              << std::endl;
-    // We need to create weighted samples
-    weighted = true;
-    for (int i=0; i<hist->GetNbinsX(); i++) {
-      for (int j=0; j<hist->GetNbinsY(); j++) {
-        for (int k=0; k<hist->GetNbinsZ(); k++) {
-          double height = hist->GetBinContent(i+1, j+1, k+1);
-          if (observed * (height / histint) > maxperbin) {
-            int weight = static_cast<int>((observed * (height/histint) /
-                                           maxperbin) + 1);
-            hist->SetBinContent(i+1, j+1, k+1, height/weight);
-            histweights[k +
-                        j*hist->GetNbinsZ() +
-                        i*hist->GetNbinsY()*hist->GetNbinsZ()] = weight;
-          }
-          else {
-            histweights[k +
-                        j*hist->GetNbinsZ() +
-                        i*hist->GetNbinsY()*hist->GetNbinsZ()] = 1.0;
-          }
-        }
-      }
-    }
-  }
-
   int allocatesize = observed;
-  if (weighted) {
-    allocatesize = static_cast<int>(observed *
-                                    (1.5 * hist->Integral() / histint));
-  }
 
   // Generate event array by sampling ROOT histograms, including only
   // events that pass cuts
-  events.reserve(events.size() + allocatesize * this->nobservables);
-  eventweights.reserve(eventweights.size() + allocatesize);
+  events.reserve(events.size() + allocatesize * (this->nobservables + 1));
   if (hist->IsA() == TH1D::Class()) {
     TH1D* ht = dynamic_cast<TH1D*>(hist);
 
@@ -886,18 +855,7 @@ int EvalHist::RandomSample(std::vector<float> &events,
       }
 
       events.push_back(obs);
-
-      if (weighted) {
-        int ibin = (hist->GetXaxis()->FindBin(obs) - 1);
-        eventweights.push_back(histweights[ibin]);
-        j += histweights[ibin]-1;
-      }
-      else {
-        eventweights.push_back(1);
-      }
-    }
-    if (j > observed) {
-      eventweights.back() -= j-observed;
+      events.push_back(dataset);
     }
   }
   else if (hist->IsA() == TH2D::Class()) {
@@ -911,7 +869,7 @@ int EvalHist::RandomSample(std::vector<float> &events,
         do {
           ht->GetRandom2(obs0, obs1);
         } while(obs0 > uppers[0] || obs0 < lowers[0] ||
-            obs1 > uppers[1] || obs1 < lowers[1]);
+                obs1 > uppers[1] || obs1 < lowers[1]);
       }
       else {
         ht->GetRandom2(obs0, obs1);
@@ -919,20 +877,7 @@ int EvalHist::RandomSample(std::vector<float> &events,
 
       events.push_back(obs0);
       events.push_back(obs1);
-
-      if (weighted) {
-        int ibin = ((hist->GetYaxis()->FindBin(obs1)-1) +
-                    (hist->GetXaxis()->FindBin(obs0)-1) *
-                     hist->GetNbinsY());
-        eventweights.push_back(histweights[ibin]);
-        j += histweights[ibin]-1;
-      }
-      else {
-        eventweights.push_back(1);
-      }
-    }
-    if (j > observed) {
-      eventweights.back() -= j-observed;
+      events.push_back(dataset);
     }
   }
   else if (hist->IsA() == TH3D::Class()) {
@@ -947,8 +892,8 @@ int EvalHist::RandomSample(std::vector<float> &events,
         do {
           ht->GetRandom3(obs0, obs1, obs2);
         } while(obs0 > uppers[0] || obs0 < lowers[0] ||
-            obs1 > uppers[1] || obs1 < lowers[1] ||
-            obs2 > uppers[2] || obs2 < lowers[2]);
+                obs1 > uppers[1] || obs1 < lowers[1] ||
+                obs2 > uppers[2] || obs2 < lowers[2]);
       }
       else {
         ht->GetRandom3(obs0, obs1, obs2);
@@ -957,22 +902,7 @@ int EvalHist::RandomSample(std::vector<float> &events,
       events.push_back(obs0);
       events.push_back(obs1);
       events.push_back(obs2);
-
-      if (weighted) {
-        int ibin = ((hist->GetZaxis()->FindBin(obs2)-1) + 
-                    (hist->GetYaxis()->FindBin(obs1)-1) *
-                     hist->GetNbinsZ() +
-                    (hist->GetXaxis()->FindBin(obs0)-1) *
-                     hist->GetNbinsZ()*hist->GetNbinsY());
-        eventweights.push_back(histweights[ibin]);
-        j += histweights[ibin]-1;
-      }
-      else {
-        eventweights.push_back(1);
-      }
-    }
-    if (j > observed) {
-      eventweights.back() -= j-observed;
+      events.push_back(dataset);
     }
   }
   else {
@@ -980,6 +910,7 @@ int EvalHist::RandomSample(std::vector<float> &events,
       << hist->ClassName() << std::endl;
     assert(false);
   }
+
   return observed;
 }
 

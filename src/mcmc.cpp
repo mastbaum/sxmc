@@ -46,17 +46,18 @@ MCMC::MCMC(const std::vector<Signal>& signals,
     npars += systematics[i].npars;
   }
 
-  // Set mean/expectation and sigma for all parameters
+  // Set mean/expectation and sigma for all fit parameters
   this->nparameters = this->nsignals + npars;
   this->parameter_means = new hemi::Array<double>(this->nparameters, true);
   this->parameter_sigma = new hemi::Array<double>(this->nparameters, true);
   this->parameter_fixed.resize(this->nparameters);
-  this->nfloat = 0;
+  this->nfloat = 0; 
+
   for (size_t i=0; i<this->nsignals; i++) {
     this->parameter_means->writeOnlyHostPtr()[i] = \
-      std::max(signals[i].nexpected, (double) 5);
+      1.0; //std::max(signals[i].nexpected, (double) 5);
     this->parameter_sigma->writeOnlyHostPtr()[i] = \
-      signals[i].nexpected * signals[i].sigma;  // Fractional
+      signals[i].sigma; //signals[i].nexpected * signals[i].sigma;  // Fractional
     this->parameter_fixed[i] = signals[i].fixed;
     this->nfloat += (signals[i].fixed ? 0 : 1);
   }
@@ -82,10 +83,14 @@ MCMC::MCMC(const std::vector<Signal>& signals,
               << "PDFs." << std::endl;
   }
 
-  // References to pdfz::Eval histograms
+  // Signal expectations, datasets, pdfz::Eval histograms
   this->pdfs.resize(this->nsignals);
+  this->nexpected = new hemi::Array<double>(this->nsignals, true);
+  //this->rate_index = new hemi::Array<unsigned>(this->nsignals, true);
   for (size_t i=0; i<this->nsignals; i++) {
     this->pdfs[i] = signals[i].histogram;
+    this->nexpected->writeOnlyHostPtr()[i] = signals[i].nexpected;
+    //this->rate_index->writeOnlyHostPtr()[i] = signals[i].rate->index;
   }
 
   // List of parameters for output ntuple
@@ -129,8 +134,8 @@ MCMC::~MCMC() {
 
 
 LikelihoodSpace*
-MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
-                 unsigned nsteps, float burnin_fraction, const bool debug_mode,
+MCMC::operator()(std::vector<float>& data, unsigned nsteps,
+                 float burnin_fraction, const bool debug_mode,
                  unsigned sync_interval) {
   // CUDA/hemi block sizes
   int bs = 128;
@@ -168,36 +173,53 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
   hemi::Array<double> proposed_nll(1, true);
   proposed_nll.writeOnlyHostPtr();
 
-  // Create hemi buffer for weighting data points
-  hemi::Array<int> dataweights(data.size(), true);
-  dataweights.copyFromHost(&weights.front(), weights.size());
-
   // Initial standard deviations for each dimension
   hemi::Array<float> jump_width(this->nparameters, true);
   const float scale_factor = 2.4 * 2.4 / this->nfloat;  // Haario, 2001
   std::cout << "MCMC: Intial jump sigma" << std::endl;
   for (size_t i=0; i<this->nparameters; i++) {
-    float mean = std::max(this->parameter_means->readOnlyHostPtr()[i], 10.0);
-    float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
-    float width;
     std::cout << " " << this->parameter_names[i] << ": ";
+
     if (this->parameter_fixed[i]) {
-      width = -1;
       std::cout << "fixed" << std::endl;
       jump_width.writeOnlyHostPtr()[i] = -1;
       continue;
     }
+
     if (i < nsignals) {
-      float m = std::max(mean, (float) 10);
-      width = (sigma > 0 ? m * sigma : sqrt(m));
+      jump_width.writeOnlyHostPtr()[i] = 0.1 * scale_factor;
     }
     else {
+      float mean = std::max(this->parameter_means->readOnlyHostPtr()[i], 10.0);
+      float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
       float m = std::max(mean, (float) 1);
-      width = (sigma > 0 ? sigma : sqrt(m));
+      float width = (sigma > 0 ? sigma : sqrt(m));
+      jump_width.writeOnlyHostPtr()[i] = 0.1 * width * scale_factor;
     }
-    jump_width.writeOnlyHostPtr()[i] = 0.1 * width * scale_factor;
+
     std::cout << jump_width.readOnlyHostPtr()[i] << std::endl;
+
+    //float mean = std::max(this->parameter_means->readOnlyHostPtr()[i], 10.0);
+    //float sigma = this->parameter_sigma->readOnlyHostPtr()[i];
+    //float width;
+    //std::cout << " " << this->parameter_names[i] << ": ";
+    //if (this->parameter_fixed[i]) {
+    //  width = -1;
+    //  std::cout << "fixed" << std::endl;
+    //  jump_width.writeOnlyHostPtr()[i] = -1;
+    //  continue;
+    //}
+    //if (i < nrates) {
+    //  float m = std::max(mean, (float) 10);
+    //  width = (sigma > 0 ? m * sigma : sqrt(m));
+    //}
+    //else {
+    //  float m = std::max(mean, (float) 1);
+    //  width = (sigma > 0 ? sigma : sqrt(m));
+    //}
+    //jump_width.writeOnlyHostPtr()[i] = 0.1 * width * scale_factor;
   }
+
   jump_width.writeOnlyHostPtr();
 
   // Buffers for computing event term in nll
@@ -214,19 +236,19 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
   hemi::Array<int> accept_counter(1, true);
   accept_counter.writeOnlyHostPtr()[0] = 0;
 
-  hemi::Array<float> jump_buffer(sync_interval * (this->nparameters + 1),
-                                 true);
+  hemi::Array<float> jump_buffer(sync_interval * (this->nparameters+1), true);
 
   float* jump_vector = new float[this->nparameters + 1];
 
   // Set up histogram and perform initial evaluation
-  size_t nevents = data.size() / this->nobservables;
+  size_t nevents = data.size() / (this->nobservables + 1);
   hemi::Array<float> lut(nevents * this->nsignals, true);
   for (size_t i=0; i<this->pdfs.size(); i++) {
     pdfz::Eval* p = this->pdfs[i];
     p->SetEvalPoints(data);
     p->SetPDFValueBuffer(&lut, i * nevents, 1);
     p->SetNormalizationBuffer(&normalizations_nominal, i);
+    //p->SetNormalizationBuffer(&normalizations, i);
     p->SetParameterBuffer(&current_vector, this->nsignals);
     p->EvalAsync();
     p->EvalFinished();
@@ -234,12 +256,15 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
     p->SetParameterBuffer(&proposed_vector, this->nsignals);
   }
 
+#ifdef __CUDACC__
   normalizations.copyFromDevice(normalizations_nominal.readOnlyPtr(),
                                 normalizations_nominal.size());
+#endif
 
   // Calculate nll with initial parameters
-  nll(lut.readOnlyPtr(), dataweights.readOnlyPtr(), nevents,
+  nll(lut.readOnlyPtr(), nevents,
       current_vector.readOnlyPtr(), current_nll.writeOnlyPtr(),
+      this->nexpected->readOnlyPtr(),
       normalizations.readOnlyPtr(), normalizations_nominal.readOnlyPtr(),
       event_partial_sums.ptr(), event_total_sum.ptr());
 
@@ -307,9 +332,10 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
     // Partial sums of event term
     HEMI_KERNEL_LAUNCH(nll_event_chunks, this->nnllblocks,
                        this->nllblocksize, 0, 0,
-                       lut.readOnlyPtr(), dataweights.readOnlyPtr(),
+                       lut.readOnlyPtr(), /*dataweights.readOnlyPtr(),*/
                        proposed_vector.readOnlyPtr(),
                        nevents, this->nsignals,
+                       this->nexpected->readOnlyPtr(),
                        normalizations.readOnlyPtr(),
                        normalizations_nominal.readOnlyPtr(),
                        event_partial_sums.ptr());
@@ -332,6 +358,7 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
                        jump_buffer.writeOnlyPtr(),
                        this->nparameters,
                        jump_width.readOnlyPtr(),
+                       this->nexpected->readOnlyPtr(),
                        normalizations.readOnlyPtr(),
                        normalizations_nominal.readOnlyPtr(),
                        debug_mode);
@@ -341,16 +368,18 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
         i == burnin_steps - 1 || i == 2 * burnin_steps - 1) {
       int njumps = jump_counter.readOnlyHostPtr()[0];
       int naccepted = accept_counter.readOnlyHostPtr()[0];
+
       std::cout << "MCMC: Step " << i + 1 << "/" << nsteps
                 << " (" << njumps << " in buffer, "
                 << naccepted << " accepted)" << std::endl;
+
       for (int j=0; j<njumps; j++) {
-         // First nsignals elements are normalizations
+         // First nparameters elements are parameters...
          for (unsigned k=0; k<this->nparameters; k++) {
            int idx = j * (this->nparameters + 1) + k;
            jump_vector[k] = jump_buffer.readOnlyHostPtr()[idx];
          }
-         // Last element is the likelihood
+         // ... Last element is the (negative log) likelihood
          jump_vector[this->nparameters] = \
            jump_buffer.readOnlyHostPtr()[j * (this->nparameters + 1) +
                                          this->nparameters];
@@ -374,14 +403,15 @@ MCMC::operator()(std::vector<float>& data, std::vector<int>& weights,
 }
 
 
-void MCMC::nll(const float* lut, const int* dataweights, size_t nevents,
-               const double* v, double* nll,
+void MCMC::nll(const float* lut, size_t nevents, const double* v, double* nll,
+               const double* nexpected,
                const unsigned* norms, const unsigned* norms_nominal,
                double* event_partial_sums, double* event_total_sum) {
   // Partial sums of event term
   HEMI_KERNEL_LAUNCH(nll_event_chunks,
                      this->nnllblocks, this->nllblocksize, 0, 0,
-                     lut, dataweights, v, nevents, this->nsignals,
+                     lut, v, nevents, this->nsignals,
+                     nexpected,
                      norms, norms_nominal,
                      event_partial_sums);
 
@@ -395,6 +425,6 @@ void MCMC::nll(const float* lut, const int* dataweights, size_t nevents,
                      this->nparameters, v, this->nsignals,
                      this->parameter_means->readOnlyPtr(),
                      this->parameter_sigma->readOnlyPtr(),
-                     event_total_sum, norms, norms_nominal, nll);
+                     event_total_sum, nexpected, norms, norms_nominal, nll);
 }
 

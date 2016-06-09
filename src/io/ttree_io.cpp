@@ -61,7 +61,7 @@ int read_float_vector_ttree(const std::string& filename,
     temp_types.push_back(kOther_t);
   }
 
-  bool first_file = ttree_fields.size() == 0;
+  bool first_file = ttree_fields.empty();
 
   // Make a list of all the branches that we can convert to floats
   TClass* cls;

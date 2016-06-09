@@ -26,11 +26,11 @@ Contour::~Contour() {
 }
 
 
-Interval Contour::get_interval(std::string name, float point_estimate) {
+Interval Contour::get_interval(std::string name) {
   Interval interval;
   interval.cl = this->cl;
   interval.one_sided = false;
-  interval.point_estimate = point_estimate;
+  interval.point_estimate = 0;
   interval.coverage = -1;
 
   // Plot projection of the requested parameter from the reduced space

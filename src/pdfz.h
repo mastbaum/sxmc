@@ -222,7 +222,8 @@ public:
    * nobservables > nfields, or if nobservables == 0. 
   */
   Eval(const std::vector<float> &samples, int nfields, int nobservables,
-       const std::vector<double> &lower, const std::vector<double> &upper);
+       const std::vector<double> &lower, const std::vector<double> &upper,
+       unsigned dataset=0);
 
   virtual ~Eval();
 
@@ -309,6 +310,8 @@ protected:
     hemi::Array<double> lower;
     hemi::Array<double> upper;
 
+    unsigned dataset;
+
     hemi::Array<float>* pdf_buffer;
     int pdf_offset;
     int pdf_stride;
@@ -344,10 +347,11 @@ public:
    * If optimize is set to true (default), then the CUDA block
    * configuration will be optimized the first time EvalAsync() is called.
   */
-  EvalHist(const std::vector<float>& samples, const std::vector<int>&_weights,
+  EvalHist(const std::vector<float>& samples, /*const std::vector<int>&_weights,*/
            int nfields, int nobservables,
            const std::vector<double>& lower, const std::vector<double>& upper,
-           const std::vector<int>& nbins, bool optimize=true);
+           const std::vector<int>& nbins, unsigned dataset=0,
+           bool optimize=true);
 
   virtual ~EvalHist();
 
@@ -381,21 +385,18 @@ public:
 
   virtual void EvalFinished();
 
-  int RandomSample(std::vector<float> &events,
-                   std::vector<int> &eventweights, double nexpected,
+  int RandomSample(std::vector<float> &events, double nexpected,
                    std::vector<double> &syst_vals,
                    std::vector<float> &uppers,
                    std::vector<float> &lowers, bool poisson=false,
-                   long int maxsamples=1e7);
+                   unsigned dataset=0);
 
-  int RandomSample(std::vector<float> &events,
-                   std::vector<int> &eventweights, double nexpected,
-                   bool poisson=false, long int maxsamples=1e7) {
+  int RandomSample(std::vector<float> &events, double nexpected,
+                   bool poisson=false, unsigned dataset=0) {
     std::vector<double> syst_vals(syst->size(), 0);
     std::vector<float> _upper;
     std::vector<float> _lower;
-    return RandomSample(events, eventweights, nexpected, syst_vals,
-                        _upper, _lower, poisson, maxsamples);
+    return RandomSample(events, nexpected, syst_vals, _upper, _lower, poisson);
   };
 
   /**
@@ -404,18 +405,18 @@ public:
   std::vector<float> GetSamples() {
     size_t nevents = this->samples.size() / this->nfields;
     const float* s = samples.readOnlyHostPtr();
-    std::vector<float> sv(nevents * this->nobservables);
+    std::vector<float> sv(nevents * (this->nobservables + 1));
     for (size_t i=0; i<nevents; i++) {
       for (int j=0; j<this->nobservables; j++) {
         sv[i * this->nobservables + j] = s[i * this->nfields + j];
       }
+      sv[i * this->nobservables + this->nobservables] = this->dataset;
     }
     return sv;
   }
 
 protected:
     hemi::Array<float> samples;
-    hemi::Array<int> weights;
     hemi::Array<int>* read_bins;
     hemi::Array<int> nbins;
     hemi::Array<int> bin_stride;

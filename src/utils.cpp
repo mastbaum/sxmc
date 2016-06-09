@@ -11,6 +11,11 @@
 
 #include <sxmc/utils.h>
 
+unsigned nint(float nexpected) {
+  return TMath::Nint(nexpected);
+}
+
+
 float get_ntuple_entry(TNtuple* nt, int i, std::string field) {
   float v;
   nt->SetBranchAddress(field.c_str(), &v);

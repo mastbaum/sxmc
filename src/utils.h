@@ -13,6 +13,12 @@
 class TNtuple;
 
 /**
+ * TMath::Nint clone to avoid clash with CUDA headers.
+ */
+unsigned nint(float nexpected);
+
+
+/**
  * Get a value from a TNtuple by event ID and field name.
  *
  * \param nt The source TNtuple

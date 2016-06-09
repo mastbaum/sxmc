@@ -1,14 +1,18 @@
 #include <algorithm>
 #include <iostream>
 #include <string>
+#include <vector>
 #include <TMath.h>
+#include <json/value.h>
 
 #include <sxmc/signals.h>
 #include <sxmc/pdfz.h>
 #include <sxmc/ttree_io.h>
+#include <sxmc/pdfz.h>
 
 void Signal::read_dataset_to_samples(std::vector<float>& samples,
                                      std::vector<float>& dataset,
+                                     unsigned dataset_id,
                                      std::vector<std::string>& sample_fields,
                                      std::vector<std::string>& dataset_fields,
                                      std::vector<Observable>& cuts) {
@@ -27,18 +31,21 @@ void Signal::read_dataset_to_samples(std::vector<float>& samples,
   }
 
   // Build a map from sample array index to dataset array index
+  // The last sample field is reserved for the dataset id tag
   std::vector<size_t> sample_to_dataset_map;
-  for (size_t i=0; i<sample_fields.size(); i++) {
+  for (size_t i=0; i<sample_fields.size()-1; i++) {
     size_t index = (std::find(dataset_fields.begin(), dataset_fields.end(),
                               sample_fields[i]) -
                     dataset_fields.begin());
     sample_to_dataset_map.push_back(index);
   }
 
+  // Loop over events and add them to the sample array
   size_t ndata = static_cast<size_t>(dataset.size() / dataset_fields.size());
   size_t sample_index = 0;
   for (size_t i=0; i<ndata; i++) {
     bool event_valid = true;
+
     // Apply cuts
     for (size_t j=0; j<dataset_fields.size(); j++){
       float data = dataset[i * dataset_fields.size() + j];
@@ -54,75 +61,14 @@ void Signal::read_dataset_to_samples(std::vector<float>& samples,
     }
 
     // Copy event data from dataset to sample array
-    for (size_t j=0; j<sample_fields.size(); j++) {
-      float data = dataset[i * dataset_fields.size() +
-                           sample_to_dataset_map[j]];
+    for (size_t j=0; j<sample_fields.size()-1; j++) {
+      float data = dataset[i * dataset_fields.size() + sample_to_dataset_map[j]];
       samples[sample_index * sample_fields.size() + j] = data;
     }
+    samples[sample_index * sample_fields.size() + sample_fields.size() - 1] = dataset_id;
     sample_index++;
   }
   samples.resize(sample_index * sample_fields.size());
-}
-
-
-void Signal::apply_exclusions(std::vector<float>& samples,
-                              std::vector<std::string>& sample_fields,
-                              std::vector<int>& weights,
-                              std::vector<Observable>& observables) {
-  // Build a lookup table for excluded regions in the observables
-  std::vector<bool> field_has_exclude(sample_fields.size(), false);
-  std::vector<double> field_exclude_lower(sample_fields.size());
-  std::vector<double> field_exclude_upper(sample_fields.size());
-  for (size_t i=0; i<sample_fields.size(); i++) {
-    for (size_t j=0; j<observables.size(); j++) {
-      if (observables[j].field == sample_fields[i] &&
-          observables[j].exclude) {
-        field_has_exclude[i] = true;
-        field_exclude_lower[i] = observables[j].exclude_min;
-        field_exclude_upper[i] = observables[j].exclude_max;
-      }
-    }
-  }
-
-  size_t nsamples = static_cast<size_t>(samples.size() / sample_fields.size());
-  size_t sample_index = 0;
-  for (size_t i=0; i<nsamples; i++) {
-    // Apply cuts
-    unsigned excludes_total = 0;
-    unsigned excludes_cut = 0;
-
-    for (size_t j=0; j<sample_fields.size(); j++) {
-      float v = samples[i * sample_fields.size() + j];
-
-      // Use the union of excluded regions in observable ranges, i.e. only
-      // cut an event if it is excluded in all observables
-      if (field_has_exclude[j]) {
-        excludes_total++;
-        if (v >= field_exclude_lower[j] && v <= field_exclude_upper[j]) {
-          excludes_cut++;
-        }
-      }
-    }
-
-    if (excludes_total > 0 && excludes_cut == excludes_total) {
-      continue;
-    }
-
-    // Fill the samples array with passing events in place
-    for (size_t j=0; j<sample_fields.size(); j++) {
-      float data = samples[i * sample_fields.size() + j];
-      samples[sample_index * sample_fields.size() + j] = data;
-    }
-
-    if (weights.size() > 0) {
-      weights[sample_index] = weights[i];
-    }
-
-    sample_index++;
-  }
-
-  samples.resize(sample_index * sample_fields.size());
-  weights.resize(sample_index);
 }
 
 
@@ -172,8 +118,7 @@ void Signal::set_efficiency(std::vector<Systematic>& systematics) {
 }
 
 
-void Signal::build_pdfz(std::vector<float> &samples,
-                        std::vector<int> &weights, int nfields,
+void Signal::build_pdfz(std::vector<float> &samples, int nfields,
                         std::vector<Observable>& observables,
                         std::vector<Systematic>& systematics) {
   // Build bin and limit arrays
@@ -193,8 +138,8 @@ void Signal::build_pdfz(std::vector<float> &samples,
 
   // Build the histogram evaluator
   this->histogram = \
-    new pdfz::EvalHist(samples, weights, nfields, observables.size(),
-                       lower, upper, nbins);
+    new pdfz::EvalHist(samples, nfields, observables.size(),
+                       lower, upper, nbins, this->dataset);
 
   short pidx = 0;  // Systematic parameter index
 
@@ -234,43 +179,37 @@ void Signal::build_pdfz(std::vector<float> &samples,
   }
 }
 
-
-Signal::Signal(std::string _name, std::string _title, float _nexpected,
-               float _sigma, std::string _category,
+Signal::Signal(std::string _name, std::string _title,
+               std::string _filename, unsigned _dataset,
+               double _nexpected, double _sigma, bool _fixed,
                std::vector<std::string>& sample_fields,
                std::vector<Observable>& observables,
                std::vector<Observable>& cuts,
-               std::vector<Systematic>& systematics,
-               std::vector<std::string>& filenames, bool _fixed)
-    : name(_name), title(_title), category(_category), nexpected(_nexpected),
-      sigma(_sigma), efficiency(1), fixed(_fixed) {
-  std::vector<float> dataset;
+               std::vector<Systematic>& systematics)
+    : name(_name), title(_title), filename(_filename),
+      dataset(_dataset), nexpected(_nexpected), sigma(_sigma), fixed(_fixed) {
+  std::vector<float> data;
   std::vector<unsigned int> rank;
   std::vector<std::string> ttree_fields;
 
-  for (size_t i=0; i<filenames.size(); i++) {
-    int code = sxmc::io::read_float_vector_ttree(filenames[i], dataset,
-                                                 rank, ttree_fields);
-    assert(code >= 0);
-  }
+  int rc = \
+    sxmc::io::read_float_vector_ttree(filename, data, rank, ttree_fields);
+  assert(rc >= 0);
 
   this->n_mc = rank[0];
   std::vector<float> samples(this->n_mc * sample_fields.size());
 
   // If user provided a scale factor for MC generation rather than a rate,
-  // nexpected is set negative in the SignalParams.
+  // nexpected is set negative.
   if (this->nexpected < 0) {
     this->nexpected *= -1.0 * n_mc;
   }
 
-  read_dataset_to_samples(samples, dataset, sample_fields, ttree_fields, cuts);
-  //apply_exclusions(samples, sample_fields, observables);
-
-  // Create default weights
-  std::vector<int> weights(samples.size() / sample_fields.size(), 1);
+  read_dataset_to_samples(samples, data, this->dataset,
+                          sample_fields, ttree_fields, cuts);
 
   // Build the histogram evaluator
-  build_pdfz(samples, weights, sample_fields.size(), observables, systematics);
+  build_pdfz(samples, sample_fields.size(), observables, systematics);
 
   // Evaluate histogram at mean of systematics to see how many
   // of our samples fall within our observable min and max limits
@@ -278,28 +217,112 @@ Signal::Signal(std::string _name, std::string _title, float _nexpected,
 }
 
 
-Signal::Signal(std::string _name, std::string _title, float _nexpected,
-               float _sigma, std::string _category,
-               std::vector<Observable>& observables,
-               std::vector<Observable>& cuts,
-               std::vector<Systematic>& systematics,
-               std::vector<float>& samples,
-               std::vector<std::string>& sample_fields,
-               std::vector<int> &weights, bool _fixed)
-    : name(_name), title(_title), category(_category), nexpected(_nexpected),
-      sigma(_sigma), efficiency(1), fixed(_fixed) {
-  this->n_mc = 0;
-  for (size_t i=0; i<weights.size(); i++) {
-    this->n_mc += weights[i];
+Observable::Observable(const std::string _name, const Json::Value& config)
+      : name(_name) {
+  assert(config.isMember("title"));
+  this->title = config["title"].asString();
+
+  assert(config.isMember("field"));
+  this->field = config["field"].asString();
+
+  assert(config.isMember("bins"));
+  this->bins = config["bins"].asInt();
+
+  assert(config.isMember("min"));
+  this->lower = config["min"].asFloat();
+
+  assert(config.isMember("max"));
+  this->upper = config["max"].asFloat();
+
+  this->units = config.get("units", "").asString();
+  this->logscale = config.get("logscale", false).asBool();
+
+  this->yrange.resize(2, -1);
+
+  if (config.isMember("yrange")) {
+    this->yrange[0] = config["yrange"][0].asFloat();
+    this->yrange[1] = config["yrange"][1].asFloat();
+  }
+}
+
+
+Systematic::Systematic(const std::string _name, const Json::Value& config)
+      : name(_name) {
+  assert(config.isMember("title"));
+  this->title = config["title"].asString();
+
+  assert(config.isMember("observable_field"));
+  this->observable_field = config["observable_field"].asString();
+
+  assert(config.isMember("type"));
+  std::string type_string = config["type"].asString();
+
+  if (type_string == "shift") {
+    this->type = pdfz::Systematic::SHIFT;
+  }
+  else if (type_string == "scale") {
+    this->type = pdfz::Systematic::SCALE;
+  }
+  else if (type_string == "ctscale") {
+    this->type = pdfz::Systematic::CTSCALE;
+  }
+  else if (type_string == "resolution_scale") {
+    this->type = pdfz::Systematic::RESOLUTION_SCALE;
+    assert(config.isMember("truth_field"));
+    this->truth_field = config["truth_field"].asString();
+  }
+  else {
+    std::cerr << "FitConfig::load_pdf_systematics: Unknown systematic type "
+              << type_string << std::endl;
+    throw(1);
   }
 
-  //apply_exclusions(samples, sample_fields, weights, observables);
+  // Parameter means and standard deviations are an array of coefficients
+  // in a power series expansion in the observable.
+  assert(config.isMember("mean"));
+  short npars = config["mean"].size();
 
-  // Build the histogram evaluator
-  build_pdfz(samples, weights, sample_fields.size(), observables, systematics);
+  double* means = new double[npars];
+  for (short j=0; j<npars; j++) {
+    means[j] = config["mean"][j].asDouble();
+  }
 
-  // Evaluate histogram at mean of systematics to see how many
-  // of our samples fall within our observable min and max limits
-  set_efficiency(systematics);
+  double* sigmas = new double[npars];
+  if (config.isMember("sigma")) {
+    assert(config["sigma"].size() == (unsigned) npars);
+    for (short j=0; j<npars; j++) {
+      sigmas[j] = config["sigma"][j].asDouble();
+    }
+  }
+  else {
+    for (short j=0; j<npars; j++) {
+      sigmas[j] = 0;
+    }
+  }
+
+  this->npars = npars;
+  this->means = means;
+  this->sigmas = sigmas;
+
+  // Fixing a systematic is all-or-nothing
+  this->fixed = config.get("fixed", false).asBool();
 }
+
+
+//Rate::Rate(const std::string& _name, const Json::Value& params) : name(_name) {
+//  // Must specify rate or scale, but not both
+//  assert(params.isMember("rate") || params.isMember("scale"));
+//  assert(!(params.isMember("rate") && params.isMember("scale")));
+//
+//  if (params.isMember("rate")) {
+//    this->rate = params["rate"].asFloat();
+//  }
+//  else {
+//    // (-) tell signals to scale by the total number of samples
+//    this->rate = -1.0 / params["scale"].asFloat();
+//  }
+//
+//  this->sigma = params.get("constraint", 0.0).asFloat();
+//  this->fixed = params.get("fixed", false).asBool();
+//}
 

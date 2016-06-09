@@ -48,10 +48,9 @@ class Contour : public ErrorEstimator {
      * Get the interval for a given parameter.
      *
      * \param name - The name of the parameter
-     * \param point_estimate - The best-fit point
      * \returns An Interval with the error estimate
     */
-    virtual Interval get_interval(std::string name, float point_estimate);
+    virtual Interval get_interval(std::string name);
 
   protected:
     TNtuple* contour_points;  //!< Likelihood space samples within the contour

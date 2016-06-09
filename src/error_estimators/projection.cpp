@@ -1,6 +1,7 @@
-#include <assert.h>
+#include <cassert>
 #include <iostream>
 #include <string>
+#include <TF1.h>
 #include <TH1F.h>
 
 #include <sxmc/error_estimator.h>
@@ -10,51 +11,66 @@
 namespace sxmc {
   namespace errors {
 
-Interval Projection::get_interval(std::string name,
-                                  float point_estimate) { 
-  // Project out the dimension of interest
-  TH1F* hp = lspace->get_projection(name);
-
-  float integral = hp->Integral(0, hp->GetNbinsX() + 1);
-  assert(integral > 0);
-
+Interval Projection::get_interval(std::string name) { 
   Interval interval;
-  interval.point_estimate = point_estimate;
   interval.cl = this->cl;
 
-  float integrated_prob = 0;  // for coverage calculation
-  float alpha = (1.0 - cl) / 2;
+  // Project out the dimension of interest
+  TH1F* hp = lspace->get_projection(name);
+  assert(hp && hp->Integral(0, -1) > 0);
 
-  int lower_bin = 0;
-  if (hp->GetMean() < 2 * hp->GetRMS()) {
-    interval.lower = 0;
-    interval.one_sided = true;
-    alpha *= 2;
+  hp->Fit("gaus", "q goff");
+  double mu = hp->GetFunction("gaus")->GetParameter(1);
+  double sigma = hp->GetFunction("gaus")->GetParameter(2);
+
+  int imax = hp->FindBin(mu);
+  interval.point_estimate = mu;
+
+  if (imax < 1) {
+    imax = 1;
+    interval.point_estimate = hp->GetBinLowEdge(1);
   }
-  else {
-    // Find the lower bound
-    for (int i=0; i<hp->GetNbinsX(); i++) {
-      if (hp->Integral(0, i) / integral >= alpha) {
-        lower_bin = i;
+
+  int ilo = 1;
+  int ihi = 0;
+  double p = 0.0;
+
+  // Is there enough probability to the west to go central?
+  if (hp->Integral(0, imax) / hp->Integral(0, -1) < this->cl / 2) {
+    interval.one_sided = true;
+    for (int i=0; i<hp->GetNbinsX()+1; i++) {
+      p = hp->Integral(0, i) / hp->Integral(0, -1);
+      if (p >= this->cl) {
+        ihi = i;
         break;
       }
     }
-    interval.lower = hp->GetBinLowEdge(lower_bin);
-    interval.one_sided = false;
   }
+  else {
+    interval.one_sided = false;
 
-  // Find the upper bound
-  int upper_bin = hp->GetNbinsX() + 1;
-  for (int i=hp->GetNbinsX()+1; i>0; i--) {
-    if (hp->Integral(i, hp->GetNbinsX() + 1) / integral > alpha) {
-      upper_bin = i;
-      break;
+    // Find the lower limit
+    for (int i=imax; i>0; i--) {
+      p = hp->Integral(i, imax) / hp->Integral(0, -1);
+      if (p >= this->cl / 2) {
+        ilo = i;
+        break;
+      }
+    }
+
+    // Find the upper limit
+    for (int i=imax+1;i<hp->GetNbinsX()+1; i++) {
+      p = hp->Integral(imax+1, i) / hp->Integral(0, -1);
+      if (p >= this->cl / 2) {
+        ihi = i;
+        break;
+      }
     }
   }
-  interval.upper = hp->GetBinLowEdge(upper_bin);
 
-  // Coverage
-  interval.coverage = hp->Integral(lower_bin, upper_bin) / integral;
+  interval.coverage = hp->Integral(ilo, ihi) / hp->Integral(0, -1);
+  interval.lower = hp->GetBinLowEdge(ilo);
+  interval.upper = hp->GetBinLowEdge(ihi) + hp->GetBinWidth(ihi);
 
   hp->Delete();
 

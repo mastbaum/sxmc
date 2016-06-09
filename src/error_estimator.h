@@ -41,10 +41,9 @@ class ErrorEstimator {
      * Get the parameter uncertainty.
      *
      * \param name Name of the parameter to get uncertainty for
-     * \param point_estimate Estimate of true value
      * \returns An Interval corresponding to the error estimate
     */
-    virtual Interval get_interval(std::string name, float point_estimate) = 0;
+    virtual Interval get_interval(std::string name) = 0;
  
     /** Pretty-print the limit. */
     virtual void print() {};

@@ -1,13 +1,13 @@
-#include <iostream>
+#include <cassert>
 #include <iomanip>
-#include <vector>
+#include <iostream>
 #include <map>
 #include <string>
-#include <assert.h>
-#include <TNtuple.h>
+#include <vector>
 #include <TEnv.h>
-#include <TH1F.h>
 #include <TDirectory.h>
+#include <TH1F.h>
+#include <TNtuple.h>
 
 #include <sxmc/contour.h>
 #include <sxmc/likelihood.h>
@@ -65,14 +65,14 @@ void LikelihoodSpace::print_correlations() {
 
 
 TH1F* LikelihoodSpace::get_projection(std::string name) {
-  int default_nbins = 100;
-  gEnv->GetValue("Hist.Binning.1D.x", default_nbins);
-  gEnv->SetValue("Hist.Binning.1D.x", 10000);
+  //double default_nbins = 1;
+  //gEnv->GetValue("Hist.Binning.1D.x", default_nbins);
+  //gEnv->SetValue("Hist.Binning.1D.x", 5000.0);
   this->samples->Draw((name + ">>_hp").c_str(), "", "goff");
-  gEnv->SetValue("Hist.Binning.1D.x", default_nbins);
   TH1F* hp = dynamic_cast<TH1F*>(gDirectory->FindObject("_hp"));
   assert(hp);
   hp->SetDirectory(NULL);
+  //gEnv->SetValue("Hist.Binning.1D.x", default_nbins);
 
   return hp;
 }
@@ -166,12 +166,13 @@ LikelihoodSpace::extract_best_fit(float& ml, float cl, ErrorType error_type) {
   else {
     std::cerr << "LikelihoodSpace::extract_best_fit: Unknown error type"
               << std::endl;
+    delete[] params;
     throw(5);
   }
 
   std::map<std::string, Interval> best_fit;
   for (size_t i=0; i<names.size(); i++) {
-    best_fit[names[i]] = error->get_interval(names[i], params[i]);
+    best_fit[names[i]] = error->get_interval(names[i]);
   }
 
   delete error;

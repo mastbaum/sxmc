@@ -68,7 +68,6 @@ public:
    * \returns LikelihoodSpace built from samples
    */
   LikelihoodSpace* operator()(std::vector<float>& data,
-                              std::vector<int>& weights,
                               unsigned nsteps,
                               float burnin_fraction,
                               const bool debug_mode=false,
@@ -95,33 +94,36 @@ protected:
    *                           calculation
    * \param event_total_sum Pre-allocated buffer for event term total
    */
-  void nll(const float* lut, const int* dataweights, size_t nevents,
+  void nll(const float* lut, size_t nevents,
            const double* v, double* nll,
+           const double* nexpected,
            const unsigned* norms, const unsigned* norms_nominal,
            double* event_partial_sums,
            double* event_total_sum);
 
 private:
-  size_t nsignals;  //!< number of signal parameters
-  size_t nsystematics;  //!< number of systematic parameters
-  size_t nparameters;  //!< total number of parameters
-  size_t nobservables;  //!< number of observables in data
+  size_t nrates;  //!< Number of signal rates
+  size_t nsignals;  //!< Number of signal parameters
+  size_t nsystematics;  //!< Number of systematic parameters
+  size_t nparameters;  //!< Total number of parameters
+  size_t nobservables;  //!< Number of observables in data
   size_t nfloat;  //!< Number of floating parameters
   bool systematics_fixed;  //!< All systematic parameters are fixed
-  unsigned nnllblocks;  //!< number of cuda blocks for nll partial sums
-  unsigned nllblocksize;  //!< size of cuda blocks for nll partial sums
-  unsigned nnllthreads;  //!< number of threads for nll partial sums
-  unsigned nreducethreads; //!< number of threads to use in partial sum
+  unsigned nnllblocks;  //!< Number of cuda blocks for nll partial sums
+  unsigned nllblocksize;  //!< Size of cuda blocks for nll partial sums
+  unsigned nnllthreads;  //!< Number of threads for nll partial sums
+  unsigned nreducethreads; //!< Number of threads to use in partial sum
                            //!< reduction kernel
-  //unsigned blocksize;  //!< size of blocks for per-signal kernels
-  //unsigned nblocks;  //!< number of blocks for per-signal kernels
-  std::string varlist;  //!< string identifier list for ntuple indexing
-  hemi::Array<double>* parameter_means;  //!< parameter central values
-  hemi::Array<double>* parameter_sigma;  //!< parameter Gaussian uncertainty
+  //unsigned blocksize;  //!< Size of blocks for per-signal kernels
+  //unsigned nblocks;  //!< Number of blocks for per-signal kernels
+  std::string varlist;  //!< String identifier list for ntuple indexing
+  hemi::Array<double>* parameter_means;  //!< Parameter central values
+  hemi::Array<double>* parameter_sigma;  //!< Parameter Gaussian uncertainty
+  hemi::Array<double>* nexpected;  //!< Expectation values
   hemi::Array<RNGState>* rngs;  //!< CURAND RNGs, ignored in CPU mode
-  std::vector<std::string> parameter_names;  //!< string name of each param
+  std::vector<std::string> parameter_names;  //!< String name of each param
   std::vector<bool> parameter_fixed;  //!< Is this parameter fixed?
-  std::vector<pdfz::Eval*> pdfs;  //!< references to signal pdfs
+  std::vector<pdfz::Eval*> pdfs;  //!< References to signal pdfs
 };
 
 #endif  // __MCMC_H__

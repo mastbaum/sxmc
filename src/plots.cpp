@@ -1,10 +1,11 @@
-#include <iostream>
-#include <vector>
-#include <map>
 #include <algorithm>
+#include <iomanip>
+#include <iostream>
+#include <set>
+#include <map>
 #include <string>
 #include <sstream>
-#include <iomanip>
+#include <vector>
 #include <TCanvas.h>
 #include <TColor.h>
 #include <TH1.h>
@@ -175,47 +176,39 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
               std::vector<Signal> signals,
               std::vector<Systematic> systematics,
               std::vector<Observable> observables,
-              std::vector<float> data, std::vector<int> weights,
+              std::set<unsigned> datasets,
+              std::vector<float> data,
               std::string output_path) {
-  std::vector<std::string> categories;
-  categories.push_back("full");
-  for (size_t i=0; i<signals.size(); i++) {
-    if (signals[i].category.size() > 0) {
-      if (std::find(categories.begin(), categories.end(),
-                    signals[i].category) == categories.end()) {
-        categories.push_back(signals[i].category);
-      }
-    }
-  }
+  std::map<unsigned, std::vector<SpectralPlot> > all_plots;
+  std::map<unsigned, std::vector<TH1F*> > all_totals;
 
-  std::map<std::string, std::vector<SpectralPlot> > all_plots;
-  std::map<std::string, std::vector<TH1D*> > all_totals;
+  for (std::set<unsigned>::iterator it=datasets.begin();
+       it!=datasets.end(); ++it) {
+    unsigned dataset = *it;
 
-  for (size_t j=0; j<categories.size(); j++) {
     std::vector<SpectralPlot> plots;
+    std::vector<TH1F*> totals(observables.size(), NULL);
 
     // Set up plots for each observable
     for (size_t i=0; i<observables.size(); i++) {
       Observable* o = &observables[i];
       std::stringstream ytitle;
-      ytitle << "Counts/" << std::setprecision(3)
-        << (o->upper - o->lower) / o->bins << " " << o->units
-        << "/" << live_time << " y";
+      ytitle << "Events/" << std::setprecision(3)
+             << (o->upper - o->lower) / o->bins << " " << o->units
+             << "/" << live_time << " y";
       plots.push_back(SpectralPlot(2, o->lower, o->upper,
                       o->yrange[0], o->yrange[1],
                       o->logscale, "", o->title, ytitle.str().c_str()));
     }
-    all_plots[categories[j]] = plots;
-
-    std::vector<TH1D*> totals(observables.size(), NULL);
-    all_totals[categories[j]] = totals;
+    all_plots[dataset] = plots;
+    all_totals[dataset] = totals;
   }
 
   // Extract best-fit parameter values
   std::cout << "plot_fit: Best fit" << std::endl;
   std::vector<float> params;
   for (size_t i=0; i<signals.size(); i++) {
-    params.push_back(best_fit[signals[i].name].point_estimate);
+    params.push_back(best_fit[signals[i].name].point_estimate * signals[i].nexpected);
     std::cout << " " << signals[i].name << ": "
               << best_fit[signals[i].name].point_estimate << std::endl;
   }
@@ -244,6 +237,11 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
     phist->SetParameterBuffer(&param_buffer, signals.size());
     phist->SetNormalizationBuffer(&norms_buffer, i);
 
+    phist->EvalAsync(false);
+    phist->EvalFinished();
+
+    params[i] *= norms_buffer.readOnlyHostPtr()[i] / signals[i].nevents;
+
     TH1* hpdf_nd = phist->CreateHistogram();
     hpdf_nd->Scale(params[i] / hpdf_nd->Integral());
 
@@ -260,94 +258,58 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
       hpdf[1] = dynamic_cast<TH3D*>(hpdf_nd)->ProjectionY("hpdf_y");
       hpdf[2] = dynamic_cast<TH3D*>(hpdf_nd)->ProjectionZ("hpdf_z");
     }
+    else {
+      assert(false);
+    }
 
-    std::string n = signals[i].name;
+    unsigned ds = signals[i].dataset;
 
     for (size_t j=0; j<observables.size(); j++) {
-      hpdf[j]->SetLineColor(colors[i % ncolors]);
-      hpdf[j]->SetLineStyle(styles[i % ncolors]);
-      if (all_totals["full"][j] == NULL) {
-        std::string hfname = "fit_total_" + signals[i].name;
-        all_totals["full"][j] = (TH1D*) hpdf[j]->Clone(hfname.c_str());
-      } else {
-        if (hpdf[j] && hpdf[j]->Integral() > 0) {
-          all_totals["full"][j]->Add(hpdf[j]);
+      int style = i - ds * datasets.size();
+      hpdf[j]->SetLineColor(colors[style % ncolors]);
+      hpdf[j]->SetLineStyle(styles[style % ncolors]);
+
+      all_plots[ds][j].add(hpdf[j], signals[i].title, "hist");
+
+      if (all_totals[ds][j] == NULL) {
+        std::ostringstream ss;
+        ss << "htotal_" << ds << observables[j].name;
+        all_totals[ds][j] = (TH1F*) hpdf[j]->Clone(ss.str().c_str());
+        all_totals[ds][j]->SetLineColor(kRed);
+        all_totals[ds][j]->SetLineStyle(1);
+      }
+      else if (hpdf[j] && hpdf[j]->Integral() > 0) {
+        all_totals[ds][j]->Add(hpdf[j]);
+      }
+    }
+  }
+
+  for (std::set<unsigned>::iterator it=datasets.begin();
+       it!=datasets.end(); ++it) {
+    unsigned ds = *it;
+
+    for (size_t i=0; i<observables.size(); i++) {
+      TH1D* hdata = (TH1D*) SpectralPlot::make_like(
+          all_plots[ds][i].histograms[0], "hdata");
+
+      hdata->SetMarkerStyle(20);
+      hdata->SetMarkerSize(0.7);
+      hdata->SetLineColor(kBlack);
+      hdata->SetLineStyle(1);
+
+      for (size_t idata=0; idata<data.size()/(observables.size()+1); idata++) {
+        unsigned dds = data[idata * (observables.size() + 1) + observables.size()];
+        if (dds == ds) {
+          hdata->Fill(data[idata * (observables.size() + 1) + i]);
         }
       }
 
-      if (signals[i].category.size() == 0) {
-        if (hpdf[j] && hpdf[j]->Integral() > 0) {
-          all_plots["full"][j].add(hpdf[j], signals[i].title, "hist");
-        }
-      }
-      else {
-        for (size_t k=0; k<categories.size(); k++) {
-          if (signals[i].category == categories[k]) {
-            all_plots[categories[k]][j].add(hpdf[j], signals[i].title, "hist");
-            std::string hname = "et" + signals[i].name + observables[j].name;
-            if (all_totals[categories[k]][j] == NULL) {
-              all_totals[categories[k]][j] = \
-                (TH1D*) hpdf[j]->Clone(hname.c_str());
-            }
-            else {
-              if (hpdf[j] && hpdf[j]->Integral() > 0) {
-                all_totals[categories[k]][j]->Add(
-                  (TH1D*) hpdf[j]->Clone(hname.c_str()));
-              }
-            }
-          }
-        }  // categories
-      }
-    }  // observables
-  }  // signals
+      all_plots[ds][i].add(all_totals[ds][i], "Fit", "hist");
+      all_plots[ds][i].add(hdata, "Data");
 
-  for (size_t i=0; i<observables.size(); i++) {
-    TH1D* hdata = (TH1D*) SpectralPlot::make_like(
-        all_plots["full"][i].histograms[0], "hdata");
-
-    hdata->SetMarkerStyle(20);
-    hdata->SetMarkerSize(0.7);
-    hdata->SetLineColor(kBlack);
-
-    for (size_t idata=0; idata<data.size() / observables.size(); idata++) {
-      hdata->Fill(data[idata * observables.size() + i], weights[idata]);
-    }
-
-    for (size_t j=0; j<categories.size(); j++) {
-      if (categories[j] == "full") {
-        continue;
-      }
-      if (all_totals[categories[j]][i] != NULL) {
-        all_totals[categories[j]][i]->SetLineColor(colors[j+1]);
-        all_totals[categories[j]][i]->SetLineStyle(styles[j+1]);
-        TH1D* t = \
-          (TH1D*) all_totals[categories[j]][i]->Clone(categories[j].c_str());
-        t->SetLineStyle(2);
-        all_plots[categories[j]][i].add(t, "Total", "hist");
-        all_plots["full"][i].add(
-            all_totals[categories[j]][i], categories[j], "hist");
-      }
-    }
-
-    if (all_totals["full"][i] != NULL) {
-      all_totals["full"][i]->SetLineColor(kRed);
-      all_totals["full"][i]->SetLineStyle(1);
-      all_plots["full"][i].add(all_totals["full"][i], "Fit", "hist");
-    }
-
-    all_plots["full"][i].add(hdata, "Data");
-
-    std::string path = \
-      output_path + observables[i].name + "_spectrum_full";
-    all_plots["full"][i].save(path);
-
-    for (size_t j=0; j<categories.size(); j++) {
-      if (categories[j] == "full") {
-        continue;
-      }
-      path = (output_path + observables[i].name +
-              "_spectrum_" + categories[j]);
-      all_plots[categories[j]][i].save(path);
+      std::ostringstream output;
+      output << output_path << observables[i].name << "_" << ds;
+      all_plots[ds][i].save(output.str());
     }
   }
 }

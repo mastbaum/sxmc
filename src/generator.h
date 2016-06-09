@@ -33,25 +33,23 @@
  * \param poisson If true, Poisson-distribute the signal rates
  * \return Array with samples
  */
-std::pair<std::vector<float>, std::vector<int> >
+//std::pair<std::vector<float>, std::vector<int> >
+std::vector<float>
 make_fake_dataset(std::vector<Signal>& signals,
                   std::vector<Systematic>& systematics,
                   std::vector<Observable>& observables,
                   std::vector<double> params,
-                  bool poisson=true, int maxsamples=1e7);
+                  bool poisson=true);
 
 
 /**
  * Sample a ROOT TH1 (TH1, TH2, or TH3) histogram.
  */
-std::pair<std::vector<float>, std::vector<int> >
-sample_pdf(TH1* hist, long int nsamples, long int maxsamples=1e7);
+//std::pair<std::vector<float>, std::vector<int> >
+//std::vector<float>
+//sample_pdf(TH1* hist, long int nsamples, long int maxsamples=1e7);
 
 
-/**
- * TMath::Nint clone to avoid clash with CUDA headers.
- */
-unsigned nint(float nexpected);
 
 #endif  // __GENERATOR_H__
 

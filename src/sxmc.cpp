@@ -17,15 +17,9 @@
 #include <iomanip>
 #include <string>
 #include <sstream>
-#include <algorithm>
 #include <TStyle.h>
 #include <TFile.h>
-#include <TH1D.h>
-#include <TH2D.h>
-#include <TH3D.h>
 #include <TNtuple.h>
-#include <TFile.h>
-#include <TH1F.h>
 #include <TRandom.h>
 #include <TRandom2.h>
 #include <TError.h>
@@ -40,82 +34,58 @@
 #include <sxmc/utils.h>
 
 /**
- * Run an ensemble of independent fake experiments
- *
  * Run experiments, fit each with MCMC.
  *
- * \param signals List of Signals defining PDFs, rates, etc.
- * \param systematics List of Systematics applied to PDFs
- * \param observables List of Observables common to PDFs
- * \param cuts List of cuts applied to data set
- * \param data Signal containing data to fit, or NULL to sample
- * \param steps Number of MCMC random walk steps to take
- * \param burnin_fraction Fraction of initial MCMC steps to throw out
- * \param confidence Desired confidence level for limits
- * \param nexperiments Number of fake experiments to run
- * \param live_time Experiment live time in years
- * \param debug_mode If true, accept and save all steps
+ * \param fc A FitConfig defining the fit parameters
+ * \param output_path Location to output files
  * \returns A list of the upper limits
  */
-std::vector<float> ensemble(std::vector<Signal>& signals,
-                            std::vector<Systematic>& systematics,
-                            std::vector<Observable>& observables,
-                            std::vector<Observable>& cuts,
-                            std::vector<Signal>* data,
-                            unsigned steps, float burnin_fraction,
-                            float confidence, unsigned nexperiments,
-                            float live_time, const bool debug_mode,
-                            std::string output_path, std::string signal_name,
-                            std::string prefix, bool plots) {
-  std::vector<float> limits;
-
-  if (plots) {
-    for (size_t i=0; i<signals.size(); i++) {
+std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
+  if (fc.plots) {
+    for (size_t i=0; i<fc.signals.size(); i++) {
       const char* output_file = \
-        (output_path + signals[i].name + "_pdf.root").c_str();
+        (output_path + fc.signals[i].name + "_pdf.root").c_str();
       TFile f1(output_file, "RECREATE");
       TH1* hist = \
-        dynamic_cast<pdfz::EvalHist*>(signals[i].histogram)->DefaultHistogram();
+        dynamic_cast<pdfz::EvalHist*>(fc.signals[i].histogram)->DefaultHistogram();
       hist->Write();
       f1.Close();
     }
   }
 
-  for (unsigned i=0; i<nexperiments; i++) {
-    std::cout << "Experiment " << i + 1 << " / " << nexperiments << std::endl;
+  std::vector<float> limits;
 
-    std::vector<double> params;
-    std::vector<std::string> param_names;
-    for (size_t j=0; j<signals.size(); j++) {
-      params.push_back(signals[j].nexpected);
-      param_names.push_back(signals[j].name);
-    }
+  for (unsigned i=0; i<fc.nexperiments; i++) {
+    std::cout << "Experiment " << i + 1
+              << " / " << fc.nexperiments << std::endl;
 
     std::vector<float> samples;
-    std::vector<int> weights;
-    if (!data) {
+    if (!fc.data) {
       // Make fake data
+      std::vector<double> params;
+      for (size_t j=0; j<fc.signals.size(); j++) {
+        params.push_back(fc.signals[j].nexpected);
+      }
+
       std::cout << "ensemble: Sampling fake dataset " << i << std::endl;
-      std::pair<std::vector<float>, std::vector<int> > fakedata = \
-        make_fake_dataset(signals, systematics, observables, params, true);
-      samples = fakedata.first;
-      weights = fakedata.second;
+      samples = \
+        make_fake_dataset(fc.signals, fc.systematics, fc.observables,
+                          params, true);
     }
     else {
       std::cout << "ensemble: Using dataset " << i << std::endl;
       samples = \
-        dynamic_cast<pdfz::EvalHist*>(data->at(i).histogram)->GetSamples();
-      weights.resize(samples.size(), 1);
+        dynamic_cast<pdfz::EvalHist*>(fc.data->at(i).histogram)->GetSamples();
     }
 
     // Run MCMC
-    MCMC mcmc(signals, systematics, observables);
+    MCMC mcmc(fc.signals, fc.systematics, fc.observables);
     LikelihoodSpace* ls = \
-      mcmc(samples, weights, steps, burnin_fraction, debug_mode);
+      mcmc(samples, fc.nsteps, fc.burnin_fraction, fc.debug_mode);
 
     // Write out samples for debugging
     std::ostringstream lsfile;
-    lsfile << output_path << prefix << "_" << i << ".root";
+    lsfile << output_path << fc.output_prefix << "_" << i << ".root";
     TFile f(lsfile.str().c_str(), "recreate");
     TNtuple* lsclone = dynamic_cast<TNtuple*>(ls->get_samples()->Clone("ls"));
     lsclone->Write();
@@ -126,20 +96,20 @@ std::vector<float> ensemble(std::vector<Signal>& signals,
     ls->print_correlations();
 
     // Make projection plots
-    if (plots) {
-      plot_fit(ls->get_best_fit(), live_time, signals, systematics,
-               observables, samples, weights, output_path);
+    if (fc.plots) {
+      plot_fit(ls->get_best_fit(), 1.0, fc.signals, fc.systematics,
+               fc.observables, fc.datasets, samples, output_path);
     }
 
     // Build a list of upper limits
     float ml;
     std::map<std::string, Interval> best_fit = \
-      ls->extract_best_fit(ml, confidence, ERROR_PROJECTION);
+      ls->extract_best_fit(ml, fc.confidence, ERROR_PROJECTION);
 
-    if (signal_name != "" && best_fit.find(signal_name) != best_fit.end()) {
-      Interval bfi = best_fit[signal_name];
+    if (fc.signal_name != "" && best_fit.find(fc.signal_name) != best_fit.end()) {
+      Interval bfi = best_fit[fc.signal_name];
       std::cout << "ensemble: Signal "
-                << signal_name << ": " << bfi.str() << std::endl;
+                << fc.signal_name << ": " << bfi.str() << std::endl;
 
       if (!bfi.one_sided) {
         std::cerr << "ensemble: Warning: Two-sided limit!" << std::endl;
@@ -225,11 +195,7 @@ int main(int argc, char* argv[]) {
 
   // Run ensemble
   std::cout << "sxmc: Running ensemble..." << std::endl;
-  std::vector<float> limits = \
-    ensemble(fc.signals, fc.systematics, fc.observables, fc.cuts, fc.data,
-             fc.steps, fc.burnin_fraction, fc.confidence, fc.experiments,
-             fc.live_time, fc.debug_mode, output_path, fc.signal_name,
-             fc.prefix, fc.plots);
+  std::vector<float> limits = ensemble(fc, output_path);
 
   std::cout << "sxmc: Upper limits: ";
   for (size_t i=0; i<limits.size(); i++) {
@@ -237,7 +203,7 @@ int main(int argc, char* argv[]) {
   }
   std::cout << std::endl;
   std::cout << "sxmc: Median upper limit: "
-            << (limits.size() > 0 ? median(limits) : -1) << std::endl;
+            << (!limits.empty() ? median(limits) : -1) << std::endl;
 
   return 0;
 }
