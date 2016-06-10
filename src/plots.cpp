@@ -148,11 +148,12 @@ TH1* SpectralPlot::make_like(TH1* h, std::string name) {
 
 
 void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
-              std::vector<Signal> signals,
-              std::vector<Systematic> systematics,
-              std::vector<Observable> observables,
-              std::set<unsigned> datasets,
-              std::vector<float> data,
+              std::vector<Source>& sources,
+              std::vector<Signal>& signals,
+              std::vector<Systematic>& systematics,
+              std::vector<Observable>& observables,
+              std::set<unsigned>& datasets,
+              std::vector<float>& data,
               std::string output_path) {
   std::map<unsigned, std::vector<SpectralPlot> > all_plots;
   std::map<unsigned, std::vector<TH1F*> > all_totals;
@@ -181,16 +182,23 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
 
   // Extract best-fit parameter values
   std::cout << "plot_fit: Best fit" << std::endl;
-  std::vector<float> params;
-  for (size_t i=0; i<signals.size(); i++) {
-    std::string source_name = signals[i].source.name;
-    params.push_back(best_fit[source_name].point_estimate * signals[i].nexpected);
+  std::vector<float> params(best_fit.size());
+
+  for (size_t i=0; i<sources.size(); i++) {
+    std::string name = sources[i].name;
+    float bf = best_fit[name].point_estimate;
+    params[i] = bf;
+    std::cout << name << " " << bf << std::endl;
   }
+
+  size_t idx = sources.size();
   for (size_t i=0; i<systematics.size(); i++) {
     for (size_t j=0; j<systematics[i].npars; j++) {
       std::ostringstream oss;
       oss << systematics[i].name << "_" << j;
-      params.push_back(best_fit[oss.str()].point_estimate);
+      float bf = best_fit[oss.str()].point_estimate;
+      params[idx] = bf;
+      std::cout << oss.str() << " " << bf << std::endl;
     }
   }
 
@@ -212,10 +220,11 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
     phist->EvalAsync(false);
     phist->EvalFinished();
 
-    params[i] *= norms_buffer.readOnlyHostPtr()[i] / signals[i].nevents;
+    float scale = signals[i].nexpected * params[signals[i].source.index];
+    scale *= norms_buffer.readOnlyHostPtr()[i] / signals[i].nevents;
 
     TH1* hpdf_nd = phist->CreateHistogram();
-    hpdf_nd->Scale(params[i] / hpdf_nd->Integral());
+    hpdf_nd->Scale(scale / hpdf_nd->Integral());
 
     std::vector<TH1D*> hpdf(observables.size(), NULL);
     if (hpdf_nd->IsA() == TH1D::Class()) {

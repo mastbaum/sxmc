@@ -39,11 +39,12 @@ extern const int styles[6];
  * \param output_path Directory to write plots to
  */
 void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
-              std::vector<Signal> signals,
-              std::vector<Systematic> systematics,
-              std::vector<Observable> observables,
-              std::set<unsigned> datasets,
-              std::vector<float> data,
+              std::vector<Source>& sources,
+              std::vector<Signal>& signals,
+              std::vector<Systematic>& systematics,
+              std::vector<Observable>& observables,
+              std::set<unsigned>& datasets,
+              std::vector<float>& data,
               std::string output_path);
 
 /**

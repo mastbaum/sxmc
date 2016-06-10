@@ -76,7 +76,7 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
       for (std::map<unsigned, std::vector<Signal> >::iterator it=fc.data.begin();
            it!=fc.data.end(); ++it) {
         std::cout << "ensemble: Loading dataset "
-                  << it->first << "." << i << "("
+                  << it->first << "." << i << " ("
                   << it->second[i].filename << ")" << std::endl;
 
         dynamic_cast<pdfz::EvalHist*>(it->second[i].histogram)->GetSamples(samples);
@@ -102,7 +102,7 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
 
     // Make projection plots
     if (fc.plots) {
-      plot_fit(ls->get_best_fit(), 1.0, fc.signals, fc.systematics,
+      plot_fit(ls->get_best_fit(), 1.0, fc.sources, fc.signals, fc.systematics,
                fc.observables, fc.datasets, samples, output_path);
     }
 
