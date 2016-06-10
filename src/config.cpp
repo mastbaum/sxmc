@@ -197,8 +197,6 @@ FitConfig::FitConfig(std::string filename) {
     assert((!config.isMember("rate") &&  config.isMember("scale")) ||
            ( config.isMember("rate") && !config.isMember("scale")));
 
-    float sigma = config.get("constraint", 0.0).asFloat();
-    float fixed = config.get("fixed", false).asBool();
     float nexpected = 0;
     if (config.isMember("rate")) {
       nexpected = config["rate"].asFloat();

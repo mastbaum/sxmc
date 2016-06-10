@@ -164,17 +164,17 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
     return;
   }
 
+  // Normalization constraints
+  for (unsigned i=0; i<nsignals; i++) {
+    short sid = source_id[i];
+    sum += pars[sid] * nexpected[i] * norms[i] / n_mc[i];
+  }
+
   for (unsigned i=0; i<nparameters; i++) {
     // Steep penalty for negative rates
     if (i < nsources && pars[i] < 0) {
       nll[0] = 1e18;
-      return;      
-    }
-
-    // Normalization constraints
-    if (i < nsignals) {
-      short sid = source_id[i];
-      sum += pars[sid] * nexpected[i] * norms[i] / n_mc[i];
+      return;
     }
 
     // Gaussian constraints

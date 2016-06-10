@@ -19,9 +19,8 @@ Interval Projection::get_interval(std::string name) {
   TH1F* hp = lspace->get_projection(name);
   assert(hp && hp->Integral(0, -1) > 0);
 
-  hp->Fit("gaus", "q goff");
+  hp->Fit("gaus", "q");
   double mu = hp->GetFunction("gaus")->GetParameter(1);
-  double sigma = hp->GetFunction("gaus")->GetParameter(2);
 
   int imax = hp->FindBin(mu);
   interval.point_estimate = mu;

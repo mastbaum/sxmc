@@ -40,10 +40,7 @@ Signal::Signal(std::string _name, std::string _title,
   // Build the histogram evaluator
   build_pdfz(samples, sample_fields.size(), observables, systematics);
 
-  // Evaluate histogram at mean of systematics to see how many
-  // of our samples fall within our observable min and max limits
-  //set_efficiency(systematics);
-
+  // Keep a list of names of active systematics
   for (size_t i=0; i<systematics.size(); i++) {
     this->systematic_names.push_back(systematics[i].name);
   }

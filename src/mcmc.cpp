@@ -133,6 +133,9 @@ MCMC::MCMC(const std::vector<Source>& sources,
 MCMC::~MCMC() {
   delete parameter_means;
   delete parameter_sigma;
+  delete nexpected;
+  delete n_mc;
+  delete source_id;
   delete rngs;
 }
 
@@ -166,6 +169,24 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
   hemi::Array<unsigned> normalizations(this->nsignals, true);
   normalizations.writeOnlyHostPtr();
 
+  // Buffers for computing event term in nll
+  hemi::Array<double> event_partial_sums(this->nnllthreads, true);
+  event_partial_sums.writeOnlyHostPtr();
+
+  hemi::Array<double> event_total_sum(1, true);
+  event_total_sum.writeOnlyHostPtr();
+
+  // Buffer of jumps, transferred from device memory periodically
+  hemi::Array<int> jump_counter(1, true);
+  jump_counter.writeOnlyHostPtr()[0] = 0;
+
+  hemi::Array<int> accept_counter(1, true);
+  accept_counter.writeOnlyHostPtr()[0] = 0;
+
+  hemi::Array<float> jump_buffer(sync_interval * (this->nparameters+1), true);
+
+  float* jump_vector = new float[this->nparameters + 1];
+
   // Buffers for nll values at current and proposed parameter vectors
   hemi::Array<double> current_nll(1, true);
   current_nll.writeOnlyHostPtr();
@@ -173,7 +194,7 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
   hemi::Array<double> proposed_nll(1, true);
   proposed_nll.writeOnlyHostPtr();
 
-  // Initial standard deviations for each dimension
+  // Set initial proposal distribution widths for each dimension
   hemi::Array<float> jump_width(this->nparameters, true);
   const float scale_factor = 2.4 * 2.4 / this->nfloat;  // Haario, 2001
   std::cout << "MCMC: Intial jump sigma" << std::endl;
@@ -206,26 +227,6 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
     std::cout << jump_width.readOnlyHostPtr()[i] << std::endl;
   }
 
-  jump_width.writeOnlyHostPtr();
-
-  // Buffers for computing event term in nll
-  hemi::Array<double> event_partial_sums(this->nnllthreads, true);
-  event_partial_sums.writeOnlyHostPtr();
-
-  hemi::Array<double> event_total_sum(1, true);    
-  event_total_sum.writeOnlyHostPtr();
-
-  // Buffer of jumps, transferred from gpu periodically
-  hemi::Array<int> jump_counter(1, true);
-  jump_counter.writeOnlyHostPtr()[0] = 0;
-
-  hemi::Array<int> accept_counter(1, true);
-  accept_counter.writeOnlyHostPtr()[0] = 0;
-
-  hemi::Array<float> jump_buffer(sync_interval * (this->nparameters+1), true);
-
-  float* jump_vector = new float[this->nparameters + 1];
-
   // Set up histogram and perform initial evaluation
   size_t nevents = data.size() / (this->nobservables + 1);
   hemi::Array<float> lut(nevents * this->nsignals, true);
@@ -234,18 +235,13 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
     p->SetEvalPoints(data);
     p->SetPDFValueBuffer(&lut, i * nevents, 1);
     p->SetNormalizationBuffer(&normalizations, i);
-    p->SetParameterBuffer(&current_vector, this->nsignals);
+    p->SetParameterBuffer(&current_vector, this->nsources);
     p->EvalAsync();
     p->EvalFinished();
-    p->SetParameterBuffer(&proposed_vector, this->nsignals);
+    p->SetParameterBuffer(&proposed_vector, this->nsources);
   }
 
-//#ifdef __CUDACC__
-//  normalizations.copyFromDevice(normalizations_nominal.readOnlyPtr(),
-//                                normalizations_nominal.size());
-//#endif
-
-  // Calculate nll with initial parameters
+  // Calculate NLL with initial parameters
   nll(lut.readOnlyPtr(), nevents,
       current_vector.readOnlyPtr(), current_nll.writeOnlyPtr(),
       this->nexpected->readOnlyPtr(), this->n_mc->readOnlyPtr(),
@@ -264,7 +260,7 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
   timer.Start();
   for (unsigned i=0; i<nsteps; i++) {
     // If systematics are varying, re-evaluate the pdfs
-    // At some point, need to look for ways of doing this less often
+    // At some point, look for ways of doing this less often?
     if (this->nsystematics > 0 && !this->systematics_fixed) {
       for (size_t j=0; j<this->pdfs.size(); j++) {
         pdfs[j]->EvalAsync();

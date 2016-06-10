@@ -13,7 +13,8 @@ Source::Source(const std::string& _name, const Json::Value& params)
 
 
 void Source::print() const {
-  std::cout << "  " << this->name << std::endl
+  std::cout << "  " << this->name
+    << " (index " << this->index << ")" << std::endl
     << "    Mean: " << this->mean << std::endl
     << "    Constraint: ";
   if (this->sigma != 0) {

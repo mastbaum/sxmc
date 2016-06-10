@@ -27,13 +27,11 @@ public:
    * \param _name - A string identifier
    * \param _title - A title for plotting (ROOT LaTeX)
    * \oaram _nexpected - The expected number of events
-   * \param _sigma - A Gaussian constraint on nexpected
    * \param sample_fields - The names of the fields for the data samples
    * \param observables - A list of observables used in the fit
    * \param cuts - A list of observables to be applied as cuts
    * \param systematics - A list of systematics to be used in the fit
    * \param filenames - A list of ROOT file names with the PDF data
-   * \param fixed - Normalization is fixed
   */
   Signal(std::string _name, std::string _title,
          std::string _filename, unsigned _dataset, Source _source,
@@ -47,13 +45,13 @@ public:
 
   std::string name;  //!< String identifier
   std::string title;  //!< Histogram title in ROOT-LaTeX format
-  std::string filename;
+  std::string filename;  //!< Filename from which data is loaded
   unsigned dataset;  //!< Dataset identifier (cf. multi-phase fitting)
   Source source;  //!< Source for correlated rates
-  double nexpected;  //!< Events expected in this fit
+  double nexpected;  //!< Total (uncut) events expected in this fit
   size_t n_mc;  //!< Number of simulated events used to make pdf
   pdfz::Eval* histogram;  //!< PDF
-  std::vector<std::string> systematic_names;
+  std::vector<std::string> systematic_names;  //!< Names of active systematics
 
 protected:
   /**
@@ -76,6 +74,7 @@ public:
    *
    * \param samples - The vector of data samples for the PDF (by reference)
    * \param dataset - The dataset to load in, as a float array
+   * \param dataset_id - An ID to tag phase, appended to the last column
    * \param sample_fields - The names of the fields for the samples array
    * \param sample_fields - The names of the fields in the dataset array
    * \param cuts - A list of observables to be applied as cuts

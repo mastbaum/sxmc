@@ -41,7 +41,6 @@
  *     const int nparams = 2; // two systematic parameters
  *
  *     std::vector<float> samples(nsamples * nfields);
- *     std::vector<int> weights(nsamples, 1);
  *     std::vector<double> lower(nobs);
  *     std::vector<double> upper(nobs);
  *     std::vector<float> eval_points(neval_points * nobs);
@@ -58,8 +57,7 @@
  *     std::vector<int> nbins(2, 10); // 10 bins in each dimension
  *   
  *     // Setup evaluator
- *     pdfz::EvalHist pdf(samples, weights, nfields, nobs,
- *                        lower, upper, nbins);
+ *     pdfz::EvalHist pdf(samples, nfields, nobs, lower, upper, nbins);
  *     pdf.SetEvalPoints(eval_points);
  *     pdf.SetPDFValueBuffer(&pdf_values, 0, 1);  // no offset, unit stride
  *     pdf.SetNormalizationBuffer(&normalizations, 0);
@@ -347,7 +345,7 @@ public:
    * If optimize is set to true (default), then the CUDA block
    * configuration will be optimized the first time EvalAsync() is called.
   */
-  EvalHist(const std::vector<float>& samples, /*const std::vector<int>&_weights,*/
+  EvalHist(const std::vector<float>& samples,
            int nfields, int nobservables,
            const std::vector<double>& lower, const std::vector<double>& upper,
            const std::vector<int>& nbins, unsigned dataset=0,
