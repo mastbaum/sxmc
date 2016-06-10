@@ -197,7 +197,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
       std::ostringstream oss;
       oss << systematics[i].name << "_" << j;
       float bf = best_fit[oss.str()].point_estimate;
-      params[idx] = bf;
+      params[idx++] = bf;
       std::cout << oss.str() << " " << bf << std::endl;
     }
   }
@@ -214,17 +214,17 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
     pdfz::EvalHist* phist = \
       dynamic_cast<pdfz::EvalHist*>(signals[i].histogram);
 
-    phist->SetParameterBuffer(&param_buffer, signals.size());
+    phist->SetParameterBuffer(&param_buffer, sources.size());
     phist->SetNormalizationBuffer(&norms_buffer, i);
 
     phist->EvalAsync(false);
     phist->EvalFinished();
 
-    float scale = signals[i].nexpected * params[signals[i].source.index];
-    scale *= norms_buffer.readOnlyHostPtr()[i] / signals[i].nevents;
+    double eff = 1.0 * norms_buffer.readOnlyHostPtr()[i] / signals[i].n_mc;
+    double nexp = signals[i].nexpected * eff * params[signals[i].source.index];
 
     TH1* hpdf_nd = phist->CreateHistogram();
-    hpdf_nd->Scale(scale / hpdf_nd->Integral());
+    hpdf_nd->Scale(nexp / hpdf_nd->Integral());
 
     std::vector<TH1D*> hpdf(observables.size(), NULL);
     if (hpdf_nd->IsA() == TH1D::Class()) {

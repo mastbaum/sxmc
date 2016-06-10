@@ -824,6 +824,7 @@ int EvalHist::RandomSample(std::vector<float> &events,
   this->SetNormalizationBuffer(&norms_buffer);
   this->SetParameterBuffer(&params_buffer);
   TH1* hist = this->CreateHistogram();
+  assert(hist);
 
   long int observed;
   if (poisson) {

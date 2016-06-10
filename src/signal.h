@@ -52,9 +52,6 @@ public:
   Source source;  //!< Source for correlated rates
   double nexpected;  //!< Events expected in this fit
   size_t n_mc;  //!< Number of simulated events used to make pdf
-  double nevents;  //!< Events in the PDF
-  double efficiency;  //!< Fraction of generated events that make it past
-                      //!< cuts (not counting the efficiency correction)
   pdfz::Eval* histogram;  //!< PDF
   std::vector<std::string> systematic_names;
 
@@ -71,13 +68,6 @@ protected:
   void build_pdfz(std::vector<float>& samples, int nfields,
                   std::vector<Observable>& observables,
                   std::vector<Systematic>& systematics);
-
-  /**
-   * Compute an efficiency based on central value of systematics.
-   *
-   * \param systematics - A list of systematics to be used in the fit
-   */
-  void set_efficiency(std::vector<Systematic>& systematics);
 
 public:
   /**

@@ -99,8 +99,10 @@ protected:
    */
   void nll(const float* lut, size_t nevents,
            const double* v, double* nll,
-           const double* nexpected, const short* source_id,
-           const unsigned* norms, const unsigned* norms_nominal,
+           const double* nexpected,
+           const unsigned* n_mc,
+           const short* source_id,
+           const unsigned* norms,
            double* event_partial_sums,
            double* event_total_sum);
 
@@ -121,6 +123,7 @@ private:
   hemi::Array<double>* parameter_means;  //!< Parameter central values
   hemi::Array<double>* parameter_sigma;  //!< Parameter Gaussian uncertainty
   hemi::Array<double>* nexpected;  //!< Expectation values
+  hemi::Array<unsigned>* n_mc;  //!< Number of MC samples
   hemi::Array<short>* source_id;  //!< Source array offsets
   hemi::Array<RNGState>* rngs;  //!< CURAND RNGs, ignored in CPU mode
   std::vector<std::string> parameter_names;  //!< String name of each param

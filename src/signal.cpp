@@ -42,7 +42,7 @@ Signal::Signal(std::string _name, std::string _title,
 
   // Evaluate histogram at mean of systematics to see how many
   // of our samples fall within our observable min and max limits
-  set_efficiency(systematics);
+  //set_efficiency(systematics);
 
   for (size_t i=0; i<systematics.size(); i++) {
     this->systematic_names.push_back(systematics[i].name);
@@ -109,52 +109,6 @@ void Signal::read_dataset_to_samples(std::vector<float>& samples,
     sample_index++;
   }
   samples.resize(sample_index * sample_fields.size());
-}
-
-
-void Signal::set_efficiency(std::vector<Systematic>& systematics) {
-  size_t nsys = systematics.size();
-
-  // Determine the total number of systematic parameters
-  size_t npars = 0;
-  for (size_t i=0; i<nsys; i++) {
-    npars += systematics[i].npars;
-  }
-
-  // Allocate and fill the parameter buffer
-  hemi::Array<double> param_buffer(npars, true);
-  param_buffer.writeOnlyHostPtr();
-
-  size_t k = 0;
-  for (size_t i=0; i<nsys; i++) {
-    for (size_t j=0; j<systematics[i].npars; j++) {
-      param_buffer.writeOnlyHostPtr()[k++] = systematics[i].means[j];
-    }
-  }
-
-  hemi::Array<unsigned> norms_buffer(1, true);
-  norms_buffer.writeOnlyHostPtr();
-  this->histogram->SetNormalizationBuffer(&norms_buffer);
-  this->histogram->SetParameterBuffer(&param_buffer);
-  dynamic_cast<pdfz::EvalHist*>(this->histogram)->EvalAsync(false);
-  dynamic_cast<pdfz::EvalHist*>(this->histogram)->EvalFinished();
-
-  // Efficiency is the number of events that make it into the histogram
-  // over the number of physical events input.
-  //
-  // Note that this is dependent on the systematics, and for now it is
-  // calculated with all systematics at means.
-  this->nevents = norms_buffer.readOnlyHostPtr()[0];
-  this->efficiency = this->nevents / (double) (this->n_mc);
-
-  // nexpected = physical events expected * efficiency
-  // sigma is fractional, does not scale
-  this->nexpected *= this->efficiency;
-
-  std::cout << "Signal::set_efficiency: "
-            << this->nevents << "/" << this->n_mc << " events remain. "
-            << "Total efficiency " << 100.0 * this->efficiency << "%"
-            << std::endl;
 }
 
 

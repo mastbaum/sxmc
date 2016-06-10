@@ -90,9 +90,9 @@ HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
                               const double* __restrict__ pars,
                               const size_t ne, const size_t ns,
                               const double* nexpected,
+                              const unsigned* n_mc,
                               const short* source_id,
                               const unsigned* norms,
-                              const unsigned* norms_nominal,
                               double* sums) {
   int offset = hemiGetElementOffset();
   int stride = hemiGetElementStride();
@@ -102,7 +102,7 @@ HEMI_KERNEL(nll_event_chunks)(const float* __restrict__ lut,
     double s = 0;
     for (size_t j=0; j<ns; j++) {
       float v = lut[j * ne + i];
-      float eff = 1.0 * norms[j] / norms_nominal[j];
+      float eff = 1.0 * norms[j] / n_mc[j];
       short sid = source_id[j];
       s += pars[sid] * nexpected[j] * eff * (!isnan(v) ? v : 0);  // Handle nans from empty hists
     }
@@ -152,8 +152,9 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
                       const double* pars, const double* means,
                       const double* sigmas, const double* events_total,
                       const double* nexpected,
+                      const unsigned* n_mc,
                       const short* source_id,
-                      const unsigned* norms, const unsigned* norms_nominal,
+                      const unsigned* norms,
                       double* nll) {
   // Total from sum over events, once
   double sum = -events_total[0];
@@ -173,7 +174,7 @@ void nll_total_device(const size_t nparameters, const size_t nsignals,
     // Normalization constraints
     if (i < nsignals) {
       short sid = source_id[i];
-      sum += pars[sid] * nexpected[i] * norms[i] / norms_nominal[i];
+      sum += pars[sid] * nexpected[i] * norms[i] / n_mc[i];
     }
 
     // Gaussian constraints
@@ -215,11 +216,13 @@ HEMI_KERNEL(nll_total)(const size_t npars, const double* pars,
                        const size_t nsignals,
                        const size_t nsources, const double* means,
                        const double* sigmas, const double* events_total,
-                       const double* nexpected, const short* source_id,
-                       const unsigned* norms, const unsigned* norms_nominal,
+                       const double* nexpected,
+                       const unsigned* n_mc,
+                       const short* source_id,
+                       const unsigned* norms,
                        double* nll) {
   nll_total_device(npars, nsignals, nsources, pars, means, sigmas,
-                   events_total, nexpected, source_id, norms, norms_nominal,
+                   events_total, nexpected, n_mc, source_id, norms,
                    nll);
 }
 
@@ -238,9 +241,9 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
                                         float* jump_buffer, int nparameters,
                                         const float* jump_width,
                                         const double* nexpected,
+                                        const unsigned* n_mc,
                                         const short* source_id,
                                         const unsigned* norms,
-                                        const unsigned* norms_nominal,
                                         const bool debug_mode) {
   double total_sum;
 
@@ -252,8 +255,8 @@ HEMI_KERNEL(finish_nll_jump_pick_combo)(const size_t npartial_sums,
 
   if (hemiGetElementOffset() == 0) {
     nll_total_device(nparameters, nsignals, nsources, v_proposed, means,
-                     sigmas, &total_sum, nexpected, source_id, norms,
-                     norms_nominal, nll_proposed);
+                     sigmas, &total_sum, nexpected, n_mc, source_id, norms,
+                     nll_proposed);
 
     jump_decider_device(rng, nll_current, nll_proposed, v_current, v_proposed,
                         nparameters, accepted, counter, jump_buffer,

@@ -88,10 +88,12 @@ MCMC::MCMC(const std::vector<Source>& sources,
   // Signal expectations, datasets, pdfz::Eval histograms
   this->pdfs.resize(this->nsignals);
   this->nexpected = new hemi::Array<double>(this->nsignals, true);
+  this->n_mc = new hemi::Array<unsigned>(this->nsignals, true);
   this->source_id = new hemi::Array<short>(this->nsignals, true);
   for (size_t i=0; i<this->nsignals; i++) {
     this->pdfs[i] = signals[i].histogram;
     this->nexpected->writeOnlyHostPtr()[i] = signals[i].nexpected;
+    this->n_mc->writeOnlyHostPtr()[i] = signals[i].n_mc;
     this->source_id->writeOnlyHostPtr()[i] = signals[i].source.index;
   }
 
@@ -164,10 +166,6 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
   hemi::Array<unsigned> normalizations(this->nsignals, true);
   normalizations.writeOnlyHostPtr();
 
-  // Buffer for baseline normalizations with nominal systematics
-  hemi::Array<unsigned> normalizations_nominal(this->nsignals, true);
-  normalizations_nominal.writeOnlyHostPtr();
-
   // Buffers for nll values at current and proposed parameter vectors
   hemi::Array<double> current_nll(1, true);
   current_nll.writeOnlyHostPtr();
@@ -235,24 +233,24 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
     pdfz::Eval* p = this->pdfs[i];
     p->SetEvalPoints(data);
     p->SetPDFValueBuffer(&lut, i * nevents, 1);
-    p->SetNormalizationBuffer(&normalizations_nominal, i);
+    p->SetNormalizationBuffer(&normalizations, i);
     p->SetParameterBuffer(&current_vector, this->nsignals);
     p->EvalAsync();
     p->EvalFinished();
-    p->SetNormalizationBuffer(&normalizations, i);
     p->SetParameterBuffer(&proposed_vector, this->nsignals);
   }
 
-#ifdef __CUDACC__
-  normalizations.copyFromDevice(normalizations_nominal.readOnlyPtr(),
-                                normalizations_nominal.size());
-#endif
+//#ifdef __CUDACC__
+//  normalizations.copyFromDevice(normalizations_nominal.readOnlyPtr(),
+//                                normalizations_nominal.size());
+//#endif
 
   // Calculate nll with initial parameters
   nll(lut.readOnlyPtr(), nevents,
       current_vector.readOnlyPtr(), current_nll.writeOnlyPtr(),
-      this->nexpected->readOnlyPtr(), this->source_id->readOnlyPtr(),
-      normalizations.readOnlyPtr(), normalizations_nominal.readOnlyPtr(),
+      this->nexpected->readOnlyPtr(), this->n_mc->readOnlyPtr(),
+      this->source_id->readOnlyPtr(),
+      normalizations.readOnlyPtr(),
       event_partial_sums.ptr(), event_total_sum.ptr());
 
   HEMI_KERNEL_LAUNCH(pick_new_vector, 1, 64, 0, 0,
@@ -323,9 +321,9 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
                        proposed_vector.readOnlyPtr(),
                        nevents, this->nsignals,
                        this->nexpected->readOnlyPtr(),
+                       this->n_mc->readOnlyPtr(),
                        this->source_id->readOnlyPtr(),
                        normalizations.readOnlyPtr(),
-                       normalizations_nominal.readOnlyPtr(),
                        event_partial_sums.ptr());
 
     // Accept/reject the jump, add current position to the buffer
@@ -348,9 +346,9 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
                        this->nparameters,
                        jump_width.readOnlyPtr(),
                        this->nexpected->readOnlyPtr(),
+                       this->n_mc->readOnlyPtr(),
                        this->source_id->readOnlyPtr(),
                        normalizations.readOnlyPtr(),
-                       normalizations_nominal.readOnlyPtr(),
                        debug_mode);
 
     // Flush the jump buffer periodically
@@ -394,15 +392,16 @@ MCMC::operator()(std::vector<float>& data, unsigned nsteps,
 
 
 void MCMC::nll(const float* lut, size_t nevents, const double* v, double* nll,
-               const double* nexpected, const short* source_id,
-               const unsigned* norms, const unsigned* norms_nominal,
+               const double* nexpected, const unsigned* n_mc,
+               const short* source_id,
+               const unsigned* norms,
                double* event_partial_sums, double* event_total_sum) {
   // Partial sums of event term
   HEMI_KERNEL_LAUNCH(nll_event_chunks,
                      this->nnllblocks, this->nllblocksize, 0, 0,
                      lut, v, nevents, this->nsignals,
-                     nexpected, source_id,
-                     norms, norms_nominal,
+                     nexpected, n_mc, source_id,
+                     norms,
                      event_partial_sums);
 
   // Total of event term
@@ -415,7 +414,7 @@ void MCMC::nll(const float* lut, size_t nevents, const double* v, double* nll,
                      this->nparameters, v, this->nsignals, this->nsources,
                      this->parameter_means->readOnlyPtr(),
                      this->parameter_sigma->readOnlyPtr(),
-                     event_total_sum, nexpected, source_id,
-                     norms, norms_nominal, nll);
+                     event_total_sum, nexpected, n_mc, source_id,
+                     norms, nll);
 }
 

@@ -83,6 +83,13 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
       }
     }
 
+    //for (size_t j=0; j<samples.size(); j++) {
+    //  std::cout << samples[j] << " ";
+    //  if (j % (fc.observables.size() + 1) == 0) {
+    //    std::cout << std::endl;
+    //  }
+    //}
+
     // Run MCMC
     MCMC mcmc(fc.sources, fc.signals, fc.systematics, fc.observables);
     LikelihoodSpace* ls = \
