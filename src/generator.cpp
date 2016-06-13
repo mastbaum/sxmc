@@ -10,7 +10,7 @@ std::vector<float>
 make_fake_dataset(std::vector<Signal>& signals,
                   std::vector<Systematic>& systematics,
                   std::vector<Observable>& observables,
-                  std::vector<double> params, bool poisson) {
+                  bool poisson) {
   std::cout << "make_fake_dataset: Generating dataset..." << std::endl;
 
   std::vector<double> syst_vals;
@@ -30,14 +30,18 @@ make_fake_dataset(std::vector<Signal>& signals,
   std::vector<float> events;
   std::vector<unsigned> observed(signals.size());
   for (size_t i=0; i<signals.size(); i++) {
+    double eff = signals[i].get_efficiency(systematics);
+    double nevents = signals[i].nexpected * eff;
+
     observed[i] = \
       dynamic_cast<pdfz::EvalHist*>(signals[i].histogram)->RandomSample(
-        events, params[i], syst_vals, upper, lower, poisson,
+        events, nevents, syst_vals, upper, lower, poisson,
         signals[i].dataset);
 
     std::cout << "make_fake_dataset: " << signals[i].name << ": "
               << observed[i] << " events "
-              << "(" << params[i] << " expected)" << std::endl;
+              << "(" << nevents << " expected, efficiency = "
+              << eff << ")" << std::endl;
   }
 
   return events;

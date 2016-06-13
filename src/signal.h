@@ -41,6 +41,14 @@ public:
          std::vector<Observable>& cuts,
          std::vector<Systematic>& systematics);
 
+  /**
+   * Get the efficiency (N in PDF / N MC) for given systematics.
+   *
+   * \param systematics - The list of systematics
+   * \returns The efficiency N_pdf / N_mc
+  */
+  double get_efficiency(std::vector<Systematic>& systematics);
+
   void print() const;
 
   std::string name;  //!< String identifier

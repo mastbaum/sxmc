@@ -169,6 +169,36 @@ void Signal::build_pdfz(std::vector<float> &samples, int nfields,
 }
 
 
+double Signal::get_efficiency(std::vector<Systematic>& systematics) {
+  // Allocate and fill the (systematics) parameter buffer
+  size_t npars = 0;
+  for (size_t i=0; i<systematics.size(); i++) {
+    npars += systematics[i].npars;
+  }
+
+  hemi::Array<double> param_buffer(npars, true);
+  param_buffer.writeOnlyHostPtr();
+
+  size_t k = 0;
+  for (size_t i=0; i<systematics.size(); i++) {
+    for (size_t j=0; j<systematics[i].npars; j++) {
+      param_buffer.writeOnlyHostPtr()[k++] = systematics[i].means[j];
+    }
+  }
+
+  hemi::Array<unsigned> norms_buffer(1, true);
+  norms_buffer.writeOnlyHostPtr();
+
+  this->histogram->SetNormalizationBuffer(&norms_buffer);
+  this->histogram->SetParameterBuffer(&param_buffer);
+
+  dynamic_cast<pdfz::EvalHist*>(this->histogram)->EvalAsync(false);
+  dynamic_cast<pdfz::EvalHist*>(this->histogram)->EvalFinished();
+
+  return 1.0 * norms_buffer.readOnlyHostPtr()[0] / (double) (this->n_mc);
+}
+
+
 void Signal::print() const {
   std::cout << "  " << this->name << std::endl
     << "    Title: \"" << this->title << "\"" << std::endl

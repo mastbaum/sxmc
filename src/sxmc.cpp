@@ -63,15 +63,9 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
     std::vector<float> samples;
     if (fc.data.empty()) {
       // Make fake data
-      std::vector<double> params;
-      for (size_t j=0; j<fc.signals.size(); j++) {
-        params.push_back(fc.signals[j].nexpected);
-      }
-
       std::cout << "ensemble: Sampling fake dataset " << i << std::endl;
       samples = \
-        make_fake_dataset(fc.signals, fc.systematics, fc.observables,
-                          params, true);
+        make_fake_dataset(fc.signals, fc.systematics, fc.observables, true);
     }
     else {
       for (std::map<unsigned, std::vector<Signal> >::iterator it=fc.data.begin();
@@ -178,7 +172,7 @@ int main(int argc, char* argv[]) {
   gRandom = new TRandom2(0);
   gStyle->SetErrorX(0);
   gStyle->SetOptStat(0);
-  gErrorIgnoreLevel = kWarning;
+  gErrorIgnoreLevel = kError;
   gROOT->SetBatch(true);
 
   // Set and check/create output path

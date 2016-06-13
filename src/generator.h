@@ -31,7 +31,6 @@
  * \param signals List of Signals defining the PDFs to sample
  * \param systematics List of Systematics to be applied to PDFs
  * \param observables List of Observables common to all PDFs
- * \param params List of parameters (normalizations then systematics)
  * \param poisson If true, Poisson-distribute the signal rates
  * \return Array with samples
  */
@@ -39,7 +38,6 @@ std::vector<float>
 make_fake_dataset(std::vector<Signal>& signals,
                   std::vector<Systematic>& systematics,
                   std::vector<Observable>& observables,
-                  std::vector<double> params,
                   bool poisson=true);
 
 #endif  // __GENERATOR_H__
