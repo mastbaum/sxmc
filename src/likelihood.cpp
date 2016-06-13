@@ -44,16 +44,18 @@ void LikelihoodSpace::print_correlations() {
   std::vector<float> correlations = get_correlation_matrix(this->samples);
 
   std::vector<std::string> names;
+  int maxlen = 0;
   for (int i=0; i<this->samples->GetListOfBranches()->GetEntries(); i++) {
     std::string name = this->samples->GetListOfBranches()->At(i)->GetName();
     if (name == "likelihood") {
       continue;
     }
     names.push_back(name);
+    maxlen = std::max(maxlen, (int) name.length());
   }
 
   for(size_t i=0; i<names.size(); i++) {
-    std::cout << std::setw(20) << names[i] << " ";
+    std::cout << std::setw(maxlen) << names[i] << " ";
     for (size_t j=0; j<names.size(); j++) {
       std::cout << std::setiosflags(std::ios::fixed)
                 << std::setprecision(3) << std::setw(8)
@@ -68,7 +70,7 @@ TH1F* LikelihoodSpace::get_projection(std::string name) {
   //double default_nbins = 1;
   //gEnv->GetValue("Hist.Binning.1D.x", default_nbins);
   //gEnv->SetValue("Hist.Binning.1D.x", 5000.0);
-  this->samples->Draw((name + ">>_hp").c_str(), "", "goff");
+  this->samples->Draw((name + ">>_hp").c_str(), "", "");
   TH1F* hp = dynamic_cast<TH1F*>(gDirectory->FindObject("_hp"));
   assert(hp);
   hp->SetDirectory(NULL);

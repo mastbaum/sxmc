@@ -22,6 +22,7 @@
 #include <TNtuple.h>
 #include <TRandom.h>
 #include <TRandom2.h>
+#include <TROOT.h>
 #include <TError.h>
 
 #include <sxmc/config.h>
@@ -83,19 +84,12 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
       }
     }
 
-    //for (size_t j=0; j<samples.size(); j++) {
-    //  std::cout << samples[j] << " ";
-    //  if (j % (fc.observables.size() + 1) == 0) {
-    //    std::cout << std::endl;
-    //  }
-    //}
-
     // Run MCMC
     MCMC mcmc(fc.sources, fc.signals, fc.systematics, fc.observables);
     LikelihoodSpace* ls = \
       mcmc(samples, fc.nsteps, fc.burnin_fraction, fc.debug_mode);
 
-    // Write out samples for debugging
+    // Write out samples
     std::ostringstream lsfile;
     lsfile << output_path << fc.output_prefix << "_" << i << ".root";
     TFile f(lsfile.str().c_str(), "recreate");
@@ -185,6 +179,7 @@ int main(int argc, char* argv[]) {
   gStyle->SetErrorX(0);
   gStyle->SetOptStat(0);
   gErrorIgnoreLevel = kWarning;
+  gROOT->SetBatch(true);
 
   // Set and check/create output path
   std::string output_path = std::string(argv[2]);
