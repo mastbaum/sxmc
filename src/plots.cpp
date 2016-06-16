@@ -245,10 +245,13 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
 
     unsigned ds = signals[i].dataset;
 
+    unsigned ii = i % (datasets.size() - 1);
+    int color = colors[ii % ncolors];
+    int style = styles[ii % ncolors];
+
     for (size_t j=0; j<observables.size(); j++) {
-      int style = i - ds * datasets.size();
-      hpdf[j]->SetLineColor(colors[style % ncolors]);
-      hpdf[j]->SetLineStyle(styles[style % ncolors]);
+      hpdf[j]->SetLineColor(color);
+      hpdf[j]->SetLineStyle(style);
 
       all_plots[ds][j].add(hpdf[j], signals[i].title, "hist");
 
