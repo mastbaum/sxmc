@@ -22,10 +22,10 @@
 
 const int ncolors = 6;
 const int colors[6] = {
-  kBlue, kBlack, kRed, kGreen+1, kGray+1, kOrange+1
+  kBlue, kBlue, kBlack, kBlack, kGray+1, kGreen+1
 };
 const int styles[6] = {
-  1, 1, 2, 1, 1, 1
+  1, 2, 1, 2, 1, 1
 };
 
 
@@ -245,7 +245,8 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
 
     unsigned ds = signals[i].dataset;
 
-    unsigned ii = i % (datasets.size() - 1);
+    unsigned ns = signals.size() / datasets.size();
+    unsigned ii = i % ns;
     int color = colors[ii % ncolors];
     int style = styles[ii % ncolors];
 
