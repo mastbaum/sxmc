@@ -89,7 +89,7 @@ class LikelihoodSpace {
      *
      * \returns A pointer to the samples
     */
-    const TNtuple* get_samples() { return samples; }
+    const TNtuple* get_samples() const { return samples; }
 
   private:
     std::map<std::string, Interval> ml_params;  //!< Likelihood-maximizing pars

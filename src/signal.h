@@ -66,7 +66,6 @@ protected:
    * Construct the pdfz histogram object.
    *
    * \param samples - The vector of data samples for the PDF
-   * \param weights - The vector of sample weights for the PDF
    * \param nfields - The number of fields (columns) in the sample array
    * \param observables - A list of observables used in the fit
    * \param systematics - A list of systematics to be used in the fit

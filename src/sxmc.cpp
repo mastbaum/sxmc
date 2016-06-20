@@ -33,6 +33,9 @@
 #include <sxmc/likelihood.h>
 #include <sxmc/plots.h>
 #include <sxmc/utils.h>
+#include <sxmc/test.h>
+#include <sxmc/drift.h>
+#include <sxmc/chi2.h>
 
 /**
  * Run experiments, fit each with MCMC.
@@ -99,6 +102,14 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
 
     ls->print_best_fit();
     ls->print_correlations();
+
+    // Run tests
+    sxmc::tests::Drift drift(2);
+    drift(ls);
+
+    sxmc::tests::Chi2 chi2(fc.sources, fc.signals, fc.systematics,
+                           fc.observables, fc.datasets, samples);
+    chi2(ls);
 
     // Make projection plots
     if (fc.plots) {
