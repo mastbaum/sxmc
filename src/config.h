@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include <sxmc/error_estimator.h>
 #include <sxmc/signal.h>
 #include <sxmc/observable.h>
 #include <sxmc/systematic.h>
@@ -55,6 +56,8 @@ public:
   std::map<unsigned, std::vector<Signal> > data;  //!< Data to fit, if any
   std::vector<std::string> sample_fields;  //!< Names of sample array fields
   std::set<unsigned> datasets;  //!< Dataset tags
+  std::string samples;  //!< Path to externally-supplied samples
+  ErrorType error_type;  //!< Error calculation method
 };
 
 #endif  // __CONFIG_H__

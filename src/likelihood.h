@@ -30,15 +30,26 @@ class LikelihoodSpace {
      * Note: The instance takes over ownership of the samples TNtuple!
      *
      * \param samples - A set of samples of the likelihood space
-     * \param cl - Confidence level for error estimation
+     * \param _cl - Confidence level for error estimation
+     * \param _error_type - Type of calculation for intervals
     */
-    LikelihoodSpace(TNtuple* samples, float cl=0.68);
+    LikelihoodSpace(TNtuple* samples, float _cl=0.683,
+                    ErrorType _error_type=ERROR_CONTOUR);
 
     /** Destructor. */
     virtual ~LikelihoodSpace();
 
     /** Get the parameters and uncertainties for the maximum L point. */
     std::map<std::string, Interval> get_best_fit() const { return ml_params; }
+
+    /**
+     * Get the parameters and uncertainties for the maximum L point,
+     * along with the NLL.
+    */
+    std::map<std::string, Interval> get_best_fit(float& _nll) const {
+      _nll = this->nll;
+      return ml_params;
+    }
 
     /** Print the parameters for the maximum-likelihood point. */
     void print_best_fit() const;
@@ -71,7 +82,7 @@ class LikelihoodSpace {
      * \returns A map from parameter names to Intervals
     */
     std::map<std::string, Interval>
-    extract_best_fit(float& ml, float cl, ErrorType error_type=ERROR_PROJECTION);
+    extract_best_fit(float& ml, float cl, ErrorType error_type=ERROR_CONTOUR);
 
     /**
      * Get a pointer to the TNtuple of samples.
@@ -81,9 +92,11 @@ class LikelihoodSpace {
     const TNtuple* get_samples() { return samples; }
 
   private:
-    TNtuple* samples;  //!< Samples of the likelihood function
     std::map<std::string, Interval> ml_params;  //!< Likelihood-maximizing pars
-    float ml;  //!< The maximum likelihood (negative for NLL)
+    ErrorType error_type;  //!< Error calculation for intervals
+    float nll;  //!< The maximum likelihood (negative for NLL)
+    float cl;  //!< Confidence level for intervals
+    TNtuple* samples;  //!< Samples of the likelihood function
 };
 
 #endif  // __LIKELIHOOD_H__

@@ -22,10 +22,10 @@
 
 const int ncolors = 6;
 const int colors[6] = {
-  kBlue, kBlue, kBlack, kBlack, kGray+1, kGreen+1
+  kRed, kRed, kBlack, kBlack, kBlue, kGreen+1
 };
 const int styles[6] = {
-  1, 2, 1, 2, 1, 1
+  1, 2, 1, 2, 3, 1
 };
 
 
@@ -86,9 +86,8 @@ SpectralPlot::~SpectralPlot() {
 }
 
 
-void SpectralPlot::add(TH1* _h, std::string title, std::string options) {
-  std::string name = "__" + std::string(title);
-  TH1* h = dynamic_cast<TH1*>(_h->Clone(name.c_str()));
+void SpectralPlot::add(TH1* _h, std::string objname, std::string title, std::string options) {
+  TH1* h = dynamic_cast<TH1*>(_h->Clone(("__" + objname).c_str()));
   h->SetDirectory(NULL);
 
   h->SetLineWidth(this->line_width);
@@ -137,6 +136,7 @@ void SpectralPlot::save(std::string filename) {
   this->c->SaveAs((filename + ".png").c_str(), "q");
   this->c->SaveAs((filename + ".tex").c_str(), "q");
   this->c->SaveAs((filename + ".C").c_str(), "q");
+  this->c->SaveAs((filename + ".root").c_str(), "q");
 }
 
 
@@ -240,6 +240,8 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
       hpdf[2] = dynamic_cast<TH3D*>(hpdf_nd)->ProjectionZ("hpdf_z");
     }
     else {
+      std::cerr << "SpectralPlot::plot_fit: Can't create projection in >3 "
+                << "observable dimensions." << std::endl;
       assert(false);
     }
 
@@ -254,13 +256,13 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
       hpdf[j]->SetLineColor(color);
       hpdf[j]->SetLineStyle(style);
 
-      all_plots[ds][j].add(hpdf[j], signals[i].title, "hist");
+      all_plots[ds][j].add(hpdf[j], signals[i].name, signals[i].title, "hist");
 
       if (all_totals[ds][j] == NULL) {
         std::ostringstream ss;
         ss << "htotal_" << ds << observables[j].name;
         all_totals[ds][j] = (TH1F*) hpdf[j]->Clone(ss.str().c_str());
-        all_totals[ds][j]->SetLineColor(kRed);
+        all_totals[ds][j]->SetLineColor(kMagenta);
         all_totals[ds][j]->SetLineStyle(1);
       }
       else if (hpdf[j] && hpdf[j]->Integral() > 0) {
@@ -289,8 +291,8 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
         }
       }
 
-      all_plots[ds][i].add(all_totals[ds][i], "Fit", "hist");
-      all_plots[ds][i].add(hdata, "Data");
+      all_plots[ds][i].add(all_totals[ds][i], "fit", "Fit", "hist");
+      all_plots[ds][i].add(hdata, "data", "Data");
 
       std::ostringstream output;
       output << output_path << observables[i].name << "_" << ds;

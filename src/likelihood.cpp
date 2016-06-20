@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <TEnv.h>
@@ -15,14 +16,18 @@
 #include <sxmc/projection.h>
 #include <sxmc/utils.h>
 
-LikelihoodSpace::LikelihoodSpace(TNtuple* _samples, float cl) {
-  this->samples = _samples;
-  this->ml_params = extract_best_fit(this->ml, cl);
+LikelihoodSpace::LikelihoodSpace(TNtuple* _samples, float _cl,
+                                 ErrorType _error_type)
+    : error_type(_error_type), cl(_cl), samples(_samples) {
+  assert(this->samples);
+
+  // Store the ML parameters and NLL value for these samples
+  this->ml_params = extract_best_fit(this->nll, this->cl, this->error_type);
 }
 
 
 LikelihoodSpace::~LikelihoodSpace() {
-  samples->Delete();
+  delete samples;
 }
 
 
@@ -33,9 +38,10 @@ void LikelihoodSpace::print_best_fit() const {
     if (it->first == "likelihood") {
       continue;
     }
-
     std::cout << " " << it->first << ": " << it->second.str() << std::endl;
   }
+
+  std::cout << " NLL: " << this->nll << std::endl;
 }
 
 
@@ -81,83 +87,23 @@ TH1F* LikelihoodSpace::get_projection(std::string name) {
 
 
 TNtuple* LikelihoodSpace::get_contour(float delta) {
-  TNtuple* contour = (TNtuple*) this->samples->Clone("lscontour");
-  contour->Reset();
+  float lmin = this->samples->GetMinimum("likelihood");
 
-  // Get list of branch names
-  std::vector<std::string> names;
-  for (int i=0; i<this->samples->GetListOfBranches()->GetEntries(); i++) {
-    std::string name = this->samples->GetListOfBranches()->At(i)->GetName();
-    if (name == "likelihood") {
-      continue;
-    }
-    names.push_back(name);
-  }
+  std::ostringstream sel;
+  sel << "likelihood+" << -lmin << "<" << delta;
 
-  float* params_branch = new float[names.size()];
-  for (size_t i=0; i<names.size(); i++) {
-    this->samples->SetBranchAddress(names[i].c_str(), &params_branch[i]);
-  }
+  TNtuple* contour_points = \
+    dynamic_cast<TNtuple*>(this->samples->CopyTree(sel.str().c_str()));
 
-  float ml_branch;
-  this->samples->SetBranchAddress("likelihood", &ml_branch);
+  assert(contour_points && contour_points->GetEntries() > 0);
 
-  // Build a new TNtuple with samples inside the contour
-  float* v = new float[names.size() + 1];
-  for (int i=0; i<this->samples->GetEntries(); i++) {
-    this->samples->GetEntry(i);
-    if (ml_branch < this->ml + delta) {
-      for (size_t j=0; j<names.size(); j++) {
-        v[j] = params_branch[j];
-      }
-      v[names.size()] = ml_branch;
-      contour->Fill(v);
-    }
-  }
-
-  this->samples->ResetBranchAddresses();
-  delete[] v;
-
-  return contour;
+  return contour_points;
 }
 
 
 std::map<std::string, Interval>
-LikelihoodSpace::extract_best_fit(float& ml, float cl, ErrorType error_type) {
-  // Get list of branch names
-  std::vector<std::string> names;
-  for (int i=0; i<this->samples->GetListOfBranches()->GetEntries(); i++) {
-    std::string name = this->samples->GetListOfBranches()->At(i)->GetName();
-    if (name == "likelihood") {
-      continue;
-    }
-    names.push_back(name);
-  }
-
-  // Extract likelihood-maximizing parameters
-  float* params_branch = new float[names.size()];
-  for (size_t j=0; j<names.size(); j++) {
-    this->samples->SetBranchAddress(names[j].c_str(), &params_branch[j]);
-  }
-
-  float ml_branch;
-  this->samples->SetBranchAddress("likelihood", &ml_branch);
-
-  float* params = new float[names.size()];
-  ml = 1e9;
-  for (int j=0; j<this->samples->GetEntries(); j++) {
-    this->samples->GetEntry(j);
-    if (ml_branch < ml) {
-      ml = ml_branch;
-      for (size_t k=0; k<names.size(); k++) {
-        params[k] = params_branch[k];
-      }
-    }
-  }
-
-  this->samples->ResetBranchAddresses();
-
-  // Extract errors
+LikelihoodSpace::extract_best_fit(float& lm, float cl, ErrorType error_type) {
+  // Choose error calculation method
   ErrorEstimator* error = NULL;
   if (error_type == ERROR_PROJECTION) {
     error = new sxmc::errors::Projection(this, cl);
@@ -168,17 +114,24 @@ LikelihoodSpace::extract_best_fit(float& ml, float cl, ErrorType error_type) {
   else {
     std::cerr << "LikelihoodSpace::extract_best_fit: Unknown error type"
               << std::endl;
-    delete[] params;
     throw(5);
   }
 
+  // Extract 1D parameter intervals
   std::map<std::string, Interval> best_fit;
-  for (size_t i=0; i<names.size(); i++) {
-    best_fit[names[i]] = error->get_interval(names[i]);
+
+  std::vector<std::string> names;
+  for (int i=0; i<this->samples->GetListOfBranches()->GetEntries(); i++) {
+    std::string name = this->samples->GetListOfBranches()->At(i)->GetName();
+    if (name == "likelihood") {
+      continue;
+    }
+    best_fit[name] = error->get_interval(name);
   }
 
   delete error;
-  delete[] params;
+
+  lm = this->samples->GetMinimum("likelihood");
 
   return best_fit;
 }

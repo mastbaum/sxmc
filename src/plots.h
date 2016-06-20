@@ -83,10 +83,11 @@ class SpectralPlot {
      * No reference to the input histogram is retained.
      *
      * \param _h The histogram
+     * \param objname Histogram object name ("__" will be prepended)
      * \param title Histogram title to show in the legend
      * \param options Options passed to TH1::Draw
      */
-    void add(TH1* _h, std::string title, std::string options="");
+    void add(TH1* _h, std::string objname, std::string title, std::string options="");
 
     /**
      * Save the plot to a file, with type based on extension.

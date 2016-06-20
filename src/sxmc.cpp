@@ -42,7 +42,7 @@
  * \returns A list of the upper limits
  */
 std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
-  if (fc.plots) {
+  if (fc.plots && fc.samples == "") {
     for (size_t i=0; i<fc.signals.size(); i++) {
       const char* output_file = \
         (output_path + fc.signals[i].name + "_pdf.root").c_str();
@@ -60,9 +60,9 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
     std::cout << "Experiment " << i + 1
               << " / " << fc.nexperiments << std::endl;
 
+    // Make fake data or load a dataset
     std::vector<float> samples;
     if (fc.data.empty()) {
-      // Make fake data
       std::cout << "ensemble: Sampling fake dataset " << i << std::endl;
       samples = \
         make_fake_dataset(fc.signals, fc.systematics, fc.observables, true);
@@ -78,19 +78,24 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
       }
     }
 
-    // Run MCMC
-    MCMC mcmc(fc.sources, fc.signals, fc.systematics, fc.observables);
-    LikelihoodSpace* ls = \
-      mcmc(samples, fc.nsteps, fc.burnin_fraction, fc.debug_mode);
-
-    // Write out samples
-    std::ostringstream lsfile;
-    lsfile << output_path << fc.output_prefix << "_" << i << ".root";
-    TFile f(lsfile.str().c_str(), "recreate");
-    TNtuple* lsclone = dynamic_cast<TNtuple*>(ls->get_samples()->Clone("ls"));
-    lsclone->Write();
-    lsclone->Delete();
-    f.Close();
+    // Run MCMC (or load MCMC samples from a file)
+    TFile* sample_file = NULL;
+    LikelihoodSpace* ls = NULL;
+    if (fc.samples != "") {
+      std::cout << "ensemble: Loading samples from "
+                << fc.samples << std::endl;
+      sample_file = TFile::Open(fc.samples.c_str(),"update");
+      assert(sample_file && sample_file->IsOpen());
+      TNtuple* nt = (TNtuple*) sample_file->Get("ls")->Clone("_ls");
+      assert(nt && nt->GetEntries() > 0);
+      std::cout << "ensemble: Loaded " << nt->GetEntries() << " samples"
+                << std::endl;
+      ls = new LikelihoodSpace(nt, fc.confidence, fc.error_type);
+    }
+    else {
+      MCMC mcmc(fc.sources, fc.signals, fc.systematics, fc.observables);
+      ls = mcmc(samples, fc.nsteps, fc.burnin_fraction, fc.debug_mode);
+    }
 
     ls->print_best_fit();
     ls->print_correlations();
@@ -102,11 +107,10 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
     }
 
     // Build a list of upper limits
-    float ml;
-    std::map<std::string, Interval> best_fit = \
-      ls->extract_best_fit(ml, fc.confidence, ERROR_PROJECTION);
+    std::map<std::string, Interval> best_fit = ls->get_best_fit();
 
-    if (fc.signal_name != "" && best_fit.find(fc.signal_name) != best_fit.end()) {
+    if (fc.signal_name != "" &&
+        best_fit.find(fc.signal_name) != best_fit.end()) {
       Interval bfi = best_fit[fc.signal_name];
       std::cout << "ensemble: Signal "
                 << fc.signal_name << ": " << bfi.str() << std::endl;
@@ -122,6 +126,21 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
       limits.push_back(bfi.upper);
     }
 
+    // Write out samples
+    if (!sample_file) {
+      std::ostringstream lsfile;
+      lsfile << output_path << fc.output_prefix << "_" << i << ".root";
+      TFile f(lsfile.str().c_str(), "recreate");
+      assert(f.IsOpen());
+      TNtuple* lsclone = \
+        dynamic_cast<TNtuple*>(ls->get_samples()->Clone("ls"));
+      assert(lsclone);
+      lsclone->Write();
+      lsclone->Delete();
+      f.Close();
+    }
+
+    delete sample_file;
     delete ls;
   }
 

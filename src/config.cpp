@@ -48,6 +48,20 @@ FitConfig::FitConfig(std::string filename) {
   this->nsteps = fit_params["nsteps"].asInt();
   assert(this->nsteps > 0);
 
+  this->samples = fit_params.get("samples", "").asString();
+  std::string err_type = fit_params.get("error_type", "contour").asString();
+  if (err_type == "projection") {
+    this->error_type = ERROR_PROJECTION;
+  }
+  else if (err_type == "contour") {
+    this->error_type = ERROR_CONTOUR;
+  }
+  else {
+    std::cerr << "FitConfig: Unknown error type \"" << err_type << "\""
+              << std::endl;
+    assert(false);
+  }
+
   this->burnin_fraction = fit_params.get("burnin_fraction", 0.1).asFloat();
   this->debug_mode = fit_params.get("debug_mode", false).asBool();
   this->output_prefix = fit_params.get("output_prefix", "lspace").asString();
@@ -290,6 +304,10 @@ void FitConfig::print() const {
     << "  Burn-in fraction: " << this->burnin_fraction << std::endl
     << "  Random seed (0=random): " << this->seed << std::endl
     << "  Confidence level: " << this->confidence << std::endl;
+
+  if (this->samples != "") {
+    std::cout << "  Samples file: " << this->samples << std::endl;
+  }
 
   std::cout << "Signals:" << std::endl;
   for (std::vector<Signal>::const_iterator it=this->signals.begin();

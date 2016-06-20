@@ -1,9 +1,10 @@
+#include <cassert>
 #include <iostream>
+#include <sstream>
 #include <string>
-#include <TH1F.h>
+#include <TEventList.h>
 #include <TMath.h>
 #include <TNtuple.h>
-#include <TEnv.h>
 #include <TDirectory.h>
 #include <assert.h>
 
@@ -22,7 +23,7 @@ Contour::Contour(LikelihoodSpace* _lspace, float _cl)
 
 
 Contour::~Contour() {
-  contour_points->Delete();
+  delete this->contour_points;
 }
 
 
@@ -30,34 +31,40 @@ Interval Contour::get_interval(std::string name) {
   Interval interval;
   interval.cl = this->cl;
   interval.one_sided = false;
-  interval.point_estimate = 0;
-  interval.coverage = -1;
+  interval.point_estimate = -999;
+  interval.coverage = -999;
 
-  // Plot projection of the requested parameter from the reduced space
-  int default_nbins = 100;
-  gEnv->GetValue("Hist.Binning.1D.x", default_nbins);
-  gEnv->SetValue("Hist.Binning.1D.x", 20000);
-  this->contour_points->Draw((name + ">>_hp").c_str(), "", "goff");
-  gEnv->SetValue("Hist.Binning.1D.x", default_nbins);
-  TH1F* hp = dynamic_cast<TH1F*>(gDirectory->FindObject("_hp"));
+  TNtuple* ls = this->contour_points;
+  assert(ls);
 
-  if (hp) {
-    hp->SetDirectory(NULL);
+  // Get the parameter at maximum-likelihood point
+  float lmin = ls->GetMinimum("likelihood");
+  float dnll = 0.13;
+  long npts = 0;
+  TEventList* el = NULL;
+  do {
+    std::ostringstream sel;
+    sel << "likelihood+" << -lmin << "<" << dnll;
+    ls->Draw(">>_el", sel.str().c_str());
+    el = (TEventList*) gDirectory->Get("_el");
+    assert(el);
+    npts = el->GetN();
+    dnll *= 5;
+  } while (npts < 1);
 
-    // Find extrema
-    int ll_bin = hp->FindFirstBinAbove(0);
-    interval.lower = hp->GetBinLowEdge(ll_bin);
+  ls->SetEventList(el);
+  interval.point_estimate = (ls->GetMinimum(name.c_str()) +
+                             ls->GetMaximum(name.c_str())) / 2;
 
-    int ul_bin = hp->FindLastBinAbove(0);
-    interval.upper = hp->GetBinLowEdge(ul_bin) +
-                     hp->GetBinWidth(ul_bin);
-  }
-  else {
-    std::cerr << "Contour::get_interval: Error getting projection"
-              << std::endl;
-  }
+  ls->SetEventList(NULL);
+  delete el;
 
-  delete hp;
+  // Get the parameter extents within the contour
+  interval.lower = ls->GetMinimum(name.c_str());
+  interval.upper = ls->GetMaximum(name.c_str());
+
+  ls->SetEventList(NULL);
+
   return interval;
 }
 
