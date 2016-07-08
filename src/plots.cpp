@@ -8,6 +8,7 @@
 #include <vector>
 #include <TCanvas.h>
 #include <TColor.h>
+#include <TFile.h>
 #include <TH1.h>
 #include <TH1F.h>
 #include <TH2F.h>
@@ -157,6 +158,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
               std::string output_path) {
   std::map<unsigned, std::vector<SpectralPlot> > all_plots;
   std::map<unsigned, std::vector<TH1F*> > all_totals;
+  std::map<unsigned, TH1*> all_totals_nd;
 
   for (std::set<unsigned>::iterator it=datasets.begin();
        it!=datasets.end(); ++it) {
@@ -179,6 +181,11 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
     all_plots[dataset] = plots;
     all_totals[dataset] = totals;
   }
+
+  // Write best-fit histograms to a file
+  std::ostringstream pdf_output_path;
+  pdf_output_path << output_path << "fit_pdfs.root";
+  TFile fpdfs(pdf_output_path.str().c_str(), "recreate");
 
   // Extract best-fit parameter values
   std::cout << "plot_fit: Best fit" << std::endl;
@@ -242,7 +249,7 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
     else {
       std::cerr << "SpectralPlot::plot_fit: Can't create projection in >3 "
                 << "observable dimensions." << std::endl;
-      assert(false);
+      assert(false);  
     }
 
     unsigned ds = signals[i].dataset;
@@ -251,6 +258,15 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
     unsigned ii = i % ns;
     int color = colors[ii % ncolors];
     int style = styles[ii % ncolors];
+
+    if (all_totals_nd[ds] == NULL) {
+      std::ostringstream ss;
+      ss << "htotal_" << ds;
+      all_totals_nd[ds] = (TH1*) hpdf_nd->Clone(ss.str().c_str());
+    }
+    else {
+      all_totals_nd[ds]->Add(hpdf_nd);
+    }
 
     for (size_t j=0; j<observables.size(); j++) {
       hpdf[j]->SetLineColor(color);
@@ -297,7 +313,11 @@ void plot_fit(std::map<std::string, Interval> best_fit, float live_time,
       std::ostringstream output;
       output << output_path << observables[i].name << "_" << ds;
       all_plots[ds][i].save(output.str());
+
+      all_totals_nd[ds]->Write();
     }
   }
+
+  fpdfs.Close();
 }
 

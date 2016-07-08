@@ -93,7 +93,7 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
       assert(nt && nt->GetEntries() > 0);
       std::cout << "ensemble: Loaded " << nt->GetEntries() << " samples"
                 << std::endl;
-      ls = new LikelihoodSpace(nt, fc.confidence, fc.error_type);
+      ls = new LikelihoodSpace(nt, fc.confidence, fc.error_type, false);
     }
     else {
       MCMC mcmc(fc.sources, fc.signals, fc.systematics, fc.observables);
@@ -104,8 +104,8 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
     ls->print_correlations();
 
     // Run tests
-    sxmc::tests::Drift drift(2);
-    drift(ls);
+    //sxmc::tests::Drift drift(2);
+    //drift(ls);
 
     sxmc::tests::Chi2 chi2(fc.sources, fc.signals, fc.systematics,
                            fc.observables, fc.datasets, samples);

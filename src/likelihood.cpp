@@ -17,8 +17,9 @@
 #include <sxmc/utils.h>
 
 LikelihoodSpace::LikelihoodSpace(TNtuple* _samples, float _cl,
-                                 ErrorType _error_type)
-    : error_type(_error_type), cl(_cl), samples(_samples) {
+                                 ErrorType _error_type, bool _own_samples)
+    : error_type(_error_type), cl(_cl), samples(_samples),
+      own_samples(_own_samples) {
   assert(this->samples);
 
   // Store the ML parameters and NLL value for these samples
@@ -27,7 +28,9 @@ LikelihoodSpace::LikelihoodSpace(TNtuple* _samples, float _cl,
 
 
 LikelihoodSpace::~LikelihoodSpace() {
-  delete samples;
+  if (own_samples) {
+    delete samples;
+  }
 }
 
 

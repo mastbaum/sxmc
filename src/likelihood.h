@@ -34,7 +34,8 @@ class LikelihoodSpace {
      * \param _error_type - Type of calculation for intervals
     */
     LikelihoodSpace(TNtuple* samples, float _cl=0.683,
-                    ErrorType _error_type=ERROR_CONTOUR);
+                    ErrorType _error_type=ERROR_CONTOUR,
+                    bool _own_samples=true);
 
     /** Destructor. */
     virtual ~LikelihoodSpace();
@@ -97,6 +98,7 @@ class LikelihoodSpace {
     float nll;  //!< The maximum likelihood (negative for NLL)
     float cl;  //!< Confidence level for intervals
     TNtuple* samples;  //!< Samples of the likelihood function
+    bool own_samples;  //!< We own the samples object
 };
 
 #endif  // __LIKELIHOOD_H__

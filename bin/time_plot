@@ -9,25 +9,93 @@ import sys
 import math
 import ROOT
 
-ROOT.gROOT.SetBatch(True)
+#ROOT.gROOT.SetBatch(True)
+
+nm = {
+    'atm_nu': 'Atm. #nu',
+    'b8': '^{8}B flux',
+    'hep': 'hep flux',
+    'nc_d2o': 'Neutrons I',
+    'nc_ncd': 'Neutrons III',
+    'nc_salt': 'Neutrons II',
+    'energy_scale_d2o_0': '#Delta_{S}^{(0)} I',
+    'energy_scale_d2o_1': '#Delta_{S}^{(1)} I',
+    'energy_resolution_d2o_0': '#Delta_{R} I',
+    'energy_scale_ncd_0': '#Delta_{S}^{(0)} III',
+    'energy_scale_ncd_1': '#Delta_{S}^{(1)} III',
+    'energy_resolution_ncd_0': '#Delta_{R} III',
+    'energy_scale_salt_0': '#Delta_{S}^{(0)} II',
+    'energy_scale_salt_1': '#Delta_{S}^{(1)} II',
+    'energy_resolution_salt_0': '#Delta_{R} II',
+    'ctsun_resolution_d2o_0': '#Delta_{#theta} I',
+    'ctsun_resolution_ncd_0': '#Delta_{#theta} III',
+    'ctsun_resolution_salt_0': '#Delta_{#theta} II',
+    'likelihood': 'NLL',
+}
+
+names = (
+    'b8',
+    'hep',
+    'atm_nu',
+    'nc_d2o',
+    'nc_ncd',
+    'nc_salt',
+    'energy_scale_d2o_0',
+    'energy_scale_salt_0',
+    'energy_scale_ncd_0',
+    'energy_scale_d2o_1',
+    'energy_scale_salt_1',
+    'energy_scale_ncd_1',
+    'energy_resolution_d2o_0',
+    'energy_resolution_salt_0',
+    'energy_resolution_ncd_0',
+    'ctsun_resolution_d2o_0',
+    'ctsun_resolution_salt_0',
+    'ctsun_resolution_ncd_0',
+)
+
 
 if __name__ == '__main__':
     f = ROOT.TFile(sys.argv[1])
     ls = f.Get('ls')
 
-    names = [branch.GetName() for branch in ls.GetListOfBranches()]
+    ROOT.gStyle.SetOptStat(0)
+
+    #names = [branch.GetName() for branch in ls.GetListOfBranches()]
     print names
+    print len(names)
 
-    panes_y = int(math.sqrt(len(names))+1)
-    panes_x = int(math.ceil(math.sqrt(len(names))))
+    names = filter(lambda x: x != 'likelihood', names)
 
-    c = ROOT.TCanvas()
-    c.Divide(panes_x, panes_y)
+    panes_x = 3
+    panes_y = int(len(names)/panes_x)
+
+    c = ROOT.TCanvas('c1','',600,700)
+    c.Divide(panes_x, panes_y, 0.005, 0.005)
 
     for i in range(len(names)):
         c.cd(i + 1)
-        ls.Draw(names[i] + ':Entry$', '', 'col')
+        ROOT.gPad.SetTopMargin(0.06)
+        ROOT.gPad.SetLeftMargin(0.25)
+        ROOT.gPad.SetBottomMargin(0.27)
+        #ROOT.gPad.SetFillStyle(1)
+        #ROOT.gPad.SetFillColor(ROOT.kRed)
+        ls.Draw(names[i] + ':Entry$>>h_' + names[i], '', 'col')
+        h = ROOT.gDirectory.Get('h_'+names[i])
+        h.SetTitle(';MCMC Step;' + nm[names[i]])
+        h.GetXaxis().SetLabelOffset(0.04)
+        h.GetYaxis().SetTitleOffset(0.9)
+        h.GetYaxis().SetTitleSize(0.13)
+        h.GetXaxis().SetTitleSize(0.12)
+        h.GetYaxis().SetLabelSize(0.11)
+        h.GetXaxis().SetLabelSize(0.11)
+        h.GetYaxis().SetNdivisions(505)
+        h.GetXaxis().SetNdivisions(505)
+        h.GetXaxis().SetRangeUser(0, ls.GetEntries())
+        
 
+    raw_input()
     c.Update()
     c.SaveAs('params_vs_t.pdf')
+    c.SaveAs('params_vs_t.tex')
 

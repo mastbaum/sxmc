@@ -126,7 +126,7 @@ TestResult Chi2::operator()(const LikelihoodSpace* ls) {
       assert(false);
     }
     
-    double chi2ndf = hdata->Chi2Test(total, "UW CHI2/NDF");
+    double chi2ndf = hdata->Chi2Test(total, "UW CHI2/NDF P");
 
     std::cout << "tests::Chi2: Dataset " << ds << ": "
               << "Chi2/ndf = " << chi2ndf << std::endl;
