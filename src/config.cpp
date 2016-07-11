@@ -66,6 +66,7 @@ FitConfig::FitConfig(std::string filename) {
   this->debug_mode = fit_params.get("debug_mode", false).asBool();
   this->output_prefix = fit_params.get("output_prefix", "lspace").asString();
   this->plots = fit_params.get("plots", true).asBool();
+  this->sensitivity = fit_params.get("sensitivity", false).asBool();
   this->seed = fit_params.get("seed", 0).asInt64();
   this->confidence = fit_params.get("confidence", 0.683).asFloat();
 

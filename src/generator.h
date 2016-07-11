@@ -38,7 +38,7 @@ std::vector<float>
 make_fake_dataset(std::vector<Signal>& signals,
                   std::vector<Systematic>& systematics,
                   std::vector<Observable>& observables,
-                  bool poisson=true);
+                  bool poisson=true, std::string signal="");
 
 #endif  // __GENERATOR_H__
 

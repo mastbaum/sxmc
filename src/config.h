@@ -45,6 +45,7 @@ public:
   float burnin_fraction;  //!< Fraction of steps to use for burn-in period
   bool debug_mode;  //!< Enable/disable debugging mode (accept/save all)
   bool plots;  //!< Write out fit plots and PDF root files
+  bool sensitivity;  //!< Sensitivity mode, no signal in fake data
   long seed;  //!< RNG seed
   std::string signal_name;  //!< Name of the signal of interest (if any)
   std::string output_prefix;  //!< Prefix for output ROOT file name

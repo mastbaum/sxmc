@@ -10,7 +10,8 @@ std::vector<float>
 make_fake_dataset(std::vector<Signal>& signals,
                   std::vector<Systematic>& systematics,
                   std::vector<Observable>& observables,
-                  bool poisson) {
+                  bool poisson,
+                  std::string signal) {
   std::cout << "make_fake_dataset: Generating dataset..." << std::endl;
 
   std::vector<double> syst_vals;
@@ -30,6 +31,13 @@ make_fake_dataset(std::vector<Signal>& signals,
   std::vector<float> events;
   std::vector<unsigned> observed(signals.size());
   for (size_t i=0; i<signals.size(); i++) {
+    // Skip the named signal
+    if (signals[i].name.find(signal) != std::string::npos) {
+      std::cout << "make_fake_dataset: Skipping signal "
+                << signal << std::endl;
+      continue;
+    }
+
     double eff = signals[i].get_efficiency(systematics);
     double nevents = signals[i].nexpected * eff;
 

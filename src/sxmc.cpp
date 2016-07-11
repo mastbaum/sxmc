@@ -68,7 +68,8 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
     if (fc.data.empty()) {
       std::cout << "ensemble: Sampling fake dataset " << i << std::endl;
       samples = \
-        make_fake_dataset(fc.signals, fc.systematics, fc.observables, true);
+        make_fake_dataset(fc.signals, fc.systematics, fc.observables, true,
+                          (fc.sensitivity ? fc.signal_name : ""));
     }
     else {
       for (std::map<unsigned, std::vector<Signal> >::iterator it=fc.data.begin();
