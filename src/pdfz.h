@@ -91,10 +91,14 @@ namespace pdfz {
  * \brief Generic PDF-related exception
 */
 struct Error {
+  /**
+   * Constructor.
+   *
+   * \param _msg - The exception message
+  */
   Error(const std::string &_msg) { msg = _msg; }
 
-  /** Cause of exception */
-  std::string msg;
+  std::string msg;  //!< Cause of the exception
 };
 
 
@@ -103,6 +107,7 @@ struct Error {
  * \brief Base struct used to describe a systematic uncertainty
 */
 struct Systematic {
+  /** Identifiers for specifying the kind of systematic. */
   enum Type {
     SHIFT,
     SCALE,
@@ -110,13 +115,22 @@ struct Systematic {
     CTSCALE
   };
 
-  Type type;
+  Type type;  //!< Type of the systematic
 
-  Systematic(Type _type) : type(_type) { }
+  /**
+   * Constructor.
+   *
+   * \param _type - The kind of systematic (as a Systematic::Type)
+  */
+  Systematic(Type _type) : type(_type) {}
 
-  // Needed to make this a polymorphic type for dynamic_cast
-  // in Eval::AddSystmatic
-  virtual ~Systematic() { }
+  /**
+   * Destructor.
+   *
+   * (Needed to make this a polymorphic type for dynamic_cast
+   * in Eval::AddSystmatic).
+  */
+  virtual ~Systematic() {}
 };
 
 
@@ -129,11 +143,17 @@ struct Systematic {
  *   where p = sum(p_i * x^i)
 */
 struct ShiftSystematic : public Systematic {
+  /**
+   * Constructor
+   *
+   * \param _obs - Index of the observable field to affect
+   * \param _pars - Array of field indices for the parameters
+  */
   ShiftSystematic(int _obs, hemi::Array<short>* _pars)
     : Systematic(SHIFT), obs(_obs), pars(_pars) {}
 
-  int obs;  // Index of observable
-  hemi::Array<short>* pars;  // Parameters
+  int obs;  //!< Index of observable
+  hemi::Array<short>* pars;  //!< Parameters
 };
 
 
@@ -146,11 +166,17 @@ struct ShiftSystematic : public Systematic {
  *   where p = sum(p_i * x^i)
 */
 struct ScaleSystematic : public Systematic {
+  /**
+   * Constructor
+   *
+   * \param _obs - Index of the observable field to affect
+   * \param _pars - Array of field indices for the parameters
+  */
   ScaleSystematic(int _obs, hemi::Array<short>* _pars)
     : Systematic(SCALE), obs(_obs), pars(_pars) {}
 
-  int obs;  // Index of observable
-  hemi::Array<short>* pars;  // Parameters
+  int obs;  //!< Index of observable
+  hemi::Array<short>* pars;  //!< Parameters
 };
 
 
@@ -166,11 +192,17 @@ struct ScaleSystematic : public Systematic {
  * If x' is outside [-1,1], it is given a random value within.
 */
 struct CosThetaScaleSystematic : public Systematic {
+  /**
+   * Constructor
+   *
+   * \param _obs - Index of the observable field to affect
+   * \param _pars - Array of field indices for the parameters
+  */
   CosThetaScaleSystematic(int _obs, hemi::Array<short>* _pars)
     : Systematic(CTSCALE), obs(_obs), pars(_pars) {}
 
-  int obs;  // Index of observable
-  hemi::Array<short>* pars;  // Parameters
+  int obs;  //!< Index of observable
+  hemi::Array<short>* pars;  //!< Parameters
 };
 
 
@@ -184,13 +216,20 @@ struct CosThetaScaleSystematic : public Systematic {
  *   where p = sum(p_i * x^i)
 */
 struct ResolutionScaleSystematic : public Systematic {
+  /**
+   * Constructor
+   *
+   * \param _obs - Index of the observable field to affect
+   * \param _true_obs - Index of the truth field to affect
+   * \param _pars - Array of field indices for the parameters
+  */
   ResolutionScaleSystematic(int _obs, int _true_obs, hemi::Array<short>* _pars)
     : Systematic(RESOLUTION_SCALE), obs(_obs), true_obs(_true_obs),
       pars(_pars) {}
 
-  int obs;  // Index of observable
-  int true_obs;  // Index of "true" observable
-  hemi::Array<short>* pars;  // Parameters
+  int obs;  //!< Index of observable
+  int true_obs;  //!< Index of "true" observable
+  hemi::Array<short>* pars;  //!< Parameters
 };
 
 
@@ -218,11 +257,21 @@ public:
    *
    * Raises pdfz::Error if samples.size() is not divisible by nfields, if
    * nobservables > nfields, or if nobservables == 0. 
+   *
+   * \param samples - The array of data samples
+   * \param nfields - Number of fields (columns) in the sample array
+   * \param nobservables - Number of observable fields
+   * \param lower - Array of lower bounds for observables
+   * \param upper - Array of upper bounds for observables
+   * \param dataset - Dataset index for this PDF data
   */
   Eval(const std::vector<float> &samples, int nfields, int nobservables,
        const std::vector<double> &lower, const std::vector<double> &upper,
        unsigned dataset=0);
 
+  /**
+   * Destructor.
+  */
   virtual ~Eval();
 
   /**
@@ -232,6 +281,8 @@ public:
    * (x1,y1,x2,y2,etc), where each row is this->GetNobs() in length.
    * This method does non-trivial calculation, so it should not be
    * called in performance-critical loops.
+   *
+   * \param points - Array of points at which to evaluate the PDF
   */
   virtual void SetEvalPoints(const std::vector<float>& points) = 0;
 
@@ -245,6 +296,10 @@ public:
    *
    * At evaulation time, the PDF evaluated at t_i will be written to:
    *     output[offset + i * stride]
+   *
+   * \param output - Array where PDF evaluation output is written
+   * \param offset - Offset in the output array
+   * \param stride - Stride for the output array writing
    */
   virtual void SetPDFValueBuffer(hemi::Array<float>* output,
                                  int offset=0, int stride=1);
@@ -262,6 +317,9 @@ public:
    * 
    * At evaulation time, the normalization will be written to:
    *     norm[offset]
+   *
+   * \param norm - Array where PDF normalization is written
+   * \param offset - Offset in output array
   */
   virtual void SetNormalizationBuffer(hemi::Array<unsigned int>* norm,
                                       int offset=0);
@@ -271,11 +329,19 @@ public:
    *
    * At evaluation time, the systematic parameter j will be read from:
    *     params[offset + j * stride]
+   *
+   * \param params - Buffer containing systematic parameters
+   * \param offset - Offset in the parameter buffer
+   * \param stride - Stride for the parameter buffer reading
   */
   virtual void SetParameterBuffer(hemi::Array<double>* params,
                                   int offset=0, int stride=1);
 
-  /** Add a systematic transformation to this PDF */
+  /**
+   * Add a systematic transformation to this PDF
+   *
+   * \param syst - Systematic to add
+  */
   virtual void AddSystematic(const Systematic& syst);
 
   /**
@@ -289,6 +355,8 @@ public:
    * evaluation completes. The output and normalization arrays should not
    * be read, and the parameter buffer should not be written to until
    * EvalFinished() is called.
+   *
+   * \param do_eval_pdf - Enable/disable the actual evaluation of the PDF
   */
   virtual void EvalAsync(bool do_eval_pdf=true) = 0;
 
@@ -302,28 +370,28 @@ public:
   virtual void EvalFinished() = 0;
 
 protected:
-    int nfields;
-    int nobservables;
+    int nfields;  //!< Total number of fields in the sample array
+    int nobservables;  //!< Observable fields in the sample array
 
-    hemi::Array<double> lower;
-    hemi::Array<double> upper;
+    hemi::Array<double> lower;  //!< Lower bounds for observables
+    hemi::Array<double> upper;  //!< Upper bounds for observables
 
-    unsigned dataset;
+    unsigned dataset;  //!< Dataset ID for this PDF
 
-    hemi::Array<float>* pdf_buffer;
-    int pdf_offset;
-    int pdf_stride;
+    hemi::Array<float>* pdf_buffer;  //!< Buffer for writing PDF values
+    int pdf_offset;  //!< Offset in PDF value buffer
+    int pdf_stride;  //!< Stride for PDF value buffer
 
-    hemi::Array<unsigned int>* norm_buffer;
-    int norm_offset;
+    hemi::Array<unsigned int>* norm_buffer;  //!< Buffer for writing PDF norms
+    int norm_offset;  //!< Offset in normalization buffer
 
-    hemi::Array<double>* param_buffer;
-    int param_offset;
-    int param_stride;
+    hemi::Array<double>* param_buffer;  //!< Buffer for reading systematic pars
+    int param_offset;  //!< Offset in parameter buffer
+    int param_stride;  //!< Stride for parameter buffer
 
-    hemi::Array<SystematicDescriptor>* syst;
+    hemi::Array<SystematicDescriptor>* syst;  //!< Systematics for this PDF
 
-    CudaState* cuda_state;
+    CudaState* cuda_state;  //!< Random number generator state
 };
 
 
@@ -334,7 +402,7 @@ protected:
 class EvalHist : public Eval {
 public:
   /**
-   * See Eval::Eval() for description of parameters.  
+   * Constructor.
    *
    * ``nbins`` gives the number of histogram bins for each observable
    * dimension.
@@ -344,6 +412,15 @@ public:
    *
    * If optimize is set to true (default), then the CUDA block
    * configuration will be optimized the first time EvalAsync() is called.
+   *
+   * \param samples - The array of data samples
+   * \param nfields - Number of fields (columns) in the sample array
+   * \param nobservables - Number of observable fields
+   * \param lower - Array of lower bounds for observables
+   * \param upper - Array of upper bounds for observables
+   * \param nbins - Number of bins for each observable
+   * \param dataset - Dataset index for this PDF data
+   * \param optimize - Discover the optimimum GPU launch configuration
   */
   EvalHist(const std::vector<float>& samples,
            int nfields, int nobservables,
@@ -351,8 +428,20 @@ public:
            const std::vector<int>& nbins, unsigned dataset=0,
            bool optimize=true);
 
+  /** Destructor. */
   virtual ~EvalHist();
 
+  
+  /**
+   * Set the points where the PDF will be evaluated.
+   *
+   * ``points`` is a flattened 2D array in row-major order
+   * (x1,y1,x2,y2,etc), where each row is this->GetNobs() in length.
+   * This method does non-trivial calculation, so it should not be
+   * called in performance-critical loops.
+   *
+   * \param points - Array of points at which to evaluate the PDF
+  */
   virtual void SetEvalPoints(const std::vector<float>& points);
 
   /** 
@@ -364,6 +453,8 @@ public:
   /**
    * Dump a 1D projection of the current PDF contents (as of the last
    * EvalAsync/Finished call) into a new TH1D object and return it.
+   *
+   * \param observable_index - Make the 1D projection for this observable
   */
   virtual TH1D* CreateHistogramProjection(int observable_index);
 
@@ -375,20 +466,66 @@ public:
   /** Brute force tests a bunch of CUDA configurations to find the best one */
   virtual void Optimize();
 
+  /** Find the best CUDA configuration for binning. */
   virtual void OptimizeBin();
 
+  /** Find the best CUDA configuration for evaluation. */
   virtual void OptimizeEval();
 
+  /**
+   * Launch evaluation of the PDF at all the points given in the last call to
+   * SetEvalPoints() using the systematic parameters read from the
+   * parameter buffer specified in SetParameterBuffer().
+   *
+   * PDF values are written to the output array given in SetOutputBuffer().
+   * 
+   * Note that on systems with GPUs, this function returns before the
+   * evaluation completes. The output and normalization arrays should not
+   * be read, and the parameter buffer should not be written to until
+   * EvalFinished() is called.
+   *
+   * \param do_eval_pdf - Enable/disable the actual evaluation of the PDF
+  */
   virtual void EvalAsync(bool do_eval_pdf=true);
 
+  /**
+   * Wait until the evaluation launched in EvalAsync() has completed.
+   *
+   * Once this function returns, the output and normalization arrays will be
+   * set and can be read, and the parameter buffer can be written to without
+   * creating a race condition.
+  */
   virtual void EvalFinished();
 
+  /**
+   * Draw random samples from the PDF (requires dimension <= 3)
+   *
+   * \param events - Buffer to write sampled events to
+   * \param nexpected - Number of events expected
+   * \param syst_vals - Values for systematic parameters
+   * \param uppers - Upper limits on observables
+   * \param lowers - Lower limits on observables
+   * \param poisson - Poisson-fluctuate the expectation value
+   * \param dataset - Dataset ID tag for the sampled events
+   * \returns The number of events sampled
+  */
   int RandomSample(std::vector<float> &events, double nexpected,
                    std::vector<double> &syst_vals,
                    std::vector<float> &uppers,
                    std::vector<float> &lowers, bool poisson=false,
                    unsigned dataset=0);
 
+  /**
+   * Draw random samples from the PDF (requires dimension <= 3)
+   *
+   * Systematics are set to zero, and no upper and lower bounds on observables.
+   *
+   * \param events - Buffer to write sampled events to
+   * \param nexpected - Number of events expected
+   * \param poisson - Poisson-fluctuate the expectation value
+   * \param dataset - Dataset ID tag for the sampled events
+   * \returns The number of events sampled
+  */
   int RandomSample(std::vector<float> &events, double nexpected,
                    bool poisson=false, unsigned dataset=0) {
     std::vector<double> syst_vals(syst->size(), 0);
@@ -399,6 +536,8 @@ public:
 
   /**
    * Copy out the samples array (for observable fields only) into a vector.
+   *
+   * \param sv - The destination vector for the samples
   */
   void GetSamples(std::vector<float>& sv) {
     size_t oldsize = sv.size();
@@ -417,21 +556,21 @@ public:
   }
 
 protected:
-    hemi::Array<float> samples;
-    hemi::Array<int>* read_bins;
-    hemi::Array<int> nbins;
-    hemi::Array<int> bin_stride;
-    hemi::Array<unsigned int>* bins;
+    hemi::Array<float> samples;  //!< The array of data samples
+    hemi::Array<int>* read_bins;  //!< Bins to read for evaluation points
+    hemi::Array<int> nbins;  //!< Number of bins
+    hemi::Array<int> bin_stride;  //!< Bin stride
+    hemi::Array<unsigned int>* bins;  //!< PDF bin contents
 
-    int total_nbins;
-    double bin_volume;
+    int total_nbins;  //!< Total number of bins
+    double bin_volume;  //!< Volume of each bin
 
-    int bin_nthreads_per_block;
-    int bin_nblocks;
-    int eval_nthreads_per_block;
-    int eval_nblocks;
+    int bin_nthreads_per_block;  //!< Number of CUDA threads/block for binning
+    int bin_nblocks;  //!< Number of CUDA blocks for binning
+    int eval_nthreads_per_block;  //!< Number of CUDA threads/block for eval
+    int eval_nblocks;  //!< Number of CUDA blocks for evaluation
 
-    bool needs_optimization;
+    bool needs_optimization;  //!< True if we require CUDA config optimization
 };
 
 
@@ -449,14 +588,39 @@ protected:
  * bandwidth_scale.size() != nobs.
 */
 class EvalKernel : public Eval {
+  /**
+   * Constructor.
+   *
+   * \param samples - The array of data samples
+   * \param nfields - Number of fields (columns) in the sample array
+   * \param nobservables - Number of observable fields
+   * \param lower - Array of lower bounds for observables
+   * \param upper - Array of upper bounds for observables
+   * \param bandwidth_scale - Scale factor for kernel bandwidths
+  */
   EvalKernel(const std::vector<float>& samples, int nfields, int nobservables,
              const std::vector<double>& lower,
              const std::vector<double>& upper,
              const std::vector<double>& bandwidth_scale);
 
+  /** Destructor. */
   virtual ~EvalKernel();
+
+  /**
+   * Set points at which to evaluate.
+   *
+   * \param points - Array of points
+  */
   virtual void SetEvalPoints(const std::vector<float>& points);
+
+  /**
+   * Perform parallel evaluation.
+   *
+   * \param do_eval_pdf - Actually perform evaluation (of just build)
+  */
   virtual void EvalAsync(bool do_eval_pdf=true);
+
+  /** Finish parallel evaluation (block). */
   virtual void EvalFinished();
 };
 

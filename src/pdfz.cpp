@@ -32,18 +32,25 @@ void resize_array(hemi::Array<T> &array, const size_t n) {
 }
 
 
-// Hidden CUDA state for evaluator.  Not visible to Eval class users.
+/**
+ * \struct CudaState
+ * \brief Hidden CUDA state for evaluator. Not visible to Eval class users.
+*/
 struct CudaState {
-  cudaStream_t stream;
+  cudaStream_t stream;  //!< The CUDA stream
 };
 
 
+/**
+ * \struct SystematicDescriptor
+ * \brief A compact description of a systematic parameter affecting a PDF
+*/
 struct SystematicDescriptor {
-  short type;
-  short obs;
-  short extra_field;
-  short npars;
-  short* pars;
+  short type;  //!< Type of the systematic
+  short obs;  //!< Observable field index
+  short extra_field;  //!< Extra (e.g. truth) field index, if required
+  short npars;  //!< Number of parameters
+  short* pars;  //!< Indices of parameters
 };
 
 

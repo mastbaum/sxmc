@@ -28,8 +28,8 @@ class ErrorEstimator {
     /**
      * Constructor.
      *
-     * \param lspace The likelihood space
-     * \param cl Confidence level
+     * \param _lspace The likelihood space
+     * \param _cl Confidence level
     */
     ErrorEstimator(LikelihoodSpace* _lspace, float _cl=0.682)
         : lspace(_lspace), cl(_cl) {}

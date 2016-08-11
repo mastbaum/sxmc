@@ -50,7 +50,6 @@ std::vector<float> get_correlation_matrix(TNtuple* nt);
  *
  * \param v The vector
  * \param o The object to locate
- # \tparam T The types contained in the vector v
  * \return The index of the object
 */
 template <typename T>

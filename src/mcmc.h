@@ -43,6 +43,7 @@ public:
   /**
    * Constructor
    *
+   * \param sources List of Sources defining the signal rates
    * \param signals List of Signals defining the PDFs and expectations
    * \param systematics List of systematic parameter definitions
    * \param observables List of observables in the data
@@ -63,7 +64,6 @@ public:
    * Perform walk.
    *
    * \param data Array of samples representing data to fit
-   * \param weights Array of weights for data samples
    * \param nsteps Number of random-walk steps to take
    * \param burnin_fraction Fraction of initial steps to throw out
    * \param debug_mode If true, accept and save all steps
@@ -91,11 +91,17 @@ protected:
    *   2. Total up partial sums from step 1
    *   3. Add normalization and other constraints with sum from step 2
    *
-   * \param v Parameter vector at which to evaluate
-   * \param nll Container for output NLL value
-   * \param event_partial_sums Pre-allocated buffer for event term
-   *                           calculation
-   * \param event_total_sum Pre-allocated buffer for event term total
+   * \param lut - PDF value lookup table (nevents x nsignals)
+   * \param nevents - Number of events
+   * \param v - Parameter vector at which to evaluate
+   * \param nll - Container for output NLL value
+   * \param nexpected - Number of events expected for each signal
+   * \param n_mc - Number of MC events for each signal
+   * \param source_id - Index in the Source array for each signal rate
+   * \param norms - Normalizations for each signal
+   * \param event_partial_sums - Pre-allocated buffer for event term
+   *                             calculation
+   * \param event_total_sum - Pre-allocated buffer for event term total
    */
   void nll(const float* lut, size_t nevents,
            const double* v, double* nll,

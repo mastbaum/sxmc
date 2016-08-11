@@ -77,7 +77,7 @@ class LikelihoodSpace {
      * Extract the best-fit parameters and uncertainties.
      *
      * \param[out] ml The likelihood at the maximum (negative for NLL)
-     * \parm cl - Confidence level for the error estimate
+     * \param cl - Confidence level for the error estimate
      * \param error_type Type of uncertainty calculation to use
      * \returns A map from parameter names to Intervals
     */

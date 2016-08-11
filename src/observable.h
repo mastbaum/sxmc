@@ -1,6 +1,12 @@
 #ifndef __OBSERVABLE_H__
 #define __OBSERVABLE_H__
 
+/**
+ * \file observable.h
+ *
+ * Fit observables.
+*/
+
 #include <string>
 #include <vector>
 
@@ -14,11 +20,13 @@ namespace Json {
  * A container for observable metadata
 */
 struct Observable {
+  /** Constructor */
   Observable() {}
 
-  // Load from JSON configuration
+  /** Load from JSON configuration */
   Observable(const std::string _name, const Json::Value& config);
 
+  /** Print the observable configuration */
   void print() const;
 
   std::string name;  //!< Name of the observable

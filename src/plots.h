@@ -21,9 +21,13 @@ class TLegend;
 class TNtuple;
 class TH1;
 
-/** A ROOT color palette in which sequential colors look okay. */
+/** Color palette: Number of colors. */
 extern const int ncolors;
+
+/** Color palette: Colors. */
 extern const int colors[6];
+
+/** Color palette: Plot styles. */
 extern const int styles[6];
 
 
@@ -32,9 +36,11 @@ extern const int styles[6];
  *
  * \param best_fit The best-fit point, used for normalizations
  * \param live_time Live time in y, used for display only
+ * \param sources List of Sources defining the signal rates
  * \param signals List of Signals, used for PDFs
  * \param systematics List of Systematics, used for names
  * \param observables List of Observables; 1D plots are created for each
+ * \param datasets List of the dataset IDs
  * \param data Observed data set
  * \param output_path Directory to write plots to
  */
