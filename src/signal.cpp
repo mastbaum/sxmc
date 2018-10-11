@@ -7,6 +7,7 @@
 #include <sxmc/signal.h>
 #include <sxmc/pdfz.h>
 #include <sxmc/ttree_io.h>
+#include <sxmc/osctable.h>
 
 Signal::Signal(std::string _name, std::string _title,
                std::string _filename, unsigned _dataset,
@@ -159,6 +160,27 @@ void Signal::build_pdfz(std::vector<float> &samples, int nfields,
     else if (syst->type == pdfz::Systematic::RESOLUTION_SCALE) {
       this->histogram->AddSystematic(
         pdfz::ResolutionScaleSystematic(o_field, t_field, pars));
+    }
+    else if (syst->type == pdfz::Systematic::OSCILLATION) {
+      std::string lut_field = syst->osc_lut;
+
+      // Load the Oscillation look up table if needed.
+      std::vector<double> lut_pee;
+      lut_pee.clear();
+      std::vector<double> lut_pars;
+      lut_pars.clear();
+      if (lut_field != "") {
+	std::size_t isHep = (this->name).find("hep");
+	std::size_t isB8 = (this->name).find("b8");
+	if (isHep != std::string::npos)
+	  OscTable(lut_field, "hep", lut_pee, lut_pars);
+	else if (isB8 != std::string::npos)
+	  OscTable(lut_field, "b8", lut_pee, lut_pars);
+	else
+	  std::cerr << "Not an applicable signal for oscillation: " << this->name << std::endl;
+      }
+      this->histogram->AddSystematic(
+       pdfz::OscillationSystematic(o_field, pars, lut_field), lut_pee, lut_pars);
     }
     else {
       std::cerr << "Signal::build_pdfz: Unknown systematic ID "

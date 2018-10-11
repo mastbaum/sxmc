@@ -32,6 +32,11 @@ Systematic::Systematic(const std::string _name, const Json::Value& config)
     assert(config.isMember("truth_field"));
     this->truth_field = config["truth_field"].asString();
   }
+  else if (type_string == "oscillation") {
+    this->type = pdfz::Systematic::OSCILLATION;
+    assert(config.isMember("osc_lut"));
+    this->osc_lut = config["osc_lut"].asString();
+  }
   else {
     std::cerr << "FitConfig::load_pdf_systematics: Unknown systematic type "
               << type_string << std::endl;

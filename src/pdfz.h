@@ -79,10 +79,29 @@
 #include <vector>
 #include <TH1.h>
 
+
+#include <cuda.h>
+#include <hemi/hemi.h>
+
+#ifdef __CUDACC__
+#include <curand_kernel.h>
+#endif
+
 #ifndef __HEMI_ARRAY_H__                                                        
 #define __HEMI_ARRAY_H__                                                        
 #include <hemi/array.h>                                                         
 #endif
+
+/**
+ * \typedef RNGState
+ * \brief Defines RNG for CURAND, ignored in CPU mode
+ */
+#ifdef __CUDACC__
+typedef curandStateXORWOW RNGState;
+#else
+typedef int RNGState;
+#endif
+
 
 namespace pdfz {
 
@@ -107,7 +126,8 @@ struct Systematic {
     SHIFT,
     SCALE,
     RESOLUTION_SCALE,
-    CTSCALE
+    CTSCALE,
+    OSCILLATION
   };
 
   Type type;
@@ -193,6 +213,25 @@ struct ResolutionScaleSystematic : public Systematic {
   hemi::Array<short>* pars;  // Parameters
 };
 
+/**
+ * \struct pdfz::OscillationSystematic
+ * \brief Fractionally alter the resolution of an observable by rescaling
+ *        its distance from a "true" value.
+ *
+ * Transform x' = p * x
+ *
+ *   where p = osc::LookUpTable(angle, mass, x, nutype)
+*/
+struct OscillationSystematic : public Systematic {
+ OscillationSystematic(int _obs, hemi::Array<short>* _pars, std::string _osc_lut)
+   : Systematic(OSCILLATION), obs(_obs), 
+    pars(_pars), osc_lut(_osc_lut) {}
+
+  int obs;  // Index of observable
+  hemi::Array<short>* pars;  // Parameters
+  std::string osc_lut; // Look Up Table name
+};
+
 
 struct CudaState; // Hide CUDA-related state from callers
 
@@ -250,6 +289,11 @@ public:
                                  int offset=0, int stride=1);
 
   /**
+   * Set an array of random number generators.
+   */
+  virtual void SetRNGBuffer(hemi::Array<RNGState>* rng);
+
+  /**
    * Set the output array where the PDF normalization will be written
    * for each point.
    *
@@ -276,7 +320,9 @@ public:
                                   int offset=0, int stride=1);
 
   /** Add a systematic transformation to this PDF */
-  virtual void AddSystematic(const Systematic& syst);
+  virtual void AddSystematic(const Systematic& syst, 
+			     const std::vector<double>& pee_lut = std::vector<double>(),
+			     const std::vector<double>& pee_pars = std::vector<double>());
 
   /**
    * Launch evaluation of the PDF at all the points given in the last call to
@@ -314,6 +360,8 @@ protected:
     int pdf_offset;
     int pdf_stride;
 
+    hemi::Array<RNGState>* rng_buffer;
+
     hemi::Array<unsigned int>* norm_buffer;
     int norm_offset;
 
@@ -322,6 +370,12 @@ protected:
     int param_stride;
 
     hemi::Array<SystematicDescriptor>* syst;
+
+    hemi::Array<double>* pee_osc_lut;
+    int pee_osc_lut_size;
+
+    hemi::Array<double>* pee_osc_lut_pars;
+    int pee_osc_lut_npars;
 
     CudaState* cuda_state;
 };
