@@ -215,12 +215,12 @@ struct ResolutionScaleSystematic : public Systematic {
 
 /**
  * \struct pdfz::OscillationSystematic
- * \brief Fractionally alter the resolution of an observable by rescaling
- *        its distance from a "true" value.
+ * \brief Decide to accept or reject an event based on a random number
+ *        generator and its comparison to the probability
  *
- * Transform x' = p * x
+ * Transform x' = (rand > p) * x
  *
- *   where p = osc::LookUpTable(angle, mass, x, nutype)
+ *   where p = LookUpTable(angle, mass, x, nutype)
 */
 struct OscillationSystematic : public Systematic {
  OscillationSystematic(int _obs, hemi::Array<short>* _pars, std::string _osc_lut)
