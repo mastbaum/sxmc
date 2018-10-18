@@ -173,9 +173,9 @@ void Signal::build_pdfz(std::vector<float> &samples, int nfields,
 	std::size_t isHep = (this->name).find("hep");
 	std::size_t isB8 = (this->name).find("b8");
 	if (isHep != std::string::npos)
-	  OscTable(lut_field, "hep", lut_pee, lut_pars);
+	  sxmc::osc::load_oscillation_table(lut_field, "hep", lut_pee, lut_pars);
 	else if (isB8 != std::string::npos)
-	  OscTable(lut_field, "b8", lut_pee, lut_pars);
+	  sxmc::osc::load_oscillation_table(lut_field, "b8", lut_pee, lut_pars);
 	else
 	  std::cerr << "Not an applicable signal for oscillation: " << this->name << std::endl;
       }
