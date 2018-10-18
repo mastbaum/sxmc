@@ -372,10 +372,7 @@ protected:
     hemi::Array<SystematicDescriptor>* syst;
 
     hemi::Array<double>* pee_osc_lut;
-    int pee_osc_lut_size;
-
     hemi::Array<double>* pee_osc_lut_pars;
-    int pee_osc_lut_npars;
 
     CudaState* cuda_state;
 };

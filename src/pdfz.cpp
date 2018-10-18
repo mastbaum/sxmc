@@ -194,8 +194,6 @@ void Eval::AddSystematic(const Systematic& syst,
     delete this->pee_osc_lut;
     this->pee_osc_lut =					\
       new hemi::Array<double>(pee_lut.size(), false);
-    
-    this->pee_osc_lut_size = pee_lut.size();
   
     for (unsigned int i = 0; i < pee_lut.size(); i++)
       this->pee_osc_lut->writeOnlyHostPtr()[i] = pee_lut[i];
@@ -208,7 +206,6 @@ void Eval::AddSystematic(const Systematic& syst,
     this->pee_osc_lut_pars =                                 \
       new hemi::Array<double>(pee_pars.size(), false);
 
-    this->pee_osc_lut_npars = pee_pars.size();
     for (unsigned int i = 0; i < pee_pars.size(); i++)
       this->pee_osc_lut_pars->writeOnlyHostPtr()[i] = pee_pars[i];
 
