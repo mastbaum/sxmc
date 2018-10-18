@@ -829,8 +829,7 @@ void EvalHist::OptimizeBin() {
     osc_par_ptr = this->pee_osc_lut_pars->readOnlyPtr();
   }
 
-  if (!this->rng_buffer)
-    std::cerr << "Optimize: No Random Number Generator available!" << std::endl;
+  assert(this->rng_buffer);
 
   // Force allocation of these buffers (since we are not calling the
   // zero bin kernel first)
