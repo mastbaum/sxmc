@@ -45,6 +45,7 @@ struct SystematicDescriptor {
   short type;
   short obs;
   short extra_field;
+  short extra_extra_field;
   short npars;
   short* pars;
   const char* osc_lut;
@@ -89,6 +90,24 @@ Eval::Eval(const std::vector<float>& _samples, int _nfields, int _nobservables,
   #else
   this->cuda_state->stream = 0;
   #endif
+
+  // Create a random number generator to pass to oscillation systematic if needed.
+  // Needs to run before optimization.
+  hemi::Array<RNGState>* rngs = new hemi::Array<RNGState>(1, true);
+  
+  // If compiling device code, initialize the RNGs
+#ifdef __CUDACC__
+  rngs->writeOnlyHostPtr();
+  int bs = 128;
+  int nb = 1;
+  assert(nb < 8);
+  init_device_rngs<<<nb, bs>>>(1,
+			       gRandom->GetSeed(),  // Random seed
+			       rngs->ptr());
+#else
+  rngs->writeOnlyHostPtr();
+#endif
+  this->SetRNGBuffer(rngs);
 
   // The handling of samples is up to the Eval subclass!
 }
@@ -176,8 +195,9 @@ void Eval::AddSystematic(const Systematic& syst,
   else if (syst.type == Systematic::OSCILLATION) {
     const OscillationSystematic &osc = \
       dynamic_cast<const OscillationSystematic&> (syst);
-    desc.obs = osc.obs;
-    desc.extra_field = 0;
+    desc.obs = 0;
+    desc.extra_field = osc.truth;
+    desc.extra_extra_field = osc.pid;
     desc.osc_lut = (osc.osc_lut).c_str();
     desc.npars = osc.pars->size();
     assert(desc.npars == 2);
@@ -386,7 +406,6 @@ void apply_oscillation_systematic(const SystematicDescriptor* syst,
   // Pull the index from the lut and apply
   double theta = parameters[syst->pars[0] * param_stride];
   double mass = parameters[syst->pars[1] * param_stride];
-  
   // pee_osc_lut_pars
   // theta: min-0, max-1, nstep-2, step-3
   double tempindex = (theta - pee_osc_lut_pars[0]) / pee_osc_lut_pars[3];
@@ -401,7 +420,7 @@ void apply_oscillation_systematic(const SystematicDescriptor* syst,
   if (mass < pee_osc_lut_pars[4]) m_index = 0;   // Below minimum
   if (m_index >= pee_osc_lut_pars[6]) m_index = (int)pee_osc_lut_pars[6] - 1;   // Above maximum
   // energy: min-8, max-9, nstep-10, step-11
-  double energy = fields[syst->obs];
+  double energy = fields[syst->extra_field];
   // Skip crazy energies seen in setup.
   if (energy > 40) return;
   tempindex = (energy - pee_osc_lut_pars[8]) / pee_osc_lut_pars[11];
@@ -420,14 +439,22 @@ void apply_oscillation_systematic(const SystematicDescriptor* syst,
 
     // Generate a uniform random number to compare to probability of oscillation
 #ifdef HEMI_DEV_CODE
-  double rand_num = curand_uniform(&rng[0]);//syst->pars[0] * param_stride]);
+  double rand_num = curand_uniform(&rng[0]);
 #else
   double rand_num = gRandom->Uniform();
 #endif
 
   // Reject event if the random number is bigger than the survival probability.
-  if (pee_osc_lut[index] < rand_num) reject_event = 0;
-  else reject_event = 1;
+  if (pee_osc_lut[index] < rand_num) {
+    reject_event = 0;
+  }
+  else {
+    reject_event = 1;
+  }
+
+  if (fabs(fields[syst->extra_extra_field] - 32) < 0.01) {
+    reject_event = 1 - reject_event;
+  }
 }
 
 
@@ -486,15 +513,16 @@ HEMI_KERNEL(bin_samples)(int ndata, const float* data,
 
     // Apply systematics
     for (int isyst=0; isyst<nsyst; isyst++) {
-      if ( (syst+isyst)->type != Systematic::OSCILLATION)
+      if ((syst+isyst)->type != Systematic::OSCILLATION) {
 	apply_systematic(syst + isyst, field_buffer, parameters,
 			 param_stride);
-      else
-      apply_oscillation_systematic(syst + isyst, field_buffer, parameters,
-				   param_stride, pee_osc_lut, pee_osc_lut_size,
-				   pee_osc_lut_pars, pee_osc_lut_npars,
-				   reject_event, rng);
-
+      }
+      else {
+        apply_oscillation_systematic(syst + isyst, field_buffer, parameters,
+                                     param_stride, pee_osc_lut, pee_osc_lut_size,
+                                     pee_osc_lut_pars, pee_osc_lut_npars,
+                                     reject_event, rng);
+      }
     }
 
     // Reject event if weight is 0 (nu_e didn't survive).
@@ -555,24 +583,6 @@ HEMI_KERNEL(eval_pdf)(int npoints, const int* read_bins,
 
 
 void EvalHist::EvalAsync(bool do_eval_pdf) {
-
-  // Create a random number generator to pass to oscillation systematic if needed.
-  // Needs to run before optimization.
-  hemi::Array<RNGState>* rngs = new hemi::Array<RNGState>(1, true);
-  
-  // If compiling device code, initialize the RNGs
-#ifdef __CUDACC__
-  rngs->writeOnlyHostPtr();
-  int bs = 128;
-  int nb = 1;
-  assert(nb < 8);
-  init_device_rngs<<<nb, bs>>>(1,
-			       gRandom->GetSeed(),  // Random seed
-			       rngs->ptr());
-#else
-  rngs->writeOnlyHostPtr();
-#endif
-  this->SetRNGBuffer(rngs);
 
   if (this->needs_optimization) {
     this->Optimize();
@@ -1095,9 +1105,22 @@ TH1* EvalHist::DefaultHistogram() {
   norms_buffer.writeOnlyDevicePtr();
   SetNormalizationBuffer(&norms_buffer);
   if (this->syst) {
-    hemi::Array<double> params_buffer(this->syst->size(), true);
+    size_t n = 0;
     for (size_t i=0; i<this->syst->size(); i++){
-      params_buffer.writeOnlyHostPtr()[i] = 0;
+      n += this->syst->readOnlyHostPtr()[i].npars;
+    }
+    
+    hemi::Array<double> params_buffer(n, true);
+    n = 0;
+    for (size_t i=0; i<this->syst->size(); i++) {
+      for (int j=0; j<this->syst->readOnlyHostPtr()[i].npars; j++) {
+        if (false) { //this->syst->readOnlyHostPtr()[i].type == Systematic::OSCILLATION) {
+          params_buffer.writeOnlyHostPtr()[n++] = this->syst->readOnlyHostPtr()[i].pars[j];
+        }
+        else {
+          params_buffer.writeOnlyHostPtr()[n++] = 0;
+        }
+      }
     }
     params_buffer.writeOnlyDevicePtr();
     SetParameterBuffer(&params_buffer);

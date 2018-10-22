@@ -3,8 +3,7 @@
 
 /**
  * \file config.h
- *
- * Fit configuration management and config file parsing.
+ * \brief Fit configuration management and config file parsing.
 */
 
 #include <map>
@@ -42,8 +41,8 @@ public:
   unsigned nexperiments;  //!< Number of experiments in ensemble
   unsigned nsteps;  //!< Number of MCMC steps
   float confidence;  //!< Confidence level for results (e.g. 0.9)
-  float burnin_fraction;  //!< Fraction of steps to use for burn-in period
-  bool debug_mode;  //!< Enable/disable debugging mode (accept/save all)
+  float burnin_fraction;  //!< Fraction of steps to use for burn-in periods
+  bool debug_mode;  //!< Enable/disable debugging mode (accept/save all steps)
   bool plots;  //!< Write out fit plots and PDF root files
   bool sensitivity;  //!< Sensitivity mode, no signal in fake data
   long seed;  //!< RNG seed

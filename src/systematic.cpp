@@ -36,6 +36,10 @@ Systematic::Systematic(const std::string _name, const Json::Value& config)
     this->type = pdfz::Systematic::OSCILLATION;
     assert(config.isMember("osc_lut"));
     this->osc_lut = config["osc_lut"].asString();
+    assert(config.isMember("truth_field"));
+    this->truth_field = config["truth_field"].asString();
+    assert(config.isMember("pid_field"));
+    this->pid_field = config["pid_field"].asString();
   }
   else {
     std::cerr << "FitConfig::load_pdf_systematics: Unknown systematic type "
@@ -81,9 +85,14 @@ void Systematic::print() const {
             << "    Type: " << this->type << std::endl
             << "    Observable: " << this->observable_field
             << " (index " << this->observable_field_index << ")" << std::endl;
-  if (this->type == pdfz::Systematic::RESOLUTION_SCALE) {
+  if (this->type == pdfz::Systematic::RESOLUTION_SCALE ||
+      this->type == pdfz::Systematic::OSCILLATION) {
     std::cout << "    Truth: " << this->truth_field
             << " (index " << this->truth_field_index << ")" << std::endl;
+  }
+  if (this->type == pdfz::Systematic::OSCILLATION) {
+    std::cout << "    PID: " << this->pid_field
+            << " (index " << this->pid_field_index << ")" << std::endl;
   }
   std::cout << "    Means: ";
   for (size_t i=0; i<this->npars; i++) {

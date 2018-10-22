@@ -16,6 +16,9 @@
 #include <sxmc/signal.h>
 #include <sxmc/utils.h>
 
+#include <TFile.h>
+#include <TParameter.h>
+
 FitConfig::FitConfig(std::string filename) {
   // Read JSON configuration file
   Json::Reader reader;
@@ -29,12 +32,13 @@ FitConfig::FitConfig(std::string filename) {
   if (!parse_ok) {
     std::cerr  << "FitConfig::FitConfig: JSON parse error:" << std::endl
                << reader.getFormattedErrorMessages();
-    throw(1);
+    assert(parse_ok);
   }
 
   const Json::Value fit_params = root["fit"];
-  const Json::Value obs_params = root["pdfs"]["observables"];
-  const Json::Value sys_params = root["pdfs"]["systematics"];
+  const Json::Value pdf_params = root["pdfs"];
+  const Json::Value obs_params = pdf_params["observables"];
+  const Json::Value sys_params = pdf_params["systematics"];
   const Json::Value rate_params = root["rates"];
   const Json::Value sig_params = root["signals"];
   const Json::Value src_params = root["sources"];
@@ -49,6 +53,7 @@ FitConfig::FitConfig(std::string filename) {
   assert(this->nsteps > 0);
 
   this->samples = fit_params.get("samples", "").asString();
+
   std::string err_type = fit_params.get("error_type", "contour").asString();
   if (err_type == "projection") {
     this->error_type = ERROR_PROJECTION;
@@ -84,9 +89,9 @@ FitConfig::FitConfig(std::string filename) {
   for (Json::Value::const_iterator it=fit_params["cuts"].begin();
        it!=fit_params["cuts"].end(); ++it) {
     std::string name = (*it).asString();
-    assert(obs_params.isMember(name));
+    assert(obs_params.isMember(name));  // Must be a defined observable...
     for (size_t j=0; j<this->observables.size(); j++) {
-      assert(this->observables[j].name != name);
+      assert(this->observables[j].name != name);  // ...not used in the fit
     }
     this->cuts.push_back(Observable(name, obs_params[name]));
   }
@@ -189,6 +194,17 @@ FitConfig::FitConfig(std::string filename) {
       this->systematics[i].truth_field_index = \
         get_index_with_append<std::string>(this->sample_fields, field_name);
     }
+
+    // For oscillations, store fields for true Enu and the neutrino PID code
+    if (this->systematics[i].type == pdfz::Systematic::OSCILLATION) {
+      field_name = this->systematics[i].truth_field;
+      this->systematics[i].truth_field_index = \
+        get_index_with_append<std::string>(this->sample_fields, field_name);
+
+      field_name = this->systematics[i].pid_field;
+      this->systematics[i].pid_field_index = \
+        get_index_with_append<std::string>(this->sample_fields, field_name);
+    }
   }
 
   // Add dataset tag to sample fields
@@ -209,23 +225,33 @@ FitConfig::FitConfig(std::string filename) {
 
     this->datasets.insert(dataset);
 
-    assert((!config.isMember("rate") &&  config.isMember("scale")) ||
-           ( config.isMember("rate") && !config.isMember("scale")));
-
-    float nexpected = 0;
-    if (config.isMember("rate")) {
-      nexpected = config["rate"].asFloat();
-    }
-    else {
-      // (-) tells Signal to scale by the total number of samples
-      nexpected = -1.0 / config["scale"].asFloat();
-    }
-
     assert(config.isMember("title"));
     std::string title = config["title"].asString();
 
     assert(config.isMember("filename"));
     std::string filename = config["filename"].asString();
+
+    //assert((!config.isMember("rate") &&  config.isMember("scale")) ||
+    //       ( config.isMember("rate") && !config.isMember("scale")));
+
+    float nexpected = 0;
+    if (config.isMember("rate")) {
+      // Rate is specified by the user
+      nexpected = config["rate"].asFloat();
+    }
+    else if (config.isMember("scale")) {
+      // (-) tells Signal to scale by the total number of samples
+      nexpected = -1.0 / config["scale"].asFloat();
+    }
+    else {
+      // Try to read the scale factor from the file
+      TFile ff(filename.c_str());
+      TParameter<float>* scale = (TParameter<float>*) ff.Get("scale");
+      assert(scale);
+      std::cout << "FitConfig: Found scale: " << scale->GetVal() << std::endl;
+      nexpected = -1.0 * scale->GetVal();
+      ff.Close();
+    }
 
     // Systematics
     std::vector<Systematic> systs;

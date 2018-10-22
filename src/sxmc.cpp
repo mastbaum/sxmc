@@ -45,6 +45,7 @@
  * \returns A list of the upper limits
  */
 std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
+/*
   if (fc.plots && fc.samples == "") {
     for (size_t i=0; i<fc.signals.size(); i++) {
       const char* output_file = \
@@ -56,7 +57,7 @@ std::vector<float> ensemble(FitConfig& fc, std::string output_path) {
       f1.Close();
     }
   }
-
+*/
   std::vector<float> limits;
 
   for (unsigned i=0; i<fc.nexperiments; i++) {

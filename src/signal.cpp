@@ -140,10 +140,12 @@ void Signal::build_pdfz(std::vector<float> &samples, int nfields,
     hemi::Array<short>* pars = new hemi::Array<short>(syst->npars, true);
     for (unsigned i=0; i<syst->pidx.size(); i++) {
       pars->writeOnlyHostPtr()[i] = syst->pidx[i];
+std::cout << syst->name << " " << i << " " << syst->pidx[i] << std::endl;
     }
 
     size_t o_field = syst->observable_field_index;
     size_t t_field = syst->truth_field_index;
+    size_t p_field = syst->pid_field_index;
 
     if (syst->type == pdfz::Systematic::SHIFT) {
       this->histogram->AddSystematic(
@@ -180,7 +182,7 @@ void Signal::build_pdfz(std::vector<float> &samples, int nfields,
 	  std::cerr << "Not an applicable signal for oscillation: " << this->name << std::endl;
       }
       this->histogram->AddSystematic(
-       pdfz::OscillationSystematic(o_field, pars, lut_field), lut_pee, lut_pars);
+       pdfz::OscillationSystematic(t_field, p_field, pars, lut_field), lut_pee, lut_pars);
     }
     else {
       std::cerr << "Signal::build_pdfz: Unknown systematic ID "

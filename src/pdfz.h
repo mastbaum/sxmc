@@ -223,11 +223,12 @@ struct ResolutionScaleSystematic : public Systematic {
  *   where p = LookUpTable(angle, mass, x, nutype)
 */
 struct OscillationSystematic : public Systematic {
- OscillationSystematic(int _obs, hemi::Array<short>* _pars, std::string _osc_lut)
-   : Systematic(OSCILLATION), obs(_obs), 
+ OscillationSystematic(int _truth, int _pid, hemi::Array<short>* _pars, std::string _osc_lut)
+   : Systematic(OSCILLATION), truth(_truth), pid(_pid), 
     pars(_pars), osc_lut(_osc_lut) {}
 
-  int obs;  // Index of observable
+  int truth;  // Index of truth energy
+  int pid;  // Index of PID
   hemi::Array<short>* pars;  // Parameters
   std::string osc_lut; // Look Up Table name
 };
