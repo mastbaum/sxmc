@@ -140,7 +140,6 @@ void Signal::build_pdfz(std::vector<float> &samples, int nfields,
     hemi::Array<short>* pars = new hemi::Array<short>(syst->npars, true);
     for (unsigned i=0; i<syst->pidx.size(); i++) {
       pars->writeOnlyHostPtr()[i] = syst->pidx[i];
-std::cout << syst->name << " " << i << " " << syst->pidx[i] << std::endl;
     }
 
     size_t o_field = syst->observable_field_index;
