@@ -1114,12 +1114,7 @@ TH1* EvalHist::DefaultHistogram() {
     n = 0;
     for (size_t i=0; i<this->syst->size(); i++) {
       for (int j=0; j<this->syst->readOnlyHostPtr()[i].npars; j++) {
-        if (false) { //this->syst->readOnlyHostPtr()[i].type == Systematic::OSCILLATION) {
-          params_buffer.writeOnlyHostPtr()[n++] = this->syst->readOnlyHostPtr()[i].pars[j];
-        }
-        else {
-          params_buffer.writeOnlyHostPtr()[n++] = 0;
-        }
+        params_buffer.writeOnlyHostPtr()[n++] = 0;
       }
     }
     params_buffer.writeOnlyDevicePtr();

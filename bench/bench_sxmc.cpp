@@ -47,7 +47,10 @@ void bench_pdfz() {
   std::vector<double> upper(1);
   std::vector<int> nbins_vec(1);
 
-  pdfz::ShiftSystematic shift(0,0);
+  hemi::Array<short> pars(0, true);
+  pars.writeOnlyHostPtr();
+
+  pdfz::ShiftSystematic shift(0, &pars);
 
   lower[0] = -3.0f;
   upper[0] = 3.0f;
@@ -55,9 +58,8 @@ void bench_pdfz() {
 
   std::vector<float> samples(nsamples);
   fill_gaussian(samples);
-  std::vector<int> weights(samples.size(), 1);
 
-  pdfz::EvalHist evaluator(samples, weights, 1, 1, lower, upper, nbins_vec);
+  pdfz::EvalHist evaluator(samples, 1, 1, lower, upper, nbins_vec);
 
   // Setup for evaluation
   vector<float> eval_points(neval_points);
@@ -110,8 +112,10 @@ void bench_pdfz_group() {
   std::vector<double> lower(1);
   std::vector<double> upper(1);
   std::vector<int> nbins_vec(1);
+  hemi::Array<short> pars(0, true);
+  pars.writeOnlyHostPtr();
 
-  pdfz::ShiftSystematic shift(0,0);
+  pdfz::ShiftSystematic shift(0, &pars);
 
   lower[0] = -3.0f;
   upper[0] = 3.0f;
@@ -185,9 +189,8 @@ void bench_pdfz_group() {
   for (int i=0; i<nsignals; i++) {
     samples.resize(nsamples[i]);
     fill_gaussian(samples);
-    std::vector<int> weights(nsamples[i], 1);
     pdfz::EvalHist* evaluator = \
-      new pdfz::EvalHist(samples, weights, 1, 1, lower, upper, nbins_vec);
+      new pdfz::EvalHist(samples, 1, 1, lower, upper, nbins_vec);
 
     evaluator->SetEvalPoints(eval_points);
     evaluator->SetPDFValueBuffer(&pdf_values, neval_points * i);
