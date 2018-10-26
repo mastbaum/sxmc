@@ -67,7 +67,8 @@ FitConfig::FitConfig(std::string filename) {
     assert(false);
   }
 
-  this->burnin_fraction = fit_params.get("burnin_fraction", 0.1).asFloat();
+  this->burnin_fraction = fit_params.get("burnin_fraction", 0.15).asFloat();
+  this->mc_scale = fit_params.get("mc_scale", 1.0).asFloat();
   this->debug_mode = fit_params.get("debug_mode", false).asBool();
   this->output_prefix = fit_params.get("output_prefix", "lspace").asString();
   this->plots = fit_params.get("plots", true).asBool();
@@ -237,11 +238,11 @@ FitConfig::FitConfig(std::string filename) {
     float nexpected = 0;
     if (config.isMember("rate")) {
       // Rate is specified by the user
-      nexpected = config["rate"].asFloat();
+      nexpected = config["rate"].asFloat() * this->mc_scale;
     }
     else if (config.isMember("scale")) {
       // (-) tells Signal to scale by the total number of samples
-      nexpected = -1.0 / config["scale"].asFloat();
+      nexpected = -1.0 / (config["scale"].asFloat() * this->mc_scale);
     }
     else {
       // Try to read the scale factor from the file
@@ -249,7 +250,7 @@ FitConfig::FitConfig(std::string filename) {
       TParameter<float>* scale = (TParameter<float>*) ff.Get("scale");
       assert(scale);
       std::cout << "FitConfig: Found scale: " << scale->GetVal() << std::endl;
-      nexpected = -1.0 * scale->GetVal();
+      nexpected = -1.0 * (scale->GetVal() / this->mc_scale);
       ff.Close();
     }
 
@@ -329,6 +330,7 @@ void FitConfig::print() const {
     << "  Number of experiments: " << this->nexperiments << std::endl
     << "  MCMC steps: " << this->nsteps << std::endl
     << "  Burn-in fraction: " << this->burnin_fraction << std::endl
+    << "  MC Scale: " << this->mc_scale << std::endl
     << "  Random seed (0=random): " << this->seed << std::endl
     << "  Confidence level: " << this->confidence << std::endl;
 
