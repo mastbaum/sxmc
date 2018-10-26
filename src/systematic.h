@@ -36,6 +36,7 @@ public:
   size_t npars;  //!< Number of parameters in power series
   std::vector<short> pidx;  //!< Global index for pdfz parameter array offsetting
   pdfz::Systematic::Type type;  //!< The type of systematic
+  std::string osc_lut;  //!< Name of oscillation look up table
   bool fixed;  //! Fix the value of the parameter to the mean
 };
 

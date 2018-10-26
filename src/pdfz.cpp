@@ -7,10 +7,13 @@
 #include <TH1D.h>
 #include <TH2D.h>
 #include <TH3D.h>
+#include <string>
+#include <vector>
 
 #include <sxmc/utils.h>
 #include <sxmc/pdfz.h>
 #include <sxmc/cuda_compat.h>
+#include <sxmc/nll_kernels.h>
 
 namespace pdfz {
 
@@ -44,6 +47,7 @@ struct SystematicDescriptor {
   short extra_field;
   short npars;
   short* pars;
+  const char* osc_lut;
 };
 
 
@@ -53,7 +57,7 @@ Eval::Eval(const std::vector<float>& _samples, int _nfields, int _nobservables,
            unsigned _dataset)
     : nfields(_nfields), nobservables(_nobservables),
       lower(_lower.size(), true), upper(_upper.size(), true),
-      dataset(_dataset), syst(NULL) {
+      dataset(_dataset), syst(NULL), pee_osc_lut(NULL), pee_osc_lut_pars(NULL) {
   if (_samples.size() % _nfields != 0) {
     throw Error("Length of samples array is not divisible by number of fields.");
   }
@@ -103,6 +107,10 @@ void Eval::SetPDFValueBuffer(hemi::Array<float>* output,
   this->pdf_stride = stride;
 }
 
+void Eval::SetRNGBuffer(hemi::Array<RNGState>* rng) {
+  this->rng_buffer = rng;
+}
+
 void Eval::SetNormalizationBuffer(hemi::Array<unsigned int>* norm,
                                   int offset) {
   this->norm_buffer = norm;
@@ -116,7 +124,9 @@ void Eval::SetParameterBuffer(hemi::Array<double>* params,
   this->param_stride = stride;
 }
 
-void Eval::AddSystematic(const Systematic& syst) {
+void Eval::AddSystematic(const Systematic& syst, 
+			 const std::vector<double>& pee_lut, 
+			 const std::vector<double>& pee_pars) {
   if (this->syst) {
     resize_array(*(this->syst), this->syst->size() + 1);
   }
@@ -132,6 +142,7 @@ void Eval::AddSystematic(const Systematic& syst) {
       dynamic_cast<const ShiftSystematic&>(syst);
     desc.obs = shift.obs;
     desc.extra_field = 0;
+    desc.osc_lut = "";
     desc.npars = shift.pars->size();
     desc.pars = shift.pars->ptr();
   }
@@ -140,6 +151,7 @@ void Eval::AddSystematic(const Systematic& syst) {
       dynamic_cast<const ScaleSystematic&>(syst);
     desc.obs = scale.obs;
     desc.extra_field = 0;
+    desc.osc_lut = "";
     desc.npars = scale.pars->size();
     desc.pars = scale.pars->ptr();
   }
@@ -148,6 +160,7 @@ void Eval::AddSystematic(const Systematic& syst) {
       dynamic_cast<const CosThetaScaleSystematic&>(syst);
     desc.obs = ctscale.obs;
     desc.extra_field = 0;
+    desc.osc_lut = "";
     desc.npars = ctscale.pars->size();
     desc.pars = ctscale.pars->ptr();
   }
@@ -156,16 +169,48 @@ void Eval::AddSystematic(const Systematic& syst) {
       dynamic_cast<const ResolutionScaleSystematic&>(syst);
     desc.obs = res.obs;
     desc.extra_field = res.true_obs;
+    desc.osc_lut = "";
     desc.npars = res.pars->size();
     desc.pars = res.pars->ptr();
+  }
+  else if (syst.type == Systematic::OSCILLATION) {
+    const OscillationSystematic &osc = \
+      dynamic_cast<const OscillationSystematic&> (syst);
+    desc.obs = osc.obs;
+    desc.extra_field = 0;
+    desc.osc_lut = (osc.osc_lut).c_str();
+    desc.npars = osc.pars->size();
+    assert(desc.npars == 2);
+    desc.pars = osc.pars->ptr();
   }
   else {
     throw Error("Unknown systematic type");
   }
 
   this->syst->writeOnlyHostPtr()[this->syst->size() - 1] = desc;
-}
 
+  // Write the Oscillation look up table to the pdfz EvalHist object.
+  if (pee_lut.size() > 0) {
+    delete this->pee_osc_lut;
+    this->pee_osc_lut =					\
+      new hemi::Array<double>(pee_lut.size(), false);
+  
+    for (unsigned int i = 0; i < pee_lut.size(); i++)
+      this->pee_osc_lut->writeOnlyHostPtr()[i] = pee_lut[i];
+    
+    if (pee_pars.size() == 0)
+      std::cerr << "pdfz: AddSystematic: No oscillation table parameters are being passed!" << std::endl;
+
+    // Assign the parameters to an array.
+    delete this->pee_osc_lut_pars;
+    this->pee_osc_lut_pars =                                 \
+      new hemi::Array<double>(pee_pars.size(), false);
+
+    for (unsigned int i = 0; i < pee_pars.size(); i++)
+      this->pee_osc_lut_pars->writeOnlyHostPtr()[i] = pee_pars[i];
+
+  }
+}
 
 ///////////////////// EvalHist ///////////////////////
 
@@ -294,7 +339,6 @@ void EvalHist::SetEvalPoints(const std::vector<float>& points) {
   }
 }
 
-
 ///// EvalHist kernels
 HEMI_DEV_CALLABLE_INLINE
 void apply_systematic(const SystematicDescriptor* syst,
@@ -305,7 +349,6 @@ void apply_systematic(const SystematicDescriptor* syst,
     p += (parameters[syst->pars[i] * param_stride] *
           pow(fields[syst->obs], (double) i));
   }
-
   switch (syst->type) {
     case Systematic::SHIFT:
       fields[syst->obs] += p;
@@ -321,6 +364,70 @@ void apply_systematic(const SystematicDescriptor* syst,
         (p * (fields[syst->obs] - fields[syst->extra_field]));
       break;
   }
+}
+
+///// EvalHist kernels
+HEMI_DEV_CALLABLE_INLINE
+void apply_oscillation_systematic(const SystematicDescriptor* syst,
+				  double* fields, const double* parameters,
+				  const int param_stride,
+				  const double* pee_osc_lut, const int pee_osc_lut_size,
+				  const double* pee_osc_lut_pars, const int pee_osc_lut_npars,
+				  int &reject_event, RNGState* rng) {
+  if (pee_osc_lut_size == 0) {
+    printf("pdfz::apply_systematic: Something is seriously wrong with the look up table!\n");
+    return;
+  }
+  if (pee_osc_lut_npars != 12) {
+    printf("pdfz::apply_systematic: Something is seriously wrong with the parameters in the look up table!\n");
+    return;
+  }
+  // Use the pull p0 and p1 with fields[syst->obs] to find the index.
+  // Pull the index from the lut and apply
+  double theta = parameters[syst->pars[0] * param_stride];
+  double mass = parameters[syst->pars[1] * param_stride];
+  
+  // pee_osc_lut_pars
+  // theta: min-0, max-1, nstep-2, step-3
+  double tempindex = (theta - pee_osc_lut_pars[0]) / pee_osc_lut_pars[3];
+  int t_index = (int)tempindex;
+  if (tempindex - t_index > 0.5) t_index++;
+  if (theta < pee_osc_lut_pars[0]) t_index = 0;   // Below minimum
+  if (t_index >= pee_osc_lut_pars[2]) t_index = (int)pee_osc_lut_pars[2] - 1;   // Above maximum
+  // mass: min-4, max-5, nstep-6, step-7
+  tempindex = (mass - pee_osc_lut_pars[4]) / pee_osc_lut_pars[7];
+  int m_index = (int)tempindex;
+  if (tempindex - m_index > 0.5) m_index++;
+  if (mass < pee_osc_lut_pars[4]) m_index = 0;   // Below minimum
+  if (m_index >= pee_osc_lut_pars[6]) m_index = (int)pee_osc_lut_pars[6] - 1;   // Above maximum
+  // energy: min-8, max-9, nstep-10, step-11
+  double energy = fields[syst->obs];
+  // Skip crazy energies seen in setup.
+  if (energy > 40) return;
+  tempindex = (energy - pee_osc_lut_pars[8]) / pee_osc_lut_pars[11];
+  int e_index = (int) tempindex;
+  if (tempindex - e_index > 0.5) e_index++;
+  if (energy < pee_osc_lut_pars[8]) e_index = 0;   // Below minimum
+  if (e_index >= pee_osc_lut_pars[10]) e_index = (int)pee_osc_lut_pars[10] - 1;   // Above maximum
+
+  // Calculate the total index from the theta/mass/energy indices
+  int index = t_index*pee_osc_lut_pars[2]*pee_osc_lut_pars[2] + m_index*pee_osc_lut_pars[6] + e_index;
+  
+  if (index > pee_osc_lut_size) {
+    printf("pdfz::apply_systematic: Something is way wrong here\n");
+    return;
+  }
+
+    // Generate a uniform random number to compare to probability of oscillation
+#ifdef HEMI_DEV_CODE
+  double rand_num = curand_uniform(&rng[0]);//syst->pars[0] * param_stride]);
+#else
+  double rand_num = gRandom->Uniform();
+#endif
+
+  // Reject event if the random number is bigger than the survival probability.
+  if (pee_osc_lut[index] < rand_num) reject_event = 0;
+  else reject_event = 1;
 }
 
 
@@ -349,7 +456,10 @@ HEMI_KERNEL(bin_samples)(int ndata, const float* data,
                          const SystematicDescriptor* __restrict__ syst,
                          const double* __restrict__ parameters,
                          const int param_stride,
-                         unsigned int* bins, unsigned int* norm) {
+                         unsigned int* bins, unsigned int* norm,
+			 const int pee_osc_lut_size, const double* pee_osc_lut, 
+			 const int pee_osc_lut_npars, const double* pee_osc_lut_pars,
+			 RNGState* rng) {
   int offset = hemiGetElementOffset();
   int stride = hemiGetElementStride();
   double field_buffer[MAX_NFIELDS];
@@ -371,11 +481,24 @@ HEMI_KERNEL(bin_samples)(int ndata, const float* data,
       field_buffer[ifield] = data[isample * nfields + ifield];
     }
 
+    // The oscillation systematic will accept (1) or reject (0) the event based on probabilities.
+    int reject_event = 1;
+
     // Apply systematics
     for (int isyst=0; isyst<nsyst; isyst++) {
-      apply_systematic(syst + isyst, field_buffer, parameters,
-                       param_stride);
+      if ( (syst+isyst)->type != Systematic::OSCILLATION)
+	apply_systematic(syst + isyst, field_buffer, parameters,
+			 param_stride);
+      else
+      apply_oscillation_systematic(syst + isyst, field_buffer, parameters,
+				   param_stride, pee_osc_lut, pee_osc_lut_size,
+				   pee_osc_lut_pars, pee_osc_lut_npars,
+				   reject_event, rng);
+
     }
+
+    // Reject event if weight is 0 (nu_e didn't survive).
+    if (reject_event == 0) continue;
 
     // Compute histogram bin
     for (int iobs=0; iobs<nobs; iobs++) {
@@ -432,6 +555,25 @@ HEMI_KERNEL(eval_pdf)(int npoints, const int* read_bins,
 
 
 void EvalHist::EvalAsync(bool do_eval_pdf) {
+
+  // Create a random number generator to pass to oscillation systematic if needed.
+  // Needs to run before optimization.
+  hemi::Array<RNGState>* rngs = new hemi::Array<RNGState>(1, true);
+  
+  // If compiling device code, initialize the RNGs
+#ifdef __CUDACC__
+  rngs->writeOnlyHostPtr();
+  int bs = 128;
+  int nb = 1;
+  assert(nb < 8);
+  init_device_rngs<<<nb, bs>>>(1,
+			       gRandom->GetSeed(),  // Random seed
+			       rngs->ptr());
+#else
+  rngs->writeOnlyHostPtr();
+#endif
+  this->SetRNGBuffer(rngs);
+
   if (this->needs_optimization) {
     this->Optimize();
   }
@@ -442,6 +584,20 @@ void EvalHist::EvalAsync(bool do_eval_pdf) {
   if (this->syst) {
     nsyst = this->syst->size();
     syst_ptr = this->syst->readOnlyPtr();
+  }
+
+  // Handle no oscillation table case
+  int nosc = 0;
+  const double* osc_ptr = NULL;
+  if (this->pee_osc_lut) {
+    nosc = this->pee_osc_lut->size();
+    osc_ptr = this->pee_osc_lut->readOnlyPtr();
+  }
+  int noscpars = 0;
+  const double* osc_par_ptr = NULL;
+  if (this->pee_osc_lut_pars) {
+    noscpars = this->pee_osc_lut_pars->size();
+    osc_par_ptr = this->pee_osc_lut_pars->readOnlyPtr();
   }
 
   HEMI_KERNEL_LAUNCH(zero_hist, this->eval_nblocks,
@@ -460,8 +616,9 @@ void EvalHist::EvalAsync(bool do_eval_pdf) {
                      nsyst, syst_ptr,
                      this->param_buffer->readOnlyPtr() + this->param_offset,
                      this->param_stride, this->bins->ptr(),
-                     this->norm_buffer->writeOnlyPtr() + this->norm_offset);
-
+                     this->norm_buffer->writeOnlyPtr() + this->norm_offset,
+		     nosc, osc_ptr, noscpars, osc_par_ptr,
+		     this->rng_buffer->ptr());
   // This can happen if someone wants to create a histogram
   // with no eval points.
   if (this->read_bins == 0 || !do_eval_pdf) {
@@ -658,6 +815,22 @@ void EvalHist::OptimizeBin() {
     syst_ptr = this->syst->readOnlyPtr();
   }
 
+  // Handle no oscillation table case
+  int nosc = 0;
+  const double* osc_ptr = NULL;
+  if (this->pee_osc_lut) {
+    nosc = this->pee_osc_lut->size();
+    osc_ptr = this->pee_osc_lut->readOnlyPtr();
+  }
+  int noscpars = 0;
+  const double* osc_par_ptr = NULL;
+  if (this->pee_osc_lut_pars) {
+    noscpars = this->pee_osc_lut_pars->size();
+    osc_par_ptr = this->pee_osc_lut_pars->readOnlyPtr();
+  }
+
+  assert(this->rng_buffer);
+
   // Force allocation of these buffers (since we are not calling the
   // zero bin kernel first)
   this->bins->writeOnlyPtr(); 
@@ -694,7 +867,9 @@ void EvalHist::OptimizeBin() {
                             this->param_offset),
                            this->param_stride, this->bins->ptr(),
                            (this->norm_buffer->writeOnlyPtr() +
-                            this->norm_offset));
+                            this->norm_offset),
+			   nosc, osc_ptr, noscpars, osc_par_ptr,
+			   this->rng_buffer->ptr());
       }
 
       checkCuda(cudaStreamSynchronize(this->cuda_state->stream));
